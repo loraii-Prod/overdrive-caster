@@ -4,7 +4,7 @@ import { RtcViewer } from './rtcViewer';
 import type { Role } from '../../shared/protocol';
 import type { CasterId, RunOfShow, Scene, Show } from '../../shared/types';
 import type { Tournament } from '../../shared/tournament';
-import type { BnlData } from '../components/show/BnlGraphics';
+import type { MatchData } from '../../shared/protocol';
 
 export function useSocket(hello: { role: Role; route?: string; slot?: CasterId; key?: string }) {
   const sock = useMemo(() => new Socket(hello), []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -69,9 +69,9 @@ export function useRos(sock: Socket) {
   return r;
 }
 
-export function useBnl(sock: Socket) {
-  const [d, setD] = useState<BnlData | null>(null);
-  useEffect(() => sock.on(m => { if (m.t === 'bnl') setD({ league: m.league, playoffs: m.playoffs, names: m.names, info: m.info ?? {}, sheet: m.sheet }); }), [sock]);
+export function useMatchData(sock: Socket) {
+  const [d, setD] = useState<MatchData | null>(null);
+  useEffect(() => sock.on(m => { if (m.t === 'match-data') setD({ names: m.names, info: m.info ?? {}, sheet: m.sheet }); }), [sock]);
   return d;
 }
 

@@ -1,11 +1,10 @@
 import type { Show } from '../../../shared/types';
-import type { QuickOp } from '../../../shared/protocol';
-import type { BnlData } from '../../components/show/BnlGraphics';
+import type { MatchData, QuickOp } from '../../../shared/protocol';
 import { fmtLeft, resolveNextMatch } from '../../components/show/NextMatch';
 import { Label, Segmented, Switch, TextField } from './ui';
 
 /** Always-on "next match" counter. Changes are instant (no TAKE). */
-export function NextMatchPanel({ live, quick, bnl, now }: { live: Show; quick: (op: QuickOp) => void; bnl: BnlData | null; now: number }) {
+export function NextMatchPanel({ live, quick, bnl, now }: { live: Show; quick: (op: QuickOp) => void; bnl: MatchData | null; now: number }) {
   const nm = live.nextMatch;
   const set = (patch: Partial<Show['nextMatch']>) => quick({ k: 'next-match', patch });
   const auto = resolveNextMatch({ ...live, nextMatch: { ...nm, label: '', time: '' } }, bnl, now);
@@ -31,7 +30,7 @@ export function NextMatchPanel({ live, quick, bnl, now }: { live: Show; quick: (
         </div>
       </div>
       <p className="text-[11px] leading-relaxed text-white/40">
-        Auto picks the first playoff match that isn't done (times from Tournament admin → Playoffs), otherwise the next entry of the day schedule. Uses this PC's clock. Also available alone as /output/nextmatch.
+        Auto picks the next unplayed match from the Google Sheet schedule, otherwise the next entry of the day schedule. Uses this PC's clock. Also available alone as /output/nextmatch.
       </p>
     </div>
   );

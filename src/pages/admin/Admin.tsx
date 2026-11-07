@@ -3,9 +3,7 @@ import { Logo } from '../../components/Brand';
 import { ScaledCanvas } from '../../components/Stage';
 import { BracketView, MatchesBoard } from '../../components/show/Bracket';
 import { TeamLogo } from '../../components/show/parts';
-import { useBnl, useConnState, useLive, useSocket, useTournament } from '../../lib/hooks';
-import { PlayoffsScreen, StandingsScreen } from '../../components/show/BnlGraphics';
-import { LeagueAdmin, PlayoffsAdmin } from './LeagueAdmin';
+import { useConnState, useLive, useSocket, useTournament } from '../../lib/hooks';
 import { ThemeProvider } from '../../lib/theme';
 import { isTeam, MAX_TEAMS, nextSize, resolve, type BMatch, type Format, type Resolved, type TournamentOp, type TTeam } from '../../../shared/tournament';
 import { ConfirmButton, Dot, Label, Panel, Segmented, Switch, TextField } from '../controller/ui';
@@ -41,8 +39,6 @@ export function Admin({ role, onLogout }: { role: 'producer' | 'admin'; onLogout
   const conn = useConnState(sock);
   const t = useTournament(sock);
   const live = useLive(sock);
-  const bnl = useBnl(sock);
-  const [mode, setMode] = useState<'league' | 'playoffs' | 'bracket'>('league');
   const [view, setView] = useState<'bracket' | 'matches'>('bracket');
   const op = (o: TournamentOp) => sock.send({ t: 't-op', op: o });
   useEffect(() => sock.on(m => { if (m.t === 'error' && m.code === 'auth') onLogout(); }), [sock, onLogout]);
@@ -64,27 +60,7 @@ export function Admin({ role, onLogout }: { role: 'producer' | 'admin'; onLogout
         </div>
       </header>
 
-      <div className="flex gap-2 px-5 pt-4">
-        <Segmented value={mode} onChange={setMode} options={[{ value: 'league', label: 'League standings' }, { value: 'playoffs', label: 'Playoffs' }, { value: 'bracket', label: 'Generic bracket' }]} />
-      </div>
-      {mode !== 'bracket' && bnl && live && (
-        <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-5 p-5">
-          <div>
-            <div className="mb-2 text-[11px] text-white/40">{mode === 'league' ? '/output/standings' : '/output/playoffs'} · also on the Standings / Playoffs screens</div>
-            <div className="aspect-video overflow-hidden rounded-md border border-white/10 bg-[#0b0b0b]">
-              <ScaledCanvas>
-                <ThemeProvider theme={live.show.theme} brand={live.show.brand}>
-                  <div className="glacial-stage relative h-[1080px] w-[1920px] overflow-hidden" data-theme={live.show.theme}>
-                    {mode === 'league' ? <StandingsScreen data={bnl} show={live.show} /> : <PlayoffsScreen data={bnl} show={live.show} />}
-                  </div>
-                </ThemeProvider>
-              </ScaledCanvas>
-            </div>
-          </div>
-          <div className="min-w-0">{mode === 'league' ? <LeagueAdmin data={bnl} send={m => sock.send(m)} /> : <PlayoffsAdmin data={bnl} send={m => sock.send(m)} />}</div>
-        </div>
-      )}
-      {mode === 'bracket' && <div className="grid grid-cols-[minmax(0,1fr)_420px] gap-5 p-5">
+      <div className="grid grid-cols-[minmax(0,1fr)_420px] gap-5 p-5">
         <main className="min-w-0 space-y-5">
           <div>
             <div className="mb-2 flex items-center justify-between">
@@ -112,7 +88,7 @@ export function Admin({ role, onLogout }: { role: 'producer' | 'admin'; onLogout
           <Teams teams={t.teams} op={op} size={t.size} />
           <Setup t={t} op={op} />
         </aside>
-      </div>}
+      </div>
     </div>
     </ThemeProvider>
   );

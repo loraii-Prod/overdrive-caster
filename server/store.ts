@@ -4,7 +4,6 @@ import crypto from 'node:crypto';
 import { config } from './config';
 import { clone, defaultPresets, defaultRos, defaultScene, defaultShow, emptyBrand, sanitizeRos, sanitizeScene, sanitizeShow } from '../shared/defaults';
 import type { CasterId, FollowSettings, Preset, RunOfShow, Scene, Show } from '../shared/types';
-import { sanitizeLeague, sanitizePlayoffs, type League, type Playoffs } from '../shared/bnl';
 import { ensureStreamIds, sanitizePlayers, sanitizeStories, type Player, type Story } from '../shared/players';
 import { defaultTournament, sanitizeTournament, type Tournament } from '../shared/tournament';
 import { emptySheet, sanitizeSheet, type SheetState } from '../shared/sheet';
@@ -20,8 +19,6 @@ export interface Persisted {
   players: Player[];
   stories: Story[];
   follow: FollowSettings;
-  league: League;
-  playoffs: Playoffs;
   liveVersion: number;
   liveAt: number;
   instant: boolean;
@@ -77,8 +74,6 @@ function fresh(): Persisted {
     crewKey: newKey(12),
     ros: defaultRos(),
     players: [],
-    league: { name: '', matches: 5, divisions: [] },
-    playoffs: { d1Seeds: [], d2Seeds: [], results: {} },
     stories: [],
     follow: { enabled: true, delayMs: 300, keepLast: true },
     liveVersion: 1,
@@ -127,8 +122,6 @@ function load(): Persisted {
       ros: raw.ros ? sanitizeRos(raw.ros) : base.ros,
       players: Array.isArray(raw.players) ? ensureStreamIds(sanitizePlayers(raw.players)) : base.players,
       follow: sanitizeFollow(raw.follow),
-      league: sanitizeLeague(raw.league, base.league),
-      playoffs: sanitizePlayoffs(raw.playoffs, base.playoffs),
       stories: Array.isArray(raw.stories) ? sanitizeStories(raw.stories) : base.stories,
       presets: Array.isArray(raw.presets)
         ? raw.presets.map((p: any) => ({ id: String(p.id), name: String(p.name).slice(0, 48), updatedAt: Number(p.updatedAt) || Date.now(), identity: p.identity === true, scene: sanitizeScene(p.scene) }))

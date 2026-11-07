@@ -9,7 +9,7 @@ import { EASE } from '../../lib/motion';
 import { Feed } from '../Feed';
 import { Countdown, formatRemaining, Socials, TeamLogo } from './parts';
 import { fmtLeft, resolveNextMatch, type NextMatchInfo } from './NextMatch';
-import type { BnlData } from './BnlGraphics';
+import type { MatchData } from '../../../shared/protocol';
 
 export function useSkin(): Skin | null {
   const { brand } = useTheme();
@@ -91,7 +91,7 @@ function SkinTeam({ name, logo, tag, align }: { name: string; logo: string; tag:
 // ------------------------------------------------------------ Intermissions
 
 /** Starting soon / BRB / Thanks: plate (title + logo) over the panel loop, live info in the lower panel. */
-export function SkinIntermission({ skin, kind, show, now, bnl }: { skin: Skin; kind: 'starting' | 'brb' | 'ending'; show: Show; now: number; bnl: BnlData | null }) {
+export function SkinIntermission({ skin, kind, show, now, bnl }: { skin: Skin; kind: 'starting' | 'brb' | 'ending'; show: Show; now: number; bnl: MatchData | null }) {
   const p = skin.panels.body;
   const nm = resolveNextMatch(show, bnl, now);
   const timer = show.timer.target != null && show.timer.showOn[kind];

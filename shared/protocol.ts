@@ -1,7 +1,6 @@
 import type { CasterId, ControllerState, FollowSettings, RosItem, RunOfShow, Scene, Show } from './types';
 import type { Tournament, TournamentOp } from './tournament';
 import type { Player, Story } from './players';
-import type { League, Playoffs, ReverseCup } from './bnl';
 
 export type Role = 'controller' | 'output' | 'contributor' | 'admin' | 'crew';
 
@@ -25,8 +24,6 @@ export type ClientMsg =
   | { t: 'ros-message'; text: string }
   | { t: 'regen-crew-key' }
   | { t: 'follow-set'; follow: FollowSettings }
-  | { t: 'league-set'; league: League }
-  | { t: 'playoffs-set'; playoffs: Playoffs }
   | { t: 'players-set'; players: Player[] }
   | { t: 'stories-set'; stories: Story[] }
   | { t: 't-op'; op: TournamentOp }
@@ -74,21 +71,13 @@ export type QuickOp =
   | { k: 'active-player'; id: string | null; via?: 'game' | 'manual' }
   | { k: 'lineup'; ids: string[] }
   | { k: 'music'; patch: Partial<import('./types').Show['music']> }
-  | { k: 'next-match'; patch: Partial<import('./types').Show['nextMatch']> }
-  | { k: 'rc'; op: RcOp };
+  | { k: 'next-match'; patch: Partial<import('./types').Show['nextMatch']> };
 
 /** Public player card data (from the player sheet) for warm-up / cam graphics. */
 export interface PlayerCard { name: string; vdo: string; input: string; style: string; age: string; funFact: string; rival: string; photo: string }
 
-export type RcOp =
-  | { a: 'round'; finish: string[]; dnf: string[] }
-  | { a: 'undo' }
-  | { a: 'reset'; start?: number }
-  | { a: 'set'; patch: Partial<Pick<ReverseCup, 'enabled' | 'title' | 'start' | 'winners' | 'maps' | 'mapIndex' | 'round'>> }
-  | { a: 'player'; i: number; id: string | null; points?: number }
-  | { a: 'load-playoff'; id: string }
-  | { a: 'load-league'; div: 'd1' | 'd2'; match: number }
-  | { a: 'save' };
+/** Bundle of player-roster + schedule-sheet data sent to every client. */
+export interface MatchData { names: Record<string, string>; info: Record<string, PlayerCard>; sheet: import('./sheet').SheetState }
 
 export type RtcSignal =
   | { kind: 'offer' | 'answer'; sdp: string; pcId: string }
@@ -101,7 +90,7 @@ export type ServerMsg =
   | { t: 'state'; state: ControllerState }
   | { t: 'tournament'; tournament: Tournament }
   | { t: 'ros'; ros: RunOfShow; now: number }
-  | { t: 'bnl'; league: League; playoffs: Playoffs; names: Record<string, string>; info: Record<string, PlayerCard>; sheet: import('./sheet').SheetState }
+  | ({ t: 'match-data' } & MatchData)
   | { t: 'caster-info'; name: string; role: string; cameraVisible: boolean }
   | { t: 'rtc-viewer-join'; viewerId: string; req: WatchRequest }
   | { t: 'rtc-viewer-leave'; viewerId: string }

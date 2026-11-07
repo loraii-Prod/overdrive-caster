@@ -197,6 +197,42 @@ export function Sponsors({ show, height = 56, label = 'PARTNERS' }: { show: Show
 }
 
 /** Continuous news ticker. Speed is in px/s, so long and short text move alike. */
+const PRIZE_TAG = 'bg-[#E8E8E8] text-[#111]';
+
+export function PrizeCard({ show, width = 900 }: { show: Show; width?: number }) {
+  const p = show.prize;
+  if (!p.enabled) return null;
+  const max = Math.max(1, ...p.goals.map(g => g.amount));
+  const pct = Math.min(1, p.raised / max);
+  return (
+    <div style={{ width }}>
+      <div className="flex items-end gap-3">
+        <span className={`${PRIZE_TAG} px-3 pt-[4px] font-display text-[24px] leading-[34px]`}>PRIZEPOOL</span>
+        {p.raised > 0 && <span className="pb-0.5 font-display text-[34px] leading-none text-white">{p.currency}{p.raised.toLocaleString('nl-NL')}</span>}
+        <span className="ml-auto pb-1 font-display text-[22px] text-white/60">CONTRIBUTE · {p.link}</span>
+      </div>
+      <div className="bg-[#050505]/92 px-5 py-4">
+        <div className="relative h-[8px] bg-white/10">
+          <div className="h-full bg-white" style={{ width: `${pct * 100}%` }} />
+          {p.goals.map(g => <div key={g.amount} className="absolute -top-1 h-[16px] w-[2px] bg-white/60" style={{ left: `${(g.amount / max) * 100}%` }} />)}
+        </div>
+        <div className="mt-3 grid gap-x-4" style={{ gridTemplateColumns: `repeat(${p.goals.length}, minmax(0, 1fr))` }}>
+          {p.goals.map(g => {
+            const hit = p.raised >= g.amount;
+            return (
+              <div key={g.amount} className={hit ? '' : 'opacity-60'}>
+                <div className="font-display text-[24px] leading-none text-white">{p.currency}{g.amount}{hit ? ' ✓' : ''}</div>
+                <div className="mt-1 truncate font-sans text-[16px] text-white/70">{g.label}</div>
+              </div>
+            );
+          })}
+        </div>
+        <div className="mt-3 font-display text-[19px] text-white/45">{p.splits.map(s => `${s.place} ${s.pct}%`).join(' · ')}</div>
+      </div>
+    </div>
+  );
+}
+
 export function Ticker({ show, height = 48 }: { show: Show; height?: number }) {
   const track = useRef<HTMLDivElement>(null);
   const [w, setW] = useState(0);

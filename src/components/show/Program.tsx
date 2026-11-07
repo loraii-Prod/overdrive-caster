@@ -15,7 +15,7 @@ import { NextMatchCorner } from './NextMatch';
 import { VdoContext } from '../../lib/vdo';
 import { skinBackground, skinOf } from '../../../shared/skins';
 import { SkinBadge, SkinCasters, SkinIntermission, SkinStinger, SkinTicker, SkinVideo } from './Skin';
-import { PlayoffsScreen, RcBar, RcBoard, StandingsScreen, type BnlData } from './BnlGraphics';
+import type { MatchData } from '../../../shared/protocol';
 import { BrbScreen, EndingScreen, StartingScreen } from './Screens';
 import { BracketView, MatchesBoard } from './Bracket';
 import { MatchBar, Scoreboard } from './Overlays';
@@ -33,7 +33,7 @@ export function ScreenView(props: Parameters<typeof ScreenViewInner>[0]) {
 }
 
 function ScreenViewInner(props: {
-  id: ScreenId; scene: Scene; show: Show; now: number; tournament: Tournament | null; viewer?: RtcViewer | null; monitor?: boolean; embeds?: boolean; bnl?: BnlData | null;
+  id: ScreenId; scene: Scene; show: Show; now: number; tournament: Tournament | null; viewer?: RtcViewer | null; monitor?: boolean; embeds?: boolean; bnl?: MatchData | null;
 }) {
   const skin = skinOf(props.show.brand.skin);
   if (!skin) return <ScreenBody {...props} />;
@@ -53,7 +53,7 @@ function ScreenViewInner(props: {
 }
 
 function ScreenBody({ id, scene, show, now, tournament, viewer, monitor, embeds = true, bnl = null }: {
-  id: ScreenId; scene: Scene; show: Show; now: number; tournament: Tournament | null; viewer?: RtcViewer | null; monitor?: boolean; embeds?: boolean; bnl?: BnlData | null;
+  id: ScreenId; scene: Scene; show: Show; now: number; tournament: Tournament | null; viewer?: RtcViewer | null; monitor?: boolean; embeds?: boolean; bnl?: MatchData | null;
 }) {
   switch (id) {
     case 'starting': return <StartingScreen show={show} now={now} tournament={tournament} />;
@@ -62,8 +62,6 @@ function ScreenBody({ id, scene, show, now, tournament, viewer, monitor, embeds 
     case 'bracket': return bnl?.sheet?.matches.length ? <><ScreenBackground /><SheetBracket sheet={bnl.sheet} show={show} /></> : tournament ? <BracketView t={tournament} /> : <ScreenBackground />;
     case 'matches': return bnl?.sheet?.matches.length ? <><ScreenBackground /><SheetMatches sheet={bnl.sheet} show={show} /></> : tournament ? <MatchesBoard t={tournament} show={show} /> : <ScreenBackground />;
     case 'warmup': return <WarmupScreen show={show} now={now} bnl={bnl} embeds={embeds && !monitor} />;
-    case 'standings': return <StandingsScreen data={bnl} show={show} />;
-    case 'playoffs': return <PlayoffsScreen data={bnl} show={show} />;
     case 'gameplay': return <GameplayScreen scene={scene} show={show} now={now} viewer={viewer} monitor={monitor} embeds={embeds && !monitor} bnl={bnl} />;
     default: {
       const ticker = show.ticker.enabled && show.ticker.onScreens && show.ticker.items.length > 0;
@@ -71,7 +69,7 @@ function ScreenBody({ id, scene, show, now, tournament, viewer, monitor, embeds 
         <div className="absolute inset-0">
           <ScreenBackground />
           <Stage scene={{ ...scene, showBackground: false }} viewer={viewer} monitor={monitor} layers={{ ...ALL_LAYERS, background: false }} />
-          {scene.showBranding && (show.rc.enabled ? (show.showMatchupOnCasters && <RcBar rc={show.rc} />) : <MatchBar show={show} />)}
+          {scene.showBranding && <MatchBar show={show} />}
           {ticker && <div className="absolute inset-x-0 bottom-0"><Ticker show={show} height={56} /></div>}
         </div>
       );
@@ -99,7 +97,7 @@ function useConnectedCams(viewer?: RtcViewer | null) {
  * Gameplay: fully transparent so the game capture underneath in OBS shows
  * through. Scoreboard on top, optional caster cams in a corner, optional ticker.
  */
-export function GameplayScreen({ scene, show, now, viewer, monitor, embeds = true, bnl = null }: { scene: Scene; show: Show; now: number; viewer?: RtcViewer | null; monitor?: boolean; embeds?: boolean; bnl?: BnlData | null }) {
+export function GameplayScreen({ scene, show, now, viewer, monitor, embeds = true, bnl = null }: { scene: Scene; show: Show; now: number; viewer?: RtcViewer | null; monitor?: boolean; embeds?: boolean; bnl?: MatchData | null }) {
   const g = show.gameplay;
   const ticker = g.ticker && show.ticker.enabled && show.ticker.items.length > 0;
   const connected = useConnectedCams(viewer);
@@ -109,13 +107,13 @@ export function GameplayScreen({ scene, show, now, viewer, monitor, embeds = tru
         c.source.type === 'url' ? !!c.source.url : c.source.type === 'webrtc' ? connected.has(c.id) : c.source.type === 'obs'))
     : [];
   const W = 320, H = 180, GAP = 12, M = 28;
-  const stripH = show.playerCam.enabled && show.playerCam.mode === 'strip' && (show.lineup.length > 0 || show.rc.enabled) ? 236 : 0;
+  const stripH = show.playerCam.enabled && show.playerCam.mode === 'strip' && show.lineup.length > 0 ? 236 : 0;
   const bottom = 1080 - M - H - (ticker ? 56 : 0) - stripH;
   const gskin = skinOf(show.brand.skin);
   return (
     <div className="absolute inset-0">
       {gskin && <SkinBadge skin={gskin} show={show} />}
-      {show.rc.enabled ? (show.showScoreboard && <RcBoard rc={show.rc} activeId={show.activePlayer?.id} now={now} />) : <Scoreboard show={show} />}
+      <Scoreboard show={show} />
       <AnimatePresence>
         {cams.map((c, i) => {
           const x = g.corner === 'right' ? 1920 - M - W - (cams.length - 1 - i) * (W + GAP) : M + i * (W + GAP);
@@ -149,7 +147,7 @@ export function GameplayScreen({ scene, show, now, viewer, monitor, embeds = tru
  * screens plays a Glacial stinger: a panel wipes across, the mark holds
  * for a beat, and the new screen is revealed underneath.
  */
-export function Program(props: { scene: Scene; show: Show; now: number; tournament: Tournament | null; viewer?: RtcViewer | null; monitor?: boolean; embeds?: boolean; bnl?: BnlData | null }) {
+export function Program(props: { scene: Scene; show: Show; now: number; tournament: Tournament | null; viewer?: RtcViewer | null; monitor?: boolean; embeds?: boolean; bnl?: MatchData | null }) {
   const target = props.scene.screen;
   const [shown, setShown] = useState<ScreenId>(target);
   const [sting, setSting] = useState(0);

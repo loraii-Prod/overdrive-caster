@@ -3,9 +3,8 @@ import type { Show } from '../../../shared/types';
 import type { Tournament } from '../../../shared/tournament';
 import { isTeam, resolve, upcoming } from '../../../shared/tournament';
 import { Logo } from '../Brand';
-import { PrizeCard, RcCard } from './BnlGraphics';
 import { useTheme } from '../../lib/theme';
-import { Countdown, FitText, Matchup, Rise, ScreenBackground, Socials, Sponsors, Ticker } from './parts';
+import { Countdown, FitText, Matchup, PrizeCard, Rise, ScreenBackground, Socials, Sponsors, Ticker } from './parts';
 
 /** Shared frame for full-screen scenes: background, top bar, bottom bar, ticker. */
 export function ScreenChrome({ show, children, footer = true }: { show: Show; children: ReactNode; footer?: boolean }) {
@@ -91,7 +90,7 @@ export function StartingScreen({ show, now, tournament }: { show: Show; now: num
       </div>
       {show.prize.enabled && <Rise i={5} className="absolute" style={{ left: 80, bottom: show.ticker.enabled && show.ticker.onScreens ? 190 : 160 }}><PrizeCard show={show} width={1000} /></Rise>}
       <div className="absolute flex flex-col items-end" style={{ right: 80, top: 270, gap: 48 }}>
-        {show.showMatchupOnScreens && <Rise i={2}>{show.rc.enabled ? <RcCard rc={show.rc} mode="next" width={560} /> : <Matchup show={show} mode="next" width={560} stacked />}</Rise>}
+        {show.showMatchupOnScreens && <Rise i={2}><Matchup show={show} mode="next" width={560} stacked /></Rise>}
         <Schedule show={show} tournament={tournament} />
       </div>
     </ScreenChrome>
@@ -105,7 +104,7 @@ export function BrbScreen({ show, now }: { show: Show; now: number }) {
       <div className="absolute inset-x-0 flex flex-col items-center" style={{ top: 250 }}>
         <Rise i={1}><Title text={s.title} size={168} align="center" max={1500} /></Rise>
         <Rise i={2} className="mt-6"><Subtitle text={s.subtitle} align="center" /></Rise>
-        {show.showMatchupOnScreens && <Rise i={3} className="mt-14">{show.rc.enabled ? <RcCard rc={show.rc} mode="live" width={760} /> : <Matchup show={show} mode="score" width={900} />}</Rise>}
+        {show.showMatchupOnScreens && <Rise i={3} className="mt-14"><Matchup show={show} mode="score" width={900} /></Rise>}
         {show.timer.showOn.brb && (
           <Rise i={4} className="mt-10"><Countdown show={show} now={now} size={72} align="center" label="BACK IN" /></Rise>
         )}
@@ -121,7 +120,7 @@ export function EndingScreen({ show, now }: { show: Show; now: number }) {
       <div className="absolute inset-x-0 flex flex-col items-center" style={{ top: 250 }}>
         <Rise i={1}><Title text={s.title} size={132} align="center" max={1700} /></Rise>
         <Rise i={2} className="mt-6"><Subtitle text={s.subtitle} align="center" /></Rise>
-        {show.showMatchupOnScreens && <Rise i={3} className="mt-14">{show.rc.enabled ? <RcCard rc={show.rc} mode="final" width={760} /> : <Matchup show={show} mode="final" width={900} />}</Rise>}
+        {show.showMatchupOnScreens && <Rise i={3} className="mt-14"><Matchup show={show} mode="final" width={900} /></Rise>}
         {show.timer.showOn.ending && <Rise i={4} className="mt-10"><Countdown show={show} now={now} size={64} align="center" /></Rise>}
       </div>
       <Rise i={5} className="absolute inset-x-0 flex flex-col items-center" style={{ bottom: show.ticker.enabled && show.ticker.onScreens ? 120 : 84, gap: 26 }}>

@@ -1,14 +1,13 @@
 import crypto from 'node:crypto';
 import { db, save } from './store';
 import { clone, defaultPresets, defaultRos, defaultScene, defaultShow, emptyBrand, sanitizeRos, sanitizeScene, sanitizeShow } from '../shared/defaults';
-import { sanitizeLeague, sanitizePlayoffs } from '../shared/bnl';
 import { ensureStreamIds, sanitizePlayers, sanitizeStories } from '../shared/players';
 import { defaultTournament, sanitizeTournament } from '../shared/tournament';
 import type { ThemeId } from '../shared/types';
 import { emptySheet, sanitizeSheet } from '../shared/sheet';
 
 /** Everything that belongs to one event (production). Logins, keys, OBS and API settings stay global. */
-const KEYS = ['preview', 'live', 'showPreview', 'showLive', 'players', 'stories', 'league', 'playoffs', 'tournament', 'ros', 'presets', 'sheet'] as const;
+const KEYS = ['preview', 'live', 'showPreview', 'showLive', 'players', 'stories', 'tournament', 'ros', 'presets', 'sheet'] as const;
 
 const snapshot = () => clone(Object.fromEntries(KEYS.map(k => [k, (db as any)[k]])));
 
@@ -20,15 +19,11 @@ function apply(data: any) {
   db.showLive = sanitizeShow(d.showLive);
   db.players = Array.isArray(d.players) ? ensureStreamIds(sanitizePlayers(d.players)) : [];
   db.stories = Array.isArray(d.stories) ? sanitizeStories(d.stories) : [];
-  db.league = sanitizeLeague(d.league, blankLeague());
-  db.playoffs = sanitizePlayoffs(d.playoffs, { d1Seeds: [], d2Seeds: [], results: {} });
   db.tournament = d.tournament ? sanitizeTournament(d.tournament) : defaultTournament();
   db.ros = d.ros ? sanitizeRos(d.ros) : defaultRos();
   db.presets = Array.isArray(d.presets) ? d.presets : defaultPresets(db.preview);
   db.sheet = sanitizeSheet(d.sheet);
 }
-
-const blankLeague = () => ({ name: '', matches: 5, divisions: [{ id: 'd1' as const, name: 'Division 1', rows: [], qualify: 8 }, { id: 'd2' as const, name: 'Division 2', rows: [], qualify: 4 }] });
 
 function blankData(name: string, theme: ThemeId) {
   const scene = defaultScene();
@@ -37,14 +32,12 @@ function blankData(name: string, theme: ThemeId) {
     theme, tournament: name.toUpperCase(), stage: '', schedule: [], socials: [], sponsors: [],
     ticker: { ...show.ticker, items: [`Welcome to ${name}`] },
     prize: { ...show.prize, enabled: false, raised: 0 },
-    rc: { ...show.rc, enabled: false, players: show.rc.players.map(p => ({ ...p, id: '', name: '' })), source: null },
     lineup: [], activePlayer: null, spotlight: null,
     brand: { ...emptyBrand(), name },
   });
   const t = defaultTournament();
   return {
     preview: scene, live: clone(scene), showPreview: show, showLive: clone(show), players: [], stories: [],
-    league: blankLeague(), playoffs: { d1Seeds: [], d2Seeds: [], results: {} },
     tournament: { ...t, name: name.toUpperCase(), teams: [] }, ros: defaultRos(), presets: defaultPresets(scene),
   };
 }

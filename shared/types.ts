@@ -34,8 +34,8 @@ export interface Caster {
 export type LayoutMode = 'auto' | 'solo' | 'duo' | 'trio' | 'mixed' | 'audio';
 
 /** Full-screen scene shown on /output/program. */
-export type ScreenId = 'starting' | 'casters' | 'warmup' | 'gameplay' | 'brb' | 'standings' | 'playoffs' | 'bracket' | 'matches' | 'ending';
-export const SCREEN_IDS: ScreenId[] = ['starting', 'casters', 'warmup', 'gameplay', 'brb', 'standings', 'playoffs', 'bracket', 'matches', 'ending'];
+export type ScreenId = 'starting' | 'casters' | 'warmup' | 'gameplay' | 'brb' | 'bracket' | 'matches' | 'ending';
+export const SCREEN_IDS: ScreenId[] = ['starting', 'casters', 'warmup', 'gameplay', 'brb', 'bracket', 'matches', 'ending'];
 
 // 'bnl' is a legacy internal id for the boxed/ticker layout (vs. 'glacial' for
 // the original pattern-background look) — purely a layout bucket now. Any
@@ -131,8 +131,6 @@ export interface Show {
   /** Built-in music beds per section (played by /output/music). */
   music: { enabled: boolean; volume: number; levels: Record<import('./music').MusicSection, number>; skip: number; fadeMs: number };
   playerCam: { enabled: boolean; corner: 'left' | 'right'; size: 'sm' | 'md' | 'lg'; /** Gameplay: one spectated cam, or a strip with every lobby cam. */ mode: 'single' | 'strip' };
-  /** 4-player Reverse Cup match (rulebook scoring). Instant. */
-  rc: import('./bnl').ReverseCup;
   /** Prizepool + donation goals (Matcherino). */
   prize: { enabled: boolean; raised: number; currency: string; link: string; splits: { place: string; pct: number }[]; goals: { amount: number; label: string }[] };
   /** VDO.Ninja settings for player cams. */

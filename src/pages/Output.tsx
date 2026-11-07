@@ -8,8 +8,7 @@ import { Ticker } from '../components/show/parts';
 import { SpotlightCard } from '../components/show/Spotlight';
 import { PlayerCam, playerCamBox } from '../components/show/PlayerCam';
 import { ThemeProvider } from '../lib/theme';
-import { useBnl, useConnState, useLive, useNow, useSocket, useTournament, useViewer, useWantedCameras, query } from '../lib/hooks';
-import { PlayoffsScreen, StandingsScreen } from '../components/show/BnlGraphics';
+import { useMatchData, useConnState, useLive, useNow, useSocket, useTournament, useViewer, useWantedCameras, query } from '../lib/hooks';
 import { NextMatchCorner } from '../components/show/NextMatch';
 import { VdoContext } from '../lib/vdo';
 import { SheetBracket, SheetMatches } from '../components/show/SheetBracket';
@@ -43,9 +42,7 @@ export type OutputKind =
   | { k: 'matches' }
   | { k: 'player' }
   | { k: 'playercam' }
-  | { k: 'standings' }
-  | { k: 'nextmatch' }
-  | { k: 'playoffs' };
+  | { k: 'nextmatch' };
 
 /**
  * OBS browser source. Renders 1:1 on a 1920x1080 canvas with a transparent
@@ -57,7 +54,7 @@ export function Output({ route, kind }: { route: string; kind: OutputKind }) {
   const state = useConnState(sock);
   const live = useLive(sock);
   const tournament = useTournament(sock);
-  const bnl = useBnl(sock);
+  const bnl = useMatchData(sock);
   const now = useNow(live?.skew ?? 0, 250);
   const viewer = useViewer(sock, 'hq');
   const needsCams = (kind.k === 'stage' && kind.layers.content) || kind.k === 'program' || (kind.k === 'screen' && (kind.id === 'casters' || kind.id === 'gameplay'));
@@ -78,8 +75,6 @@ export function Output({ route, kind }: { route: string; kind: OutputKind }) {
       case 'program': body = <Program scene={scene} show={show} now={now} tournament={tournament} viewer={viewer} bnl={bnl} />; break;
       case 'screen': body = <ScreenView id={kind.id} scene={scene} show={show} now={now} tournament={tournament} viewer={viewer} bnl={bnl} />; break;
       case 'nextmatch': body = <NextMatchCorner show={{ ...show, nextMatch: { ...show.nextMatch, enabled: true } }} bnl={bnl} now={now} screen="gameplay" />; break;
-      case 'standings': body = <StandingsScreen data={bnl} show={show} />; break;
-      case 'playoffs': body = <PlayoffsScreen data={bnl} show={show} />; break;
       case 'scoreboard': body = <Scoreboard show={show} />; break;
       case 'ticker': body = <div className="absolute inset-x-0 bottom-0"><Ticker show={show} height={56} /></div>; break;
       case 'bracket': if (bnl?.sheet?.matches.length) { body = <SheetBracket sheet={bnl.sheet} show={show} />; break; } {

@@ -3,7 +3,7 @@ import { ScaledCanvas } from '../components/Stage';
 import { Program } from '../components/show/Program';
 import { RosView } from '../components/RosView';
 import { StatusPill } from './Contribute';
-import { useBnl, useConnState, useLive, useNow, useRos, useSocket, useTournament, query } from '../lib/hooks';
+import { useMatchData, useConnState, useLive, useNow, useRos, useSocket, useTournament, query } from '../lib/hooks';
 
 /** /crew?key=… — read-only page for casters & crew: what's on air + run of show + producer messages. */
 export function Crew() {
@@ -12,7 +12,7 @@ export function Crew() {
   const live = useLive(sock);
   const ros = useRos(sock);
   const tournament = useTournament(sock);
-  const bnl = useBnl(sock);
+  const bnl = useMatchData(sock);
   const now = useNow(ros?.skew ?? live?.skew ?? 0, 500);
   return (
     <div className="min-h-screen bg-[#121212] text-white">

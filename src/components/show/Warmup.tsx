@@ -1,53 +1,46 @@
 import { useEffect, useMemo, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import type { Show } from '../../../shared/types';
-import { standings } from '../../../shared/bnl';
+import type { MatchData } from '../../../shared/protocol';
 import { vdoViewUrl } from '../../../shared/players';
 import { EASE } from '../../lib/motion';
 import { Mark } from '../Brand';
 import { VdoView } from './PlayerCam';
 import { Countdown, Rise, ScreenBackground, Ticker } from './parts';
-import type { BnlData } from './BnlGraphics';
 
 const TAG = 'bg-[#E8E8E8] text-[#111]';
 const ord = (n: number) => `${n}${n === 1 ? 'ST' : n === 2 ? 'ND' : n === 3 ? 'RD' : 'TH'}`;
 
 export interface LobbyPlayer { id: string; name: string; vdo: string; points: number | null; place: number | null; tag: string; sub: string; fact: string }
 
-/** The players of the match on air: the Reverse Cup lobby, else the player-cam lineup. */
-export function useLobby(show: Show, bnl: BnlData | null): LobbyPlayer[] {
+/** The players of the match on air: the player-cam lineup, or the featured sheet match's rosters. */
+export function useLobby(show: Show, bnl: MatchData | null): LobbyPlayer[] {
   return useMemo(() => {
     const info = bnl?.info ?? {};
     const lineupVdo = new Map(show.lineup.map(l => [l.id, l.vdo]));
-    const rcById = new Map(show.rc.players.filter(p => p.id).map(p => [p.id, p]));
-    let ids = show.rc.enabled && rcById.size > 0 ? [...rcById.keys()] : show.lineup.map(l => l.id);
+    let ids = show.lineup.map(l => l.id);
     // Team events: the featured sheet match's rosters
     const fm = bnl?.sheet?.featured ? bnl.sheet.matches.find(m => m.id === bnl.sheet!.featured) : undefined;
-    if (fm && !(show.rc.enabled && rcById.size > 0)) {
+    if (fm) {
       const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
       const byName = new Map(Object.entries(info).map(([id, p]) => [norm(p.name), id]));
       const roster = [fm.t1.id, fm.t2.id].flatMap(tid => (bnl!.sheet!.teams.find(t => t.id === tid)?.players ?? []).slice(0, 2));
       const found = roster.map(n => byName.get(norm(n))).filter(Boolean) as string[];
       if (found.length) ids = found;
     }
-    const pos = new Map<string, string>();
-    if (bnl) {
-      const pl = Object.entries(bnl.names).map(([id, name]) => ({ id, name } as any));
-      for (const d of bnl.league.divisions) for (const r of standings(d, pl)) pos.set(r.player, `${d.id.toUpperCase()} · #${r.pos} · ${r.total} PTS`);
-    }
     return ids.slice(0, 6).map(id => {
-      const i = info[id], rc = rcById.get(id);
+      const i = info[id];
       return {
-        id, name: i?.name ?? rc?.name ?? bnl?.names[id] ?? id,
+        id, name: i?.name ?? bnl?.names[id] ?? id,
         vdo: i?.vdo || lineupVdo.get(id) || '',
-        points: show.rc.enabled && rc ? rc.points : null,
-        place: show.rc.enabled && rc ? rc.place : null,
-        tag: pos.get(id) ?? '',
+        points: null,
+        place: null,
+        tag: '',
         sub: [i?.input, i?.style].filter(Boolean).join(' · '),
         fact: i?.funFact ?? '',
       };
     });
-  }, [show.lineup, show.rc, bnl]);
+  }, [show.lineup, bnl]);
 }
 
 function CamBox({ p, show, embeds, w, h, active }: { p: LobbyPlayer; show: Show; embeds: boolean; w: number; h: number; active: boolean }) {
@@ -69,18 +62,16 @@ function CamBox({ p, show, embeds, w, h, active }: { p: LobbyPlayer; show: Show;
 
 /**
  * Pre-match "lobby cam" screen (think RLCS player-cam intros): every player of the
- * upcoming match on camera while they warm up on the map, with their league form,
+ * upcoming match on camera while they warm up on the map, with their
  * setup and a rotating fun fact.
  */
-export function WarmupScreen({ show, now, bnl, embeds = true }: { show: Show; now: number; bnl: BnlData | null; embeds?: boolean }) {
+export function WarmupScreen({ show, now, bnl, embeds = true }: { show: Show; now: number; bnl: MatchData | null; embeds?: boolean }) {
   const lobby = useLobby(show, bnl);
   const [fi, setFi] = useState(0);
   const facts = lobby.filter(p => p.fact);
   useEffect(() => { const t = setInterval(() => setFi(i => i + 1), 9000); return () => clearInterval(t); }, []);
   const fact = facts.length ? facts[fi % facts.length] : null;
   const ticker = show.ticker.enabled && show.ticker.onScreens && show.ticker.items.length > 0;
-  const rc = show.rc;
-  const map = rc.maps[rc.mapIndex];
 
   // grid geometry (right side)
   const n = Math.max(1, lobby.length);
@@ -100,12 +91,10 @@ export function WarmupScreen({ show, now, bnl, embeds = true }: { show: Show; no
     <div className="absolute inset-0 overflow-hidden">
       <ScreenBackground />
       <Rise className="absolute" style={{ left: 80, top: 170, width: 500 }}>
-        <span className={`${TAG} px-3 pt-[4px] font-display text-[26px] leading-[36px]`}>{rc.enabled ? rc.title : show.stage}</span>
+        <span className={`${TAG} px-3 pt-[4px] font-display text-[26px] leading-[36px]`}>{show.stage}</span>
         <div className="mt-4 font-display text-[110px] leading-[0.9] text-white">WARM<br />UP</div>
         <div className="mt-4 font-display text-[28px] text-white/60">
-          {rc.enabled
-            ? <>{map ? `${map.toUpperCase()} · ` : ''}{rc.maps.length} MAPS · {rc.start} PTS</>
-            : <>{show.tournament}{show.tournament ? ' · ' : ''}BEST OF {show.bestOf}</>}
+          {show.tournament}{show.tournament ? ' · ' : ''}BEST OF {show.bestOf}
         </div>
       </Rise>
       {show.timer.target != null && (
@@ -128,7 +117,7 @@ export function WarmupScreen({ show, now, bnl, embeds = true }: { show: Show; no
 
       {lobby.length === 0 && (
         <div className="absolute grid place-items-center font-display text-[34px] text-white/40" style={{ left: GX, top: 120, width: GW, height: maxH }}>
-          Load a Reverse Cup match or set the player-cam lineup
+          Set the player-cam lineup or feature a sheet match
         </div>
       )}
       {lobby.map((p, i) => {
@@ -165,7 +154,7 @@ export function WarmupScreen({ show, now, bnl, embeds = true }: { show: Show; no
 // ------------------------------------------------------- Gameplay cam strip
 
 /** RLCS-style strip with every lobby cam along the bottom of the gameplay overlay. */
-export function CamStrip({ show, bnl, embeds, bottom }: { show: Show; bnl: BnlData | null; embeds: boolean; bottom: number }) {
+export function CamStrip({ show, bnl, embeds, bottom }: { show: Show; bnl: MatchData | null; embeds: boolean; bottom: number }) {
   const lobby = useLobby(show, bnl);
   if (!show.playerCam.enabled || lobby.length === 0) return null;
   const W = lobby.length > 4 ? 256 : 300, H = Math.round(W * 9 / 16), BAR = 40, B = 4, GAP = 10;
@@ -175,17 +164,15 @@ export function CamStrip({ show, bnl, embeds, bottom }: { show: Show; bnl: BnlDa
     <>
       {lobby.map((p, i) => {
         const active = show.activePlayer?.id === p.id;
-        const out = p.place !== null && !(show.rc.finished && p.place <= show.rc.winners);
         return (
-          <motion.div key={p.id} className="absolute bg-[#050505]" style={{ left: x0 + i * (W + B * 2 + GAP), bottom, width: W + B * 2, height: H + B + BAR, opacity: out ? 0.55 : 1, boxShadow: '0 10px 26px rgba(0,0,0,0.45)' }}
-            initial={{ opacity: 0, y: 14 }} animate={{ opacity: out ? 0.55 : 1, y: active ? -8 : 0 }} transition={{ duration: 0.3, ease: EASE }}>
+          <motion.div key={p.id} className="absolute bg-[#050505]" style={{ left: x0 + i * (W + B * 2 + GAP), bottom, width: W + B * 2, height: H + B + BAR, boxShadow: '0 10px 26px rgba(0,0,0,0.45)' }}
+            initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: active ? -8 : 0 }} transition={{ duration: 0.3, ease: EASE }}>
             <div className="absolute" style={{ left: B, top: B, width: W, height: H }}>
               <CamBox p={p} show={show} embeds={embeds} w={W} h={H} active={active} />
             </div>
             <div className="absolute inset-x-0 bottom-0 flex items-center" style={{ height: BAR }}>
               {active && <div className="absolute inset-y-0 left-0 w-[4px] bg-[var(--accent)]" />}
               <span className="min-w-0 flex-1 truncate px-3 font-display text-[24px] leading-none text-white" style={{ paddingTop: 2 }}>{p.name}</span>
-              {p.points !== null && <span className={`${TAG} mr-2 min-w-[48px] px-1.5 pt-[2px] text-center font-display text-[22px] leading-[28px]`}>{p.place && (out || show.rc.finished) ? ord(p.place) : p.points}</span>}
             </div>
           </motion.div>
         );

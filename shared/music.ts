@@ -23,7 +23,7 @@ export function sectionFor(screen: ScreenId): MusicSection | null {
     case 'casters': return 'desk';
     case 'warmup': return 'warmup';
     case 'brb': return 'brb';
-    case 'standings': case 'playoffs': case 'bracket': case 'matches': return 'results';
+    case 'bracket': case 'matches': return 'results';
     case 'ending': return 'ending';
     case 'gameplay': return null;
   }

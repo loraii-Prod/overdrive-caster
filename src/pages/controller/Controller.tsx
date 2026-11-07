@@ -3,7 +3,7 @@ import { Logo } from '../../components/Brand';
 import { ScaledCanvas } from '../../components/Stage';
 import { Program } from '../../components/show/Program';
 import { formatRemaining } from '../../components/show/parts';
-import { useBnl, useConnState, useNow, useSocket, useTournament, useViewer, useWantedCameras } from '../../lib/hooks';
+import { useMatchData, useConnState, useNow, useSocket, useTournament, useViewer, useWantedCameras } from '../../lib/hooks';
 import { compose } from '../../../shared/layout';
 import { sameScene, SCREEN_LABELS } from '../../../shared/defaults';
 import { SCREEN_IDS, THEMES } from '../../../shared/types';
@@ -11,7 +11,6 @@ import type { QuickOp } from '../../../shared/protocol';
 import type { Caster, CasterId, ControllerState, LayoutMode, Scene, Show } from '../../../shared/types';
 import { CasterCard } from './CasterCard';
 import { ThemeProvider } from '../../lib/theme';
-import { ReverseCupPanel } from './ReverseCupPanel';
 import { IntegrationsTab, MatchTab, PrizeTab, ScreensTab, SponsorsTab, TickerTab, TimerTab, TournamentTab, type ShowProps } from './ShowPanels';
 import { ConfirmButton, CopyField, Dot, Segmented, Switch } from './ui';
 import { RosBar, RosEditor } from './RosEditor';
@@ -61,7 +60,7 @@ const SECTIONS: { id: Section; label: string; hint: string }[] = [
   { id: 'ros', label: 'Run of show', hint: 'Rundown, caster messages' },
   { id: 'casters', label: 'Casters', hint: 'Names, cameras' },
   { id: 'players', label: 'Players', hint: 'Cams, spotlight, facts' },
-  { id: 'match', label: 'Match', hint: 'Reverse Cup, score, timer' },
+  { id: 'match', label: 'Match', hint: 'Score, timer' },
   { id: 'music', label: 'Music', hint: 'Beds per screen, volume' },
   { id: 'screens', label: 'Screens', hint: 'Texts, ticker, sponsors' },
   { id: 'tournament', label: 'Tournament', hint: 'Bracket link' },
@@ -83,7 +82,7 @@ export function Controller({ onLogout }: { onLogout: () => void }) {
   const showTimer = useRef<number | undefined>(undefined);
   const viewer = useViewer(sock, 'lq');
   const tournament = useTournament(sock);
-  const bnl = useBnl(sock);
+  const bnl = useMatchData(sock);
   const [skew, setSkew] = useState(0);
   const now = useNow(skew, 250);
 
@@ -346,8 +345,7 @@ export function Controller({ onLogout }: { onLogout: () => void }) {
             {section === 'match' && (
               <>
                 <Block title="Next match counter" note="On top of every scene · instant"><NextMatchPanel live={st.showLive} quick={quick} bnl={bnl} now={now} /></Block>
-                <Block title="Reverse Cup" note="Rulebook scoring · 4 players · instant"><ReverseCupPanel live={st.showLive} st={st} quick={quick} bnl={bnl} /></Block>
-                <Block title="Team match (classic 1v1/team scoreboard)" note="Used when Reverse Cup is off"><MatchTab {...showProps} /></Block>
+                <Block title="Team match" note="Score, best-of, teams"><MatchTab {...showProps} /></Block>
                 <Block title="Gameplay screen" note="Transparent: put the game capture under it in OBS">
                   <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
                     <Switch on={showPreview.showScoreboard} onChange={v => showProps.set({ showScoreboard: v })} label="Scoreboard" />

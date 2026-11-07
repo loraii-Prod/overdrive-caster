@@ -1,5 +1,4 @@
 import { DEFAULT_LEVELS, MUSIC_SECTIONS } from './music';
-import { defaultRc, sanitizeRc } from './bnl';
 import type { Caster, CasterId, LayoutMode, Preset, RosItem, RunOfShow, Scene, ScreenId, Show, Social, SocialPlatform, SourceType, Team } from './types';
 
 export const ROLE_SUGGESTIONS = ['HOST', 'PLAY-BY-PLAY', 'ANALYST', 'COLOR', 'GUEST', 'INTERVIEWER'];
@@ -33,7 +32,7 @@ export const SOCIAL_LABELS: Record<SocialPlatform, string> = {
 };
 
 export const SCREEN_LABELS: Record<ScreenId, string> = {
-  casters: 'Casters', warmup: 'Warm-up', gameplay: 'Gameplay', standings: 'Standings', playoffs: 'Playoffs', starting: 'Starting soon', brb: 'Be right back', ending: 'Thanks for watching', bracket: 'Bracket', matches: 'Matches',
+  casters: 'Casters', warmup: 'Warm-up', gameplay: 'Gameplay', starting: 'Starting soon', brb: 'Be right back', ending: 'Thanks for watching', bracket: 'Bracket', matches: 'Matches',
 };
 
 export function defaultShow(): Show {
@@ -59,8 +58,7 @@ export function defaultShow(): Show {
     sponsors: [],
     sponsorSeconds: 8,
     ticker: { enabled: true, items: BNL_TICKER(), speed: 90, onScreens: true },
-    obsScenes: { casters: '', warmup: '', gameplay: '', starting: '', brb: '', standings: '', playoffs: '', ending: '', bracket: '', matches: '' },
-    rc: defaultRc(),
+    obsScenes: { casters: '', warmup: '', gameplay: '', starting: '', brb: '', ending: '', bracket: '', matches: '' },
     prize: defaultPrize(),
     brand: emptyBrand(),
     music: { enabled: true, volume: 0.6, levels: { ...DEFAULT_LEVELS }, skip: 0, fadeMs: 2500 },
@@ -109,7 +107,7 @@ export function sameScene(a: Scene, b: Scene): boolean {
 
 // ---------- validation (server trusts nothing from the wire) ----------
 
-const SCREENS: ScreenId[] = ['starting', 'casters', 'warmup', 'gameplay', 'brb', 'standings', 'playoffs', 'bracket', 'matches', 'ending'];
+const SCREENS: ScreenId[] = ['starting', 'casters', 'warmup', 'gameplay', 'brb', 'bracket', 'matches', 'ending'];
 const PLATFORMS = Object.keys(SOCIAL_LABELS) as SocialPlatform[];
 const int = (v: unknown, min: number, max: number, d: number) => (typeof v === 'number' && Number.isFinite(v) ? Math.max(min, Math.min(max, Math.round(v))) : d);
 
@@ -217,7 +215,6 @@ export function sanitizeShow(v: any): Show {
       onScreens: bool(v.ticker?.onScreens, d.ticker.onScreens),
     },
     scheduleFromBracket: bool(v.scheduleFromBracket, d.scheduleFromBracket),
-    rc: sanitizeRc(v.rc),
     prize: sanitizePrize(v.prize),
     brand: sanitizeBrand(v.brand),
     music: {
@@ -294,20 +291,15 @@ export function sanitizeRos(v: any): RunOfShow {
   return { items, current: cur, startedAt: cur == null ? null : Number(v.startedAt) || Date.now(), message: m };
 }
 
-// ---------- prizepool (rulebook S1) ----------
+// ---------- prizepool ----------
 export function defaultPrize(): Show['prize'] {
   return {
-    enabled: true, raised: 0, currency: '€', link: 'mno.gg/s/f9f31f8090',
+    enabled: false, raised: 0, currency: '€', link: '',
     splits: [
       { place: '1st', pct: 40 }, { place: '2nd', pct: 25 }, { place: '3rd', pct: 15 }, { place: '4th', pct: 10 },
       { place: '5th–8th', pct: 2.5 },
     ],
-    goals: [
-      { amount: 250, label: 'Return of “Bingo zonder Ballen”' },
-      { amount: 500, label: 'Benelux Pro League Season 2' },
-      { amount: 750, label: 'Clanwar Benelux vs ???' },
-      { amount: 1000, label: 'Marijntje TikTok video' },
-    ],
+    goals: [],
   };
 }
 
@@ -325,25 +317,12 @@ function sanitizePrize(v: any): Show['prize'] {
   };
 }
 
-// ---------- Benelux Pro League rulebook info ----------
-export const BNL_SOCIALS = (): Social[] => [
-  { platform: 'twitch', handle: 'twitch.tv/beneluxtm' },
-  { platform: 'discord', handle: 'discord.gg/SzhhY4WsxP' },
-];
+// ---------- default placeholder info ----------
+export const BNL_SOCIALS = (): Social[] => [];
 export const BNL_TICKER = (): string[] => [
-  'Welcome to the Benelux Pro League: the best Trackmania players from Belgium, the Netherlands and Luxembourg',
-  'Support the crowdfunded prizepool at mno.gg/s/f9f31f8090: every contributor gets a custom Benelux skin',
-  'Donation goals: €250 Bingo zonder Ballen · €500 Season 2 · €750 Clanwar Benelux vs ??? · €1000 Marijntje TikTok video',
-  'Playoffs LIVE from the Esports Lounge Twente, Enschede',
-  'Join the community: discord.gg/SzhhY4WsxP',
+  'Welcome to the Overdrive Circuit',
 ];
-export const BNL_SCHEDULE = () => [
-  { time: '14:00', label: 'Upper Semi-finals' },
-  { time: '15:00', label: 'Upper Final + Lower Semi-final' },
-  { time: '16:00', label: 'Lower Final' },
-  { time: '17:00', label: 'Division 2 Promotion match' },
-  { time: '18:00', label: 'Grand Final' },
-];
+export const BNL_SCHEDULE = () => [];
 
 export const emptyBrand = (): import('./types').BrandKit => ({ name: '', logo: '', mark: '', accent: '', font: '', bg: '', bgKind: '', skin: '', desk: false });
 const assetUrl = (v: unknown) => (typeof v === 'string' && /^(\/uploads\/[\w.-]+|\/brand\/[\w./-]+|https:\/\/[^\s"'<>]+)$/.test(v) ? v.slice(0, 500) : '');

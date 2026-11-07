@@ -6,8 +6,6 @@ import { config } from './config';
 import { roleFrom, type AuthRole } from './auth';
 import { applyOp, isTeam, resolve, type TournamentOp } from '../shared/tournament';
 import { ensureStreamIds, matchPlayer, sanitizePlayers, sanitizeStories, STORY_LABELS } from '../shared/players';
-import { applyRound, LEAGUE_POINTS, PLAYOFF_DEFS, playoffPlayers, rcOrder, resetRc, sanitizeLeague, sanitizePlayoffs, undoRound, type ReverseCup } from '../shared/bnl';
-import type { RcOp } from '../shared/protocol';
 import { db, newKey, sanitizeFollow, save } from './store';
 import { iceServers } from './turn';
 import { ObsBridge } from './obs';
@@ -134,78 +132,14 @@ export function createHub(server: Server) {
     each(c => c.role === 'controller' || c.role === 'contributor' || c.role === 'crew', { t: 'ros', ros: db.ros, now: Date.now() });
   }
 
-  const nameOf = (id: string) => db.players.find(p => p.id === id)?.name ?? id;
-  function bnlMsg(): ServerMsg {
-    const ids = new Set<string>([...db.league.divisions.flatMap(d => d.rows.map(r => r.player)), ...db.playoffs.d1Seeds, ...db.playoffs.d2Seeds,
-      ...Object.values(db.playoffs.results).flatMap(r => r.order)]);
-    return { t: 'bnl', league: db.league, playoffs: db.playoffs, names: Object.fromEntries([...ids].filter(Boolean).map(id => [id, nameOf(id)])),
+  function matchDataMsg(): ServerMsg {
+    return { t: 'match-data', names: Object.fromEntries(db.players.map(p => [p.id, p.name])),
       sheet: db.sheet,
       info: Object.fromEntries(db.players.map(p => [p.id, { name: p.name, vdo: p.vdo, input: p.input, style: p.style, age: p.age, funFact: p.funFact, rival: p.rival, photo: p.photo }])) };
   }
-  function pushBnl() {
+  function pushMatchData() {
     save();
-    each(c => c.role === 'output' || c.role === 'controller' || c.role === 'admin' || c.role === 'crew', bnlMsg());
-  }
-
-  function rcApply(rc: ReverseCup, op: RcOp): ReverseCup {
-    switch (op.a) {
-      case 'round': return applyRound(rc, op.finish ?? [], op.dnf ?? []);
-      case 'undo': return undoRound(rc);
-      case 'reset': return resetRc(rc, typeof op.start === 'number' ? op.start : rc.start);
-      case 'set': {
-        const p = op.patch ?? {};
-        return { ...rc, ...Object.fromEntries(Object.entries(p).filter(([k]) => ['enabled', 'title', 'start', 'winners', 'maps', 'mapIndex', 'round'].includes(k))) } as ReverseCup;
-      }
-      case 'player': {
-        const players = rc.players.map((x, i) => {
-          if (i !== op.i) return x;
-          if (op.id === null) return { ...x, id: '', name: '' };
-          const pl = op.id !== undefined ? db.players.find(p => p.id === op.id) : undefined;
-          const next = { ...x, ...(pl ? { id: pl.id, name: pl.name } : {}) };
-          if (typeof op.points === 'number') { next.points = op.points; next.place = null; next.delta = null; }
-          return next;
-        });
-        return { ...rc, players };
-      }
-      case 'load-playoff': {
-        const def = PLAYOFF_DEFS.find(d => d.id === op.id);
-        if (!def) return rc;
-        const ids = playoffPlayers(db.playoffs, def);
-        const next: ReverseCup = { ...rc, title: def.label.toUpperCase(), start: def.start, winners: def.winners, source: { kind: 'playoff', id: def.id },
-          players: ids.map(id => ({ id: id ?? '', name: id ? nameOf(id) : '', points: def.start, prev: def.start, place: null, delta: null })) };
-        return resetRc(next, def.start);
-      }
-      case 'load-league': {
-        const div = db.league.divisions.find(d => d.id === op.div);
-        const next: ReverseCup = { ...rc, title: `${(div?.name ?? 'Division').toUpperCase()} · MATCH ${op.match + 1}`, start: 100, winners: 1, source: { kind: 'league', div: op.div, match: op.match } };
-        return resetRc(next, 100);
-      }
-      case 'save': return rc;
-    }
-  }
-
-  /** Write a finished Reverse Cup match into the league table or playoff bracket. */
-  function saveRc(rc: ReverseCup) {
-    const order = rcOrder(rc);
-    if (!rc.source || order.length === 0) return;
-    if (rc.source.kind === 'playoff') {
-      const id = rc.source.id;
-      db.playoffs = { ...db.playoffs, results: { ...db.playoffs.results, [id]: {
-        order, status: rc.finished ? 'done' : 'live', time: db.playoffs.results[id]?.time ?? '',
-        points: Object.fromEntries(rc.players.filter(p => p.id).map(p => [p.id, p.points > 0 ? p.points : -(p.place ?? 4)])),
-      } } };
-    } else {
-      const { div, match } = rc.source;
-      db.league = { ...db.league, divisions: db.league.divisions.map(d => d.id !== div ? d : {
-        ...d, rows: d.rows.map(r => {
-          const place = order.indexOf(r.player);
-          if (place < 0) return r;
-          const results = [...r.results]; results[match] = LEAGUE_POINTS[place] ?? 0;
-          return { ...r, results };
-        }),
-      }) };
-    }
-    pushBnl();
+    each(c => c.role === 'output' || c.role === 'controller' || c.role === 'admin' || c.role === 'crew', matchDataMsg());
   }
 
   let sheetBusy = false;
@@ -215,7 +149,7 @@ export function createHub(server: Server) {
     const before = JSON.stringify([db.showLive.teamA, db.showLive.teamB, db.showLive.bestOf]);
     try { await syncSheet(); } finally { sheetBusy = false; }
     if (JSON.stringify([db.showLive.teamA, db.showLive.teamB, db.showLive.bestOf]) !== before) broadcastLive();
-    pushBnl();
+    pushMatchData();
     pushState();
   }
   setInterval(() => { if (db.sheet.enabled && db.sheet.id) sheetNow(); }, 60_000);
@@ -224,7 +158,7 @@ export function createHub(server: Server) {
     if (!switchEvent(id)) return pushState();
     broadcastLive();
     pushRos();
-    pushBnl();
+    pushMatchData();
     each(c => c.role === 'output' || c.role === 'controller' || c.role === 'admin' || c.role === 'crew', { t: 'tournament', tournament: db.tournament });
     obs.apply(db.live, db.showLive.theme);
     const sc = db.showLive.obsScenes[db.live.screen];
@@ -282,8 +216,6 @@ export function createHub(server: Server) {
 
   function quick(op: QuickOp) {
     let spot: Show['spotlight'] | undefined;
-    const rcResult = op.k === 'rc' ? rcApply(db.showLive.rc, op.op) : undefined;
-    if (op.k === 'rc' && op.op.a === 'save') saveRc(db.showLive.rc);
     if (op.k === 'spotlight') {
       const until = typeof op.seconds === 'number' && op.seconds > 0 ? Date.now() + Math.min(600, op.seconds) * 1000 : null;
       if (op.kind === 'player') {
@@ -317,7 +249,6 @@ export function createHub(server: Server) {
         case 'timer-until': show.timer.target = Number.isFinite(op.target) ? op.target : null; break;
         case 'timer-stop': show.timer.target = null; break;
         case 'spotlight': show.spotlight = spot ?? null; break;
-        case 'rc': show.rc = rcResult ?? show.rc; break;
         case 'music': show.music = sanitizeShow({ ...show, music: { ...show.music, ...(op.patch ?? {}) } }).music; break;
         case 'next-match': show.nextMatch = sanitizeShow({ ...show, nextMatch: { ...show.nextMatch, ...(op.patch ?? {}) } }).nextMatch; break;
         case 'lineup': show.lineup = op.ids.map(id => db.players.find(x => x.id === id)).filter(Boolean).slice(0, 32).map(x => ({ id: x!.id, vdo: x!.vdo })); break;
@@ -424,7 +355,7 @@ export function createHub(server: Server) {
     if (c.role === 'output' || c.role === 'controller' || c.role === 'crew' || c.role === 'admin') send(c, liveMsg());
     if (c.role === 'controller' || c.role === 'contributor' || c.role === 'crew') send(c, { t: 'ros', ros: db.ros, now: Date.now() });
     if (c.role === 'controller') send(c, { t: 'state', state: controllerState() });
-    if (c.role !== 'contributor') { send(c, { t: 'tournament', tournament: db.tournament }); send(c, bnlMsg()); }
+    if (c.role !== 'contributor') { send(c, { t: 'tournament', tournament: db.tournament }); send(c, matchDataMsg()); }
     if (c.role === 'contributor') registerPublisher(c, c.slot!);
     pushState();
   }
@@ -446,7 +377,6 @@ export function createHub(server: Server) {
     }
 
     if (m.t === 't-op' && (c.role === 'admin' || c.role === 'controller')) return tournamentOp(m.op);
-    if ((m.t === 'league-set' || m.t === 'playoffs-set') && c.role === 'admin') { act(m); return; }
     if (c.role !== 'controller') return; // everything below mutates state
     act(m);
   }
@@ -469,21 +399,13 @@ export function createHub(server: Server) {
         db.ros = { ...db.ros, message: m.text ? { text: String(m.text).slice(0, 140), at: Date.now() } : null };
         pushRos();
         break;
-      case 'league-set':
-        db.league = sanitizeLeague(m.league, db.league);
-        pushBnl();
-        break;
-      case 'playoffs-set':
-        db.playoffs = sanitizePlayoffs(m.playoffs, db.playoffs);
-        pushBnl();
-        break;
       case 'follow-set':
         db.follow = sanitizeFollow(m.follow);
         save();
         break;
       case 'players-set':
         db.players = ensureStreamIds(sanitizePlayers(m.players));
-        pushBnl();
+        pushMatchData();
         save();
         break;
       case 'stories-set':
@@ -608,7 +530,7 @@ export function createHub(server: Server) {
         db.sheet.featured = typeof m.id === 'string' ? m.id : null;
         applyFeatured();
         broadcastLive();
-        pushBnl();
+        pushMatchData();
         break;
       }
       case 'badge': {

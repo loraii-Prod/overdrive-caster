@@ -72,8 +72,6 @@ createRoot(document.getElementById('root')!).render(
         <Route path="/output/player" element={<Output route="player" kind={{ k: 'player' }} />} />
         <Route path="/output/music" element={<MusicOutput />} />
         <Route path="/output/nextmatch" element={<Output route="nextmatch" kind={{ k: 'nextmatch' }} />} />
-        <Route path="/output/standings" element={<Output route="standings" kind={{ k: 'standings' }} />} />
-        <Route path="/output/playoffs" element={<Output route="playoffs" kind={{ k: 'playoffs' }} />} />
         <Route path="/output/playercam" element={<Output route="playercam" kind={{ k: 'playercam' }} />} />
         <Route path="/output/scoreboard" element={<Output route="scoreboard" kind={{ k: 'scoreboard' }} />} />
         <Route path="/output/ticker" element={<Output route="ticker" kind={{ k: 'ticker' }} />} />

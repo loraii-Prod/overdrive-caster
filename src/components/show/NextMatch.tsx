@@ -1,8 +1,7 @@
 import { motion } from 'motion/react';
 import type { Show } from '../../../shared/types';
-import { PLAYOFF_DEFS, playoffPlayers } from '../../../shared/bnl';
+import type { MatchData } from '../../../shared/protocol';
 import { EASE } from '../../lib/motion';
-import type { BnlData } from './BnlGraphics';
 
 export interface NextMatchInfo { label: string; time: string; target: number; players: string[]; live: boolean }
 
@@ -21,12 +20,11 @@ const GRACE = 10 * 60_000; // keep showing "starting now" for 10 min after the s
  * The next match: manual override if set, else the first playoff match that isn't
  * done (by its time), else the first schedule entry later today.
  */
-export function resolveNextMatch(show: Show, bnl: BnlData | null, now: number): NextMatchInfo | null {
+export function resolveNextMatch(show: Show, bnl: MatchData | null, now: number): NextMatchInfo | null {
   const nm = show.nextMatch;
   if (nm.label.trim() || nm.time) {
     const target = todayAt(nm.time, now) ?? now;
-    const rc = show.rc.enabled ? show.rc.players.filter(p => p.id).map(p => p.name) : [];
-    return { label: nm.label.trim() || 'NEXT MATCH', time: nm.time, target, players: rc, live: false };
+    return { label: nm.label.trim() || 'NEXT MATCH', time: nm.time, target, players: [], live: false };
   }
   const sm = bnl?.sheet?.matches ?? [];
   if (sm.length) {
@@ -35,19 +33,6 @@ export function resolveNextMatch(show: Show, bnl: BnlData | null, now: number): 
     if (c) {
       const sameDay = new Date(c.at!).toDateString() === new Date(now).toDateString();
       return { label: `${c.t1.name} vs ${c.t2.name}`, time: sameDay ? c.time.split(' ')[1] : c.time, target: c.at!, players: [], live: false };
-    }
-  }
-  if (bnl) {
-    const cands = PLAYOFF_DEFS.map(def => {
-      const r = bnl.playoffs.results[def.id];
-      const t = r?.time ? todayAt(r.time, now) : null;
-      return { def, r, t };
-    }).filter(c => c.t !== null && c.r?.status !== 'done' && c.r?.status !== 'live' && c.t! + GRACE > now)
-      .sort((a, b) => a.t! - b.t!);
-    const c = cands[0];
-    if (c) {
-      const ids = playoffPlayers(bnl.playoffs, c.def);
-      return { label: c.def.label, time: c.r!.time, target: c.t!, players: ids.map(id => (id ? bnl.names[id] ?? id : '')).filter(Boolean), live: false };
     }
   }
   const s = show.schedule.map(x => ({ x, t: todayAt(x.time, now) })).filter(c => c.t !== null && c.t + GRACE > now).sort((a, b) => a.t! - b.t!)[0];
@@ -66,7 +51,7 @@ const TAG = 'bg-[#E8E8E8] text-[#111]';
 export const NM_W = 300, NM_H = 78;
 
 /** Small always-on corner counter: "NEXT MATCH · 15:00 / Lower Final / 12:34". */
-export function NextMatchCorner({ show, bnl, now, screen }: { show: Show; bnl: BnlData | null; now: number; screen?: string }) {
+export function NextMatchCorner({ show, bnl, now, screen }: { show: Show; bnl: MatchData | null; now: number; screen?: string }) {
   if (!show.nextMatch.enabled) return null;
   const info = resolveNextMatch(show, bnl, now);
   if (!info) return null;

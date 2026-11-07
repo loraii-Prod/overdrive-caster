@@ -41,7 +41,7 @@ export function EventsPanel({ st, send }: { st: ControllerState; send: (m: any) 
         })}
       </div>
       <p className="text-[11px] leading-relaxed text-white/40">
-        Each event keeps its own casters, players, standings, playoffs, bracket, run of show, screen texts, schedule, ticker, music and brand kit. Switching is instant and goes straight to air (all OBS outputs restyle). Logins, OBS connection, camera links and the API token stay the same.
+        Each event keeps its own casters, players, bracket, run of show, screen texts, schedule, ticker, music and brand kit. Switching is instant and goes straight to air (all OBS outputs restyle). Logins, OBS connection, camera links and the API token stay the same.
       </p>
 
       <div className="rounded-md border border-white/10 bg-white/[0.02] p-3">
