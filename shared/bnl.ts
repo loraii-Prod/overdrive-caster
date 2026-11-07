@@ -45,7 +45,9 @@ export const emptyRcPlayer = (): RcPlayer => ({ id: '', name: '', points: 100, p
 
 export function defaultRc(): ReverseCup {
   return {
-    enabled: true, title: 'DIVISION 1 · MATCH 1', start: 100, winners: 1, maps: [...DEFAULT_MAPS], mapIndex: 0, round: 1,
+    // Off by default: Overdrive is a 2v2 team league (best-of match scoreboard),
+    // not the 4-player individual point-ladder this Reverse Cup mode is for.
+    enabled: false, title: 'DIVISION 1 · MATCH 1', start: 100, winners: 1, maps: [...DEFAULT_MAPS], mapIndex: 0, round: 1,
     players: [0, 1, 2, 3].map(() => emptyRcPlayer()), finished: false, roundAt: 0, source: null, history: [],
   };
 }

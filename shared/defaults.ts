@@ -38,11 +38,11 @@ export const SCREEN_LABELS: Record<ScreenId, string> = {
 
 export function defaultShow(): Show {
   return {
-    tournament: 'BENELUX PRO LEAGUE',
+    tournament: 'OVERDRIVE LEAGUE',
     stage: 'SEASON 1',
     teamA: { name: 'Team Alpha', tag: 'ALP', logo: '', score: 0 },
     teamB: { name: 'Team Bravo', tag: 'BRV', logo: '', score: 0 },
-    bestOf: 3,
+    bestOf: 5,
     game: 1,
     mapName: '',
     showScoreboard: true,

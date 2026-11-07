@@ -190,9 +190,9 @@ function timeKey(s: string) {
 // ---------- defaults & validation ----------
 
 export function defaultTournament(): Tournament {
-  const names = ['Zeemuis', 'astronauttm', 'Delet3..', 'ChiliConArne.', 'TIMMYS..', 'OwlsAreVeryCool', 'Jortim', 'Pug_TM'];
+  const names = ['Team Alpha', 'Team Bravo', 'Team Charlie', 'Team Delta', 'Team Echo', 'Team Foxtrot', 'Team Golf', 'Team Hotel'];
   const teams = names.map((n, i) => ({ id: `t${i + 1}`, name: n, tag: n.replace(/[^A-Za-z0-9]/g, '').slice(0, 4).toUpperCase(), logo: '' }));
-  return { name: 'BENELUX PRO LEAGUE', format: 'double', size: 8, gfReset: true, teams, matches: generate('double', 8), featured: null, updatedAt: Date.now() };
+  return { name: 'OVERDRIVE LEAGUE', format: 'double', size: 8, gfReset: true, teams, matches: generate('double', 8), featured: null, updatedAt: Date.now() };
 }
 
 export const nextSize = (n: number) => SIZES.find(s => s >= n) ?? MAX_TEAMS;

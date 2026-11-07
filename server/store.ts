@@ -139,7 +139,7 @@ function load(): Persisted {
       activeEvent: typeof raw.activeEvent === 'string' ? raw.activeEvent : base.activeEvent,
       eventData: raw.eventData && typeof raw.eventData === 'object' ? raw.eventData : {},
       sessions: Object.fromEntries(Object.entries(raw.sessions ?? {}).map(([k, v]: [string, any]) => [k, typeof v === 'number' ? { exp: v, role: 'producer' } : v])) as Persisted['sessions'],
-      tournament: raw.tournament && raw.tournament.name !== 'GLACIAL CUP' ? sanitizeTournament(raw.tournament) : base.tournament,
+      tournament: raw.tournament && raw.tournament.name !== defaultTournament().name ? sanitizeTournament(raw.tournament) : base.tournament,
     };
   } catch (e: any) {
     if (e.code !== 'ENOENT') {

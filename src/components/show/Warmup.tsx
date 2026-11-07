@@ -103,7 +103,9 @@ export function WarmupScreen({ show, now, bnl, embeds = true }: { show: Show; no
         <span className={`${TAG} px-3 pt-[4px] font-display text-[26px] leading-[36px]`}>{rc.enabled ? rc.title : show.stage}</span>
         <div className="mt-4 font-display text-[110px] leading-[0.9] text-white">WARM<br />UP</div>
         <div className="mt-4 font-display text-[28px] text-white/60">
-          {rc.enabled ? <>{map ? `${map.toUpperCase()} · ` : ''}{rc.maps.length} MAPS · {rc.start} PTS</> : show.tournament}
+          {rc.enabled
+            ? <>{map ? `${map.toUpperCase()} · ` : ''}{rc.maps.length} MAPS · {rc.start} PTS</>
+            : <>{show.tournament}{show.tournament ? ' · ' : ''}BEST OF {show.bestOf}</>}
         </div>
       </Rise>
       {show.timer.target != null && (
