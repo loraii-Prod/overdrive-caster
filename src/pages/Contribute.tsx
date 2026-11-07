@@ -30,10 +30,10 @@ export function Contribute() {
   const [info, setInfo] = useState<{ name: string; role: string; cameraVisible: boolean } | null>(null);
   const [error, setError] = useState('');
   const [devices, setDevices] = useState<MediaDeviceInfo[]>([]);
-  const [camId, setCamId] = useState(store.get('glacial.cam'));
-  const [micId, setMicId] = useState(store.get('glacial.mic'));
-  const [micOn, setMicOn] = useState(store.get('glacial.micOn') === '1');
-  const [quality, setQuality] = useState<keyof typeof QUALITIES>((store.get('glacial.q') as '720') || '720');
+  const [camId, setCamId] = useState(store.get('overdrive.cam'));
+  const [micId, setMicId] = useState(store.get('overdrive.mic'));
+  const [micOn, setMicOn] = useState(store.get('overdrive.micOn') === '1');
+  const [quality, setQuality] = useState<keyof typeof QUALITIES>((store.get('overdrive.q') as '720') || '720');
   const [started, setStarted] = useState(false);
   const [viewers, setViewers] = useState(0);
   const streamRef = useRef<MediaStream | null>(null);
@@ -84,7 +84,7 @@ export function Contribute() {
 
   // Re-acquire when the user changes device/quality/mic while live.
   useEffect(() => {
-    store.set('glacial.cam', camId); store.set('glacial.mic', micId); store.set('glacial.micOn', micOn ? '1' : '0'); store.set('glacial.q', quality);
+    store.set('overdrive.cam', camId); store.set('overdrive.mic', micId); store.set('overdrive.micOn', micOn ? '1' : '0'); store.set('overdrive.q', quality);
     if (started) acquire();
   }, [camId, micId, micOn, quality]); // eslint-disable-line react-hooks/exhaustive-deps
 

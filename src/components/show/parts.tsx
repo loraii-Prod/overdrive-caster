@@ -22,7 +22,8 @@ export function FitText({ children, max, className = '', style }: { children: Re
   );
 }
 
-/** Glacial backdrop for full-screen scenes: two pattern layers drifting in opposite directions. */
+/** Fallback backdrop for full-screen scenes on an event with no video skin of its own
+ * (Overdrive always has one, via skins.ts, so this path never renders for it). */
 export function ScreenBackground() {
   const { theme, bgProvided, brand } = useTheme();
   if (brand?.skin) return null;
@@ -30,7 +31,6 @@ export function ScreenBackground() {
   return (
     <div className="absolute inset-0 overflow-hidden bg-[#141414]">
       <Pattern drift opacity={0.5} size={620} />
-      <div className="glacial-drift-rev absolute inset-0" style={{ backgroundImage: 'url(/brand/glacial-pattern.svg)', backgroundSize: '1100px auto', opacity: 0.12 }} />
       <div className="absolute inset-0" style={{ background: 'radial-gradient(ellipse 80% 70% at 50% 45%, rgba(20,20,20,0.35) 0%, rgba(14,14,14,0.92) 100%)' }} />
     </div>
   );
@@ -213,7 +213,7 @@ export function Ticker({ show, height = 48 }: { show: Show; height?: number }) {
   return (
     <div className="relative flex overflow-hidden border-t border-white/10" style={{ height, background: 'rgba(12,12,12,0.9)' }}>
       <div className="z-10 flex flex-none items-center bg-white px-6 font-sans font-bold text-[#111]" style={{ fontSize: height * 0.27, letterSpacing: '0.26em' }}>
-        {show.tournament || 'GLACIAL'}
+        {show.tournament || 'OVERDRIVE'}
       </div>
       <div className="relative flex-1 overflow-hidden">
         <div ref={track} className="glacial-ticker absolute top-0 flex h-full items-center whitespace-nowrap font-sans font-medium text-white/90"

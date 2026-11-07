@@ -4,7 +4,7 @@
 [Setting category="General" name="Enabled"]
 bool S_Enabled = true;
 
-[Setting category="General" name="Server URL" description="Address of the caster system (Start GLACIAL Caster.bat)"]
+[Setting category="General" name="Server URL" description="Address of the caster system (Start Overdrive Caster.bat)"]
 string S_Url = "__URL__";
 
 [Setting category="General" name="API token" password description="Controller → Settings → Stream Deck / Companion"]

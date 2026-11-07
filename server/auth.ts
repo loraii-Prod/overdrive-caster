@@ -4,7 +4,7 @@ import { parseCookie } from 'cookie';
 import { config } from './config';
 import { db, newKey, save } from './store';
 
-export const COOKIE = 'glacial_session';
+export const COOKIE = 'overdrive_session';
 const TTL = 1000 * 60 * 60 * 24 * 14; // 14 days: survives a tournament weekend + restarts
 
 /** producer = full control (incl. tournament). admin = tournament data only. */

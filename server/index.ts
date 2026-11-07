@@ -67,7 +67,7 @@ if (clientDir) {
 }
 
 server.listen(config.port, config.host, () => {
-  console.log(`GLACIAL caster system on http://localhost:${config.port}`);
+  console.log(`Overdrive caster system on http://localhost:${config.port}`);
   console.log(`  controller  /controller`);
   console.log(`  outputs     /output/casters  /output/solo  /output/duo  /output/trio  /output/names  /output/branding  /output/audio/1..3`);
   console.log(`  cameras     /contribute/1..3?key=…  (links shown in the controller)`);

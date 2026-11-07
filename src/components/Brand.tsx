@@ -9,9 +9,9 @@ import { skinOf } from '../../shared/skins';
  * it. Only height is ever set, so original proportions are always preserved.
  */
 export const BRAND = {
-  logo: '/brand/glacial-logo.svg', // mark + GLACIAL
-  mark: '/brand/glacial-mark.svg', // circuit + mountain
-  pattern: '/brand/glacial-pattern.svg',
+  logo: '/brand/overdrive/logo.png',
+  mark: '/brand/overdrive/mark.png',
+  pattern: '',
 };
 
 export function Logo({ height, style, className }: { height: number; style?: CSSProperties; className?: string }) {
@@ -27,7 +27,7 @@ export function Logo({ height, style, className }: { height: number; style?: CSS
       </div>
     );
   }
-  return <img src={BRAND.logo} alt="Glacial" draggable={false} className={className} style={{ height, width: 'auto', display: 'block', ...style }} />;
+  return <img src={BRAND.logo} alt="Overdrive" draggable={false} className={className} style={{ height, width: 'auto', display: 'block', ...style }} />;
 }
 
 export function Mark({ height, style, className }: { height: number; style?: CSSProperties; className?: string }) {

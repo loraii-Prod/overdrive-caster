@@ -44,7 +44,7 @@ export const SCREEN_IDS: ScreenId[] = ['starting', 'casters', 'warmup', 'gamepla
 export type ThemeId = 'glacial' | 'bnl';
 export const THEMES: { id: ThemeId; label: string }[] = [
   { id: 'bnl', label: 'Boxed / ticker' },
-  { id: 'glacial', label: 'Glacial' },
+  { id: 'glacial', label: 'Classic' },
 ];
 
 /** Player spotlight / story card currently on screen (resolved data, so outputs need no database). */

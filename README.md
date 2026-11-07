@@ -1,4 +1,4 @@
-# GLACIAL — Broadcast Caster System
+# Overdrive — Broadcast Caster System
 
 A web-based caster control system for live esports production. A producer runs up to three casters from a password-protected dashboard. OBS shows the result through browser sources that update in real time and never need refreshing.
 
@@ -18,8 +18,8 @@ If `CONTROLLER_PASSWORD` or `ADMIN_PASSWORD` isn't set, the server generates one
 
 Docker:
 ```bash
-docker build -t glacial-caster .
-docker run -p 8787:8787 -v glacial-data:/data -e CONTROLLER_PASSWORD=… glacial-caster
+docker build -t overdrive-caster .
+docker run -p 8787:8787 -v overdrive-data:/data -e CONTROLLER_PASSWORD=… overdrive-caster
 ```
 
 ## Routes
@@ -30,9 +30,9 @@ docker run -p 8787:8787 -v glacial-data:/data -e CONTROLLER_PASSWORD=… glacial
 | `/output/casters` | Main caster composition (cameras, cards, nameplates, branding) |
 | `/output/solo` · `/output/duo` · `/output/trio` | Same scene, capped at 1 / 2 / 3 tiles. These always adapt down and never show an empty box |
 | `/output/names` | Nameplates only, transparent, in the same positions as `/output/casters` |
-| `/output/branding` | Glacial branding only, transparent |
+| `/output/branding` | Overdrive branding only, transparent |
 | `/output/audio/1..3` | A remote caster's microphone only, for mixing in OBS |
-| `/output/program` | **The whole show in one source.** Shows whichever screen is live (Casters, Starting soon, BRB, Thanks for watching, Bracket, Matches), with a Glacial stinger between screens |
+| `/output/program` | **The whole show in one source.** Shows whichever screen is live (Casters, Starting soon, BRB, Thanks for watching, Bracket, Matches), with an Overdrive stinger between screens |
 | `/output/starting` · `/output/brb` · `/output/ending` | Each full screen on its own, for one-OBS-scene-per-screen setups |
 | `/output/scoreboard` | In-game scoreboard (transparent): tags, logos, series pips, game/map |
 | `/output/ticker` | Scrolling news ticker (transparent, bottom) |
@@ -48,7 +48,7 @@ Output URLs are read-only. They receive the live scene and can't change anything
 ## Producer workflow
 
 - **Preview / Program.** Every edit goes to the preview monitor. **TAKE LIVE** (or Ctrl/Cmd+Enter) pushes the whole preview to air in one step. **Instant mode** sends every change straight to air.
-- **Layouts.** Auto picks Solo, Duo or Trio from the number of active casters. You can also force Solo, Duo or Trio. Mixed shows cameras where they're on and branded cards elsewhere. Audio shows identity cards only, over an animated Glacial background.
+- **Layouts.** Auto picks Solo, Duo or Trio from the number of active casters. You can also force Solo, Duo or Trio. Mixed shows cameras where they're on and branded cards elsewhere. Audio shows identity cards only, over an animated Overdrive background.
 - **Per caster:** enable, name, role, camera on/off, nameplate on/off, and camera source (Remote / OBS / URL / None). For a caster whose camera is off, choose *Name card* (stays on screen as a branded card) or *Remove* (the layout closes up).
 - **Global:** a master nameplate switch, a branding switch, and a background switch.
 - **Presets.** Six presets come built in: Pre-show, Match commentary, Analysis desk, Interview, Audio-only and Post-match. A preset stores the *look*: layout, which casters and cameras are on, and nameplates. Recalling one keeps the current names and camera sources. Tick *Also store names, roles & camera sources* when saving if you want those stored too. **TAKE** next to a preset recalls it and puts it on air in one click.
@@ -131,12 +131,7 @@ Set `OBS_WS_URL=ws://127.0.0.1:4455` and `OBS_WS_PASSWORD=…` on the server. Th
 
 ## Branding
 
-The files in `public/brand/` are vector traces of the supplied Glacial artwork:
-- `glacial-logo.svg`: the mark with the GLACIAL wordmark
-- `glacial-mark.svg`: the circuit-and-mountain mark only
-- `glacial-pattern.svg`: a seamless pattern tile built from the mark
-
-You can swap in official master files with the same names. Logos are only ever sized by height, so their proportions are preserved. The colors match the supplied artwork: background #161616, pattern #454545, white #EFEFEF.
+Overdrive's full graphics package lives in `public/brand/overdrive/`: the animated loops, caster booth/desk frames, stinger, replay/highlight overlays, and the starting/BRB/ending plates, all wired up in `shared/skins.ts`. `logo.png` and `mark.png` there are also used as the app's own fallback logo (`src/components/Brand.tsx`) for any event with no brand kit of its own. Logos are only ever sized by height, so their proportions are preserved.
 
 ## Project layout
 

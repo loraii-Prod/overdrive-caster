@@ -24,4 +24,4 @@ CONTROLLER_PASSWORD=overdrive-pass ADMIN_PASSWORD=overdrive-admin npm run dev
 
 All Overdrive brand assets (stinger, replay/highlight overlays, blank loops, duo/trio caster backgrounds, start/BRB/end plates) are already in `public/brand/overdrive/` — verified identical to the files you supplied separately.
 
-This is a standalone fork of GLACIAL Caster reskinned for Overdrive. See README.md for the full feature/route rundown.
+This is Overdrive's own standalone caster system (forked from the GLACIAL Caster codebase, now rebranded throughout). See README.md for the full feature/route rundown.

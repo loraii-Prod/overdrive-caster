@@ -75,7 +75,7 @@ export function Controller({ onLogout }: { onLogout: () => void }) {
   const [draft, setDraft] = useState<Scene | null>(null);
   const [showDraft, setShowDraft] = useState<Show | null>(null);
   const [section, setSection] = useState<Section>(() => {
-    try { return (localStorage.getItem('glacial.section') as Section) || 'live'; } catch { return 'live'; }
+    try { return (localStorage.getItem('overdrive.section') as Section) || 'live'; } catch { return 'live'; }
   });
   const lastEdit = useRef(0);
   const lastShowEdit = useRef(0);
@@ -87,7 +87,7 @@ export function Controller({ onLogout }: { onLogout: () => void }) {
   const [skew, setSkew] = useState(0);
   const now = useNow(skew, 250);
 
-  useEffect(() => { try { localStorage.setItem('glacial.section', section); } catch {} }, [section]);
+  useEffect(() => { try { localStorage.setItem('overdrive.section', section); } catch {} }, [section]);
 
   useEffect(() => sock.on(m => {
     if (m.t === 'state') {
@@ -416,7 +416,7 @@ export function Controller({ onLogout }: { onLogout: () => void }) {
                 <Block title="Advanced layout">
                   <div className="flex flex-wrap items-center gap-6">
                     <Switch on={preview.layout === 'mixed'} onChange={v => setScene({ layout: v ? 'mixed' : 'auto' })} label="Mixed mode (cards for cameras that are off)" />
-                    <Switch on={preview.showBackground} onChange={v => setScene({ showBackground: v })} label="Glacial background behind cameras" />
+                    <Switch on={preview.showBackground} onChange={v => setScene({ showBackground: v })} label="Background behind cameras" />
                   </div>
                 </Block>
                 <Block title="OBS WebSocket" note="Connect + one-click scene import"><ObsPanel st={st} send={m => sock.send(m)} /></Block>
