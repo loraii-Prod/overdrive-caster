@@ -5,7 +5,7 @@ import { Dot, Label, Switch, TextField } from './ui';
 /** Connect to OBS and build the whole BNL scene setup in one click. */
 export function ObsPanel({ st, send }: { st: ControllerState; send: (m: any) => void }) {
   const o = st.obs;
-  const [url, setUrl] = useState(o.url ?? 'ws://127.0.0.1:4455');
+  const [url, setUrl] = useState(o.url ?? '');
   const [pw, setPw] = useState('');
   const [game, setGame] = useState(true);
   const [audio, setAudio] = useState(true);
@@ -32,13 +32,15 @@ export function ObsPanel({ st, send }: { st: ControllerState; send: (m: any) => 
         </div>
       </div>
       <p className="text-[11px] leading-relaxed text-white/40">
-        In OBS: Tools → WebSocket Server Settings → tick <b>Enable WebSocket server</b> → Show Connect Info, copy the password here. OBS on this PC = ws://127.0.0.1:4455.
+        In OBS: Tools → WebSocket Server Settings → tick <b>Enable WebSocket server</b> → Show Connect Info, copy the password here.{' '}
+        <b>This caster server runs in the cloud, not on your PC</b> — so ws://127.0.0.1:4455 will never connect here, even though that's what OBS shows you locally.
+        Open a tunnel to your OBS WebSocket port instead (e.g. <code>ngrok tcp 4455</code>) and enter the public address it gives you, e.g. ws://0.tcp.ngrok.io:12345.
       </p>
 
       <div className="rounded-md border border-white/10 bg-white/[0.02] p-3">
         <div className="text-[13px] font-semibold">Import the BNL setup into OBS</div>
         <p className="mt-1 text-[12px] leading-relaxed text-white/50">
-          Creates one scene per screen (BNL · Starting soon, BNL · Casters, BNL · Gameplay, …), all sharing one 1920×1080 browser source with the whole show, and links them so GO / TAKE LIVE also switches OBS. Safe to run again: nothing is deleted, existing scenes are reused.
+          Creates one scene per screen (BNL · Starting soon, BNL · Casters, BNL · Gameplay, …), each with its own 1920×1080 browser source pointed at that screen, and links them so GO / TAKE LIVE also switches OBS. Safe to run again: nothing is deleted, existing scenes are reused.
         </p>
         <div className="mt-3 flex flex-wrap items-center gap-x-6 gap-y-2">
           <Switch on={game} onChange={setGame} label="Game capture under the gameplay overlay" />
