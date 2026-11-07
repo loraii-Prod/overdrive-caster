@@ -1,4 +1,5 @@
-import { motion } from 'motion/react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { AnimatePresence, motion } from 'motion/react';
 import type { Show } from '../../../shared/types';
 import type { MatchData } from '../../../shared/protocol';
 import { EASE } from '../../lib/motion';
@@ -53,6 +54,9 @@ export const NM_W = 300, NM_H = 78;
 /** Small always-on corner counter: "NEXT MATCH · 15:00 / Lower Final / 12:34". */
 export function NextMatchCorner({ show, bnl, now, screen }: { show: Show; bnl: MatchData | null; now: number; screen?: string }) {
   if (!show.nextMatch.enabled) return null;
+  // The waiting/starting screen already shows its own big countdown — a second
+  // "next match" timer here would just be a duplicate clock.
+  if (screen === 'starting' && show.timer.showOn.starting && show.timer.target != null) return null;
   const info = resolveNextMatch(show, bnl, now);
   if (!info) return null;
   const left = fmtLeft(info.target - now);
@@ -104,5 +108,59 @@ function SkinNextBox({ info, left, pos }: { info: NextMatchInfo; left: string | 
         </div>
       </div>
     </motion.div>
+  );
+}
+
+// -------------------------------------------------------- Other matches popout
+
+/** A sheet match counts as "live elsewhere" once it has a score and isn't done/not-played. */
+function liveElsewhere(bnl: MatchData | null): { t1: string; t2: string; s1: string; s2: string; bracket: string }[] {
+  const matches = bnl?.sheet?.matches ?? [];
+  const featured = bnl?.sheet?.featured;
+  return matches
+    .filter(m => m.id !== featured && m.status.toUpperCase() !== 'COMPLETED' && m.status.toLowerCase() !== 'not played' && (m.s1 || m.s2))
+    .map(m => ({ t1: m.t1.name, t2: m.t2.name, s1: m.s1 || '0', s2: m.s2 || '0', bracket: m.bracket }));
+}
+
+/**
+ * Small periodic popout on the gameplay screen: every `otherMatches.intervalSec`,
+ * shows one other live match's score for `otherMatches.durationSec`, cycling
+ * through whichever other sheet matches currently have a score (excludes the
+ * match being watched).
+ */
+export function OtherMatchPopout({ show, bnl }: { show: Show; bnl: MatchData | null }) {
+  const cfg = show.otherMatches;
+  const matches = useMemo(() => liveElsewhere(bnl), [bnl]);
+  const [i, setI] = useState(0);
+  const [visible, setVisible] = useState(false);
+  const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    setVisible(false);
+    if (hideTimer.current) clearTimeout(hideTimer.current);
+    if (!cfg.enabled || matches.length === 0) return;
+    const t = setInterval(() => {
+      setI(x => x + 1);
+      setVisible(true);
+      if (hideTimer.current) clearTimeout(hideTimer.current);
+      hideTimer.current = setTimeout(() => setVisible(false), cfg.durationSec * 1000);
+    }, Math.max(5, cfg.intervalSec) * 1000);
+    return () => { clearInterval(t); if (hideTimer.current) clearTimeout(hideTimer.current); };
+  }, [cfg.enabled, cfg.intervalSec, cfg.durationSec, matches.length]);
+
+  if (!visible || matches.length === 0) return null;
+  const m = matches[i % matches.length];
+  return (
+    <AnimatePresence>
+      <motion.div key={i} className="pointer-events-none absolute bottom-6 left-1/2 flex items-stretch" style={{ x: '-50%', height: 58, filter: 'drop-shadow(0 8px 20px rgba(0,0,0,0.5))' }}
+        initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 12 }} transition={{ duration: 0.3, ease: EASE }}>
+        <span className={`${TAG} flex items-center px-3 font-display text-[16px]`}>ELSEWHERE</span>
+        <div className="flex items-center gap-3 bg-[#050505] px-4 font-display text-[20px] leading-none text-white">
+          <span className="truncate">{m.t1}</span>
+          <span className="text-white/45">{m.s1}–{m.s2}</span>
+          <span className="truncate">{m.t2}</span>
+        </div>
+      </motion.div>
+    </AnimatePresence>
   );
 }

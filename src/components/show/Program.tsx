@@ -11,7 +11,7 @@ import { SpotlightCard } from './Spotlight';
 import { PlayerCam, playerCamBox } from './PlayerCam';
 import { CamStrip, WarmupScreen } from './Warmup';
 import { SheetBracket, SheetMatches } from './SheetBracket';
-import { NextMatchCorner } from './NextMatch';
+import { NextMatchCorner, OtherMatchPopout } from './NextMatch';
 import { VdoContext } from '../../lib/vdo';
 import { skinBackground, skinOf } from '../../../shared/skins';
 import { SkinBadge, SkinCasters, SkinIntermission, SkinStinger, SkinTicker, SkinVideo } from './Skin';
@@ -59,7 +59,7 @@ function ScreenBody({ id, scene, show, now, tournament, viewer, monitor, embeds 
     case 'starting': return <StartingScreen show={show} now={now} tournament={tournament} />;
     case 'brb': return <BrbScreen show={show} now={now} />;
     case 'ending': return <EndingScreen show={show} now={now} />;
-    case 'bracket': return bnl?.sheet?.matches.length ? <><ScreenBackground /><SheetBracket sheet={bnl.sheet} show={show} /></> : tournament ? <BracketView t={tournament} /> : <ScreenBackground />;
+    case 'bracket': return bnl?.sheet?.matches.length ? <><ScreenBackground /><SheetBracket sheet={bnl.sheet} show={show} /></> : tournament ? <BracketView t={tournament} view={show.bracketView} /> : <ScreenBackground />;
     case 'matches': return bnl?.sheet?.matches.length ? <><ScreenBackground /><SheetMatches sheet={bnl.sheet} show={show} /></> : tournament ? <MatchesBoard t={tournament} show={show} /> : <ScreenBackground />;
     case 'warmup': return <WarmupScreen show={show} now={now} bnl={bnl} embeds={embeds && !monitor} />;
     case 'gameplay': return <GameplayScreen scene={scene} show={show} now={now} viewer={viewer} monitor={monitor} embeds={embeds && !monitor} bnl={bnl} />;
@@ -138,6 +138,7 @@ export function GameplayScreen({ scene, show, now, viewer, monitor, embeds = tru
       <SpotlightCard spot={show.spotlight} now={now} bottom={(ticker ? 56 : 0) + 40}
         left={(g.cams && cams.length > 0 && g.corner === 'left') || (show.playerCam.enabled && show.activePlayer && show.playerCam.corner === 'left') ? 1920 - 40 - 820 : 40} />
       {ticker && <div className="absolute inset-x-0 bottom-0"><Ticker show={show} height={56} /></div>}
+      <OtherMatchPopout show={show} bnl={bnl} />
     </div>
   );
 }

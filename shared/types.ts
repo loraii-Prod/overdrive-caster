@@ -143,6 +143,10 @@ export interface Show {
   gameplay: { cams: boolean; corner: 'left' | 'right'; ticker: boolean };
   /** Starting Soon shows the bracket's upcoming matches instead of the manual schedule. */
   scheduleFromBracket: boolean;
+  /** Which half of the bracket /output/bracket shows (controller picks; "full" shows both). */
+  bracketView: 'full' | 'upper' | 'lower';
+  /** Periodic small popout on the gameplay screen with another live match's score. */
+  otherMatches: { enabled: boolean; intervalSec: number; durationSec: number };
 }
 
 export interface Scene {

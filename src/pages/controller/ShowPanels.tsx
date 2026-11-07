@@ -95,7 +95,7 @@ export function MatchTab({ show, live, set, quick, tournament }: ShowProps) {
       </div>
       <div className="flex flex-wrap items-center gap-x-5 gap-y-2.5">
         <Switch on={show.showScoreboard} onChange={v => set({ showScoreboard: v })} label="In-game scoreboard" />
-        <Switch on={show.showMatchupOnCasters} onChange={v => set({ showMatchupOnCasters: v })} label="Matchup bar on casters" />
+        <Switch on={show.showMatchupOnCasters} onChange={v => set({ showMatchupOnCasters: v })} label="Show match result on casters" />
         <Switch on={show.showMatchupOnScreens} onChange={v => set({ showMatchupOnScreens: v })} label="Matchup on screens" />
         <div className="ml-auto flex gap-2">
           <button type="button" className="btn-sm" onClick={() => quick({ k: 'swap' })} title="Swap sides (unlinks a featured match)">Swap sides</button>
@@ -242,7 +242,7 @@ export function SponsorsTab({ show, set }: ShowProps) {
   );
 }
 
-export function TournamentTab({ tournament, send }: ShowProps) {
+export function TournamentTab({ show, set, tournament, send }: ShowProps) {
   const res = useMemo(() => (tournament ? resolve(tournament) : null), [tournament]);
   if (!tournament || !res) return null;
   const ready = tournament.matches.filter(m => { const r = res.get(m.id)!; return isTeam(r.a) && isTeam(r.b) && !r.skipped; });
@@ -258,6 +258,11 @@ export function TournamentTab({ tournament, send }: ShowProps) {
             return <option key={m.id} value={m.id}>{m.label}: {name(r.a)} vs {name(r.b)}{m.status === 'live' ? ' · LIVE' : m.status === 'done' ? ' · final' : m.time ? ` · ${m.time}` : ''}</option>;
           })}
         </select>
+      </div>
+      <div>
+        <Label>/output/bracket shows</Label>
+        <Segmented size="sm" value={show.bracketView} onChange={v => set({ bracketView: v })}
+          options={[{ value: 'full', label: 'Both (auto-rotate)' }, { value: 'upper', label: 'Upper only' }, { value: 'lower', label: 'Lower only' }]} />
       </div>
       <a href="/admin" target="_blank" rel="noreferrer" className="btn-sm inline-flex items-center">Open tournament admin ↗</a>
       <p className="w-full text-[11px] leading-relaxed text-white/40">

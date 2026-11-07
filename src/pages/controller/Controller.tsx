@@ -365,6 +365,20 @@ export function Controller({ onLogout }: { onLogout: () => void }) {
                     </div>
                   )}
                 </Block>
+                <Block title="Other matches popout" note="Gameplay screen · shows another live sheet match's score, on a timer">
+                  <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
+                    <Switch on={showPreview.otherMatches.enabled} onChange={v => showProps.set({ otherMatches: { ...showPreview.otherMatches, enabled: v } })} label="Enabled" />
+                    <div className="flex items-center gap-2 text-[12px] text-white/60">
+                      Every
+                      <input className="input h-8 w-16" type="number" min={30} max={3600} value={showPreview.otherMatches.intervalSec}
+                        onChange={e => showProps.set({ otherMatches: { ...showPreview.otherMatches, intervalSec: Math.max(30, Math.min(3600, +e.target.value || 300)) } })} />
+                      sec, show for
+                      <input className="input h-8 w-16" type="number" min={5} max={60} value={showPreview.otherMatches.durationSec}
+                        onChange={e => showProps.set({ otherMatches: { ...showPreview.otherMatches, durationSec: Math.max(5, Math.min(60, +e.target.value || 12)) } })} />
+                      sec
+                    </div>
+                  </div>
+                </Block>
                 <Block title="Countdown"><TimerTab {...showProps} /></Block>
               </>
             )}

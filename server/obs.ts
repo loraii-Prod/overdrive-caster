@@ -141,17 +141,19 @@ export class ObsBridge {
 
   /**
    * Create a ready-to-go BNL scene collection inside the current OBS profile:
-   * one scene per broadcast screen, all sharing one "BNL Overlay" browser source
-   * (/output/program), a nested caster-audio scene, and a game capture under
-   * the gameplay overlay. Safe to run again: existing scenes/sources are reused.
-   * Returns the screen → OBS scene mapping.
+   * one scene PER broadcast screen, each with its OWN browser source pointed
+   * at that screen's dedicated /output/<screen> page (not a shared /output/program
+   * source — that would show identical content in every OBS scene, defeating
+   * the point of OBS doing the switching), a nested caster-audio scene, and a
+   * game capture under the gameplay overlay. Safe to run again: existing
+   * scenes/sources are reused. Returns the screen → OBS scene mapping.
    */
-  async build(o: { base: string; key: string; screens: { id: string; label: string }[]; gameCapture: boolean; audio: boolean }): Promise<Record<string, string> | null> {
+  async build(o: { base: string; key: string; screens: { id: string; label: string; route: string }[]; gameCapture: boolean; audio: boolean }): Promise<Record<string, string> | null> {
     const lines: string[] = [];
     const done = (ok: boolean) => { this.status.build = { at: Date.now(), ok, lines }; this.onChange(); };
     if (!this.status.connected) { lines.push('OBS is not connected.'); done(false); return null; }
     const q = (path: string) => `${o.base}${path}${o.key ? `?key=${encodeURIComponent(o.key)}` : ''}`;
-    const OVERLAY = 'BNL Overlay', AUDIO_SCENE = 'BNL · Caster audio', GAME = 'BNL Game capture';
+    const AUDIO_SCENE = 'BNL · Caster audio', GAME = 'BNL Game capture';
     const css = 'body { background-color: rgba(0, 0, 0, 0); margin: 0px auto; overflow: hidden; }';
     try {
       const v = await this.obs.call('GetVideoSettings');
@@ -192,6 +194,7 @@ export class ObsBridge {
       const map: Record<string, string> = {};
       for (const s of o.screens) {
         const name = `BNL · ${s.label}`;
+        const overlay = `BNL · ${s.label} overlay`;
         map[s.id] = name;
         const made = await ensureScene(name);
         if (s.id === 'gameplay' && o.gameCapture) {
@@ -200,14 +203,14 @@ export class ObsBridge {
             if (r === 'created') lines.push(`Created "${GAME}" (any fullscreen game) under the gameplay overlay`);
           } catch (e: any) { lines.push(`Game capture skipped: ${e.message}`); }
         }
-        const r = await place(name, OVERLAY, 'browser_source', { url: q('/output/program'), width: 1920, height: 1080, fps_custom: true, fps: 60, css, shutdown: false, restart_when_active: false, reroute_audio: false });
-        if (r !== 'kept') await fill(name, OVERLAY);
-        if (r === 'created') lines.push(`Created "${OVERLAY}" → ${q('/output/program')}`);
+        const r = await place(name, overlay, 'browser_source', { url: q(s.route), width: 1920, height: 1080, fps_custom: true, fps: 60, css, shutdown: false, restart_when_active: false, reroute_audio: false });
+        if (r !== 'kept') await fill(name, overlay);
+        if (r === 'created') lines.push(`Created "${overlay}" → ${q(s.route)}`);
+        // keep each screen's own URL current (port / output key may have changed)
+        await this.obs.call('SetInputSettings', { inputName: overlay, inputSettings: { url: q(s.route) } });
         if (o.audio && !(await hasItem(name, AUDIO_SCENE))) await this.obs.call('CreateSceneItem', { sceneName: name, sourceName: AUDIO_SCENE });
         lines.push(`${made ? 'Created' : 'Updated'} scene "${name}"`);
       }
-      // keep the overlay URL current (port / output key may have changed)
-      await this.obs.call('SetInputSettings', { inputName: OVERLAY, inputSettings: { url: q('/output/program') } });
       await this.refreshScenes();
       lines.push('Scene switching is linked: GO / TAKE LIVE on a screen now also switches OBS.');
       done(true);

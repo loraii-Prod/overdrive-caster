@@ -78,8 +78,11 @@ export function Output({ route, kind }: { route: string; kind: OutputKind }) {
       case 'scoreboard': body = <Scoreboard show={show} />; break;
       case 'ticker': body = <div className="absolute inset-x-0 bottom-0"><Ticker show={show} height={56} /></div>; break;
       case 'bracket': if (bnl?.sheet?.matches.length) { body = <SheetBracket sheet={bnl.sheet} show={show} />; break; } {
+        // ?view=upper/lower overrides the controller's bracket-view pick (e.g. for a
+        // dedicated OBS source), otherwise it follows show.bracketView.
         const v = query().get('view');
-        body = tournament && <BracketView t={tournament} view={v === 'upper' || v === 'lower' ? v : 'full'} transparent={query().has('transparent')} />;
+        const view = v === 'upper' || v === 'lower' ? v : show.bracketView;
+        body = tournament && <BracketView t={tournament} view={view} transparent={query().has('transparent')} />;
         break;
       }
       case 'matches': body = bnl?.sheet?.matches.length ? <SheetMatches sheet={bnl.sheet} show={show} /> : tournament && <MatchesBoard t={tournament} show={show} transparent={query().has('transparent')} />; break;

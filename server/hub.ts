@@ -555,7 +555,7 @@ export function createHub(server: Server) {
       case 'obs-build': {
         obs.build({
           base: `http://localhost:${config.port}`, key: config.outputKey,
-          screens: SCREEN_IDS.map(id => ({ id, label: SCREEN_LABELS[id] })),
+          screens: SCREEN_IDS.map(id => ({ id, label: SCREEN_LABELS[id], route: `/output/${id}` })),
           gameCapture: m.gameCapture !== false, audio: m.audio !== false,
         }).then(map => {
           if (!map) return;

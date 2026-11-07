@@ -38,28 +38,35 @@ export function SkinCasters({ skin, scene, show, viewer, monitor }: { skin: Skin
   const holes = skin.holes[kind];
   return (
     <div className="absolute inset-0">
-      {cams.map((c, i) => {
-        const r = holes[i];
-        if (!r) return null;
-        return (
-          <div key={c.id} className="absolute overflow-hidden bg-[#140a0a]" style={{ left: r.x, top: r.y, width: r.w, height: r.h }}>
-            {c.cameraOn && <Feed caster={c} viewer={viewer} size={kind === 'solo' ? 'lg' : 'md'} showName={false} monitor={monitor} />}
-          </div>
-        );
-      })}
-      <SkinVideo src={frame} />
-      {scene.showNames && cams.map((c, i) => {
-        const r = holes[i];
-        if (!r || !c.showName) return null;
-        return (
-          <motion.div key={`n${c.id}`} className="absolute flex items-center gap-3" style={{ left: r.x + 18, top: r.y + r.h, height: skin.nameBar, width: r.w * 0.62 }}
-            initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.35, ease: EASE, delay: 0.1 + i * 0.06 }}>
-            <span className={`${NAME} truncate text-white`} style={{ fontSize: kind === 'trio' ? 26 : 30 }}>{c.name}</span>
-            {c.role && <span className="flex-none font-['Montserrat'] text-[14px] font-bold uppercase tracking-[0.12em] text-white/55">{c.role}</span>}
-          </motion.div>
-        );
-      })}
-      {scene.showBranding && <SkinMatchStrip show={show} />}
+      {/* Crossfade the whole layout on a cam-count change (solo/duo/trio), so switching
+       * between 1/2/3 casters is a smooth transition instead of a hard cut. */}
+      <AnimatePresence mode="wait">
+        <motion.div key={kind} className="absolute inset-0" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.3, ease: EASE }}>
+          {cams.map((c, i) => {
+            const r = holes[i];
+            if (!r) return null;
+            return (
+              <motion.div key={c.id} className="absolute overflow-hidden bg-[#140a0a]" style={{ left: r.x, top: r.y, width: r.w, height: r.h }}
+                initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.35, ease: EASE, delay: 0.06 + i * 0.06 }}>
+                {c.cameraOn && <Feed caster={c} viewer={viewer} size={kind === 'solo' ? 'lg' : 'md'} showName={false} monitor={monitor} />}
+              </motion.div>
+            );
+          })}
+          <SkinVideo src={frame} />
+          {scene.showNames && cams.map((c, i) => {
+            const r = holes[i];
+            if (!r || !c.showName) return null;
+            return (
+              <motion.div key={`n${c.id}`} className="absolute flex items-center gap-3" style={{ left: r.x + 18, top: r.y + r.h, height: skin.nameBar, width: r.w * 0.62 }}
+                initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.35, ease: EASE, delay: 0.1 + i * 0.06 }}>
+                <span className={`${NAME} truncate text-white`} style={{ fontSize: kind === 'trio' ? 26 : 30 }}>{c.name}</span>
+                {c.role && <span className="flex-none font-['Montserrat'] text-[14px] font-bold uppercase tracking-[0.12em] text-white/55">{c.role}</span>}
+              </motion.div>
+            );
+          })}
+        </motion.div>
+      </AnimatePresence>
+      {scene.showBranding && show.showMatchupOnCasters && <SkinMatchStrip show={show} />}
     </div>
   );
 }

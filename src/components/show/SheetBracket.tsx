@@ -119,9 +119,10 @@ function PageDots({ n, i }: { n: number; i: number }) {
 }
 
 /** Bracket straight from the sheet's match list. Upper and lower+qualified are
- * each a full screen, auto-rotating every 10s (there's too much to legibly fit
- * side-by-side on one screen with 15+ teams). Stays on one page if there's
- * nothing yet to show on the other. */
+ * each a full screen. `show.bracketView` picks which one is on air: "full"
+ * auto-rotates every 10s (there's too much to legibly fit side-by-side on one
+ * screen with 15+ teams), "upper"/"lower" pins it to one page. Stays on one
+ * page if there's nothing yet to show on the other. */
 export function SheetBracket({ sheet, show }: { sheet: SheetState; show: Show }) {
   const teams = new Map(sheet.teams.map(t => [t.id, t]));
   const played = sheet.matches.filter(m => m.status.toLowerCase() !== 'not played');
@@ -136,13 +137,15 @@ export function SheetBracket({ sheet, show }: { sheet: SheetState; show: Show })
   const qualified = qualSlots.map(m => (m.status === 'COMPLETED' ? teams.get(m.winner) ?? null : null));
 
   const hasLowerPage = lower.flat().length > 0 || qualSlots.length > 0 || finals.length > 0;
-  const pages = hasLowerPage ? 2 : 1;
-  const [page, setPage] = useState(0);
+  const pinned = show.bracketView === 'upper' ? 0 : show.bracketView === 'lower' ? (hasLowerPage ? 1 : 0) : null;
+  const pages = pinned != null ? 1 : hasLowerPage ? 2 : 1;
+  const [auto, setAuto] = useState(0);
   useEffect(() => {
-    if (pages < 2) { setPage(0); return; }
-    const t = setInterval(() => setPage(p => (p + 1) % pages), 10_000);
+    if (pinned != null || pages < 2) return;
+    const t = setInterval(() => setAuto(p => (p + 1) % pages), 10_000);
     return () => clearInterval(t);
-  }, [pages]);
+  }, [pinned, pages]);
+  const page = pinned ?? auto;
 
   return (
     <div className="absolute inset-0">
@@ -153,7 +156,7 @@ export function SheetBracket({ sheet, show }: { sheet: SheetState; show: Show })
             : <LowerPage upper={upper} lower={lower} finals={finals} qualSlots={qualSlots} qualified={qualified} teams={teams} sheet={sheet} show={show} />}
         </motion.div>
       </AnimatePresence>
-      <PageDots n={pages} i={page} />
+      {pinned == null && <PageDots n={pages} i={page} />}
     </div>
   );
 }

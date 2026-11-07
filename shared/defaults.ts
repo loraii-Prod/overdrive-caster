@@ -72,6 +72,8 @@ export function defaultShow(): Show {
     vdo: { password: '', params: '&cleanoutput&noaudio&cover' },
     lineup: [],
     scheduleFromBracket: false,
+    bracketView: 'full',
+    otherMatches: { enabled: true, intervalSec: 300, durationSec: 12 },
   };
 }
 
@@ -215,6 +217,12 @@ export function sanitizeShow(v: any): Show {
       onScreens: bool(v.ticker?.onScreens, d.ticker.onScreens),
     },
     scheduleFromBracket: bool(v.scheduleFromBracket, d.scheduleFromBracket),
+    bracketView: v.bracketView === 'upper' || v.bracketView === 'lower' ? v.bracketView : 'full',
+    otherMatches: {
+      enabled: bool(v.otherMatches?.enabled, d.otherMatches.enabled),
+      intervalSec: int(v.otherMatches?.intervalSec, 30, 3600, d.otherMatches.intervalSec),
+      durationSec: int(v.otherMatches?.durationSec, 5, 60, d.otherMatches.durationSec),
+    },
     prize: sanitizePrize(v.prize),
     brand: sanitizeBrand(v.brand),
     music: {
