@@ -3,7 +3,7 @@ import { ScaledCanvas } from '../components/Stage';
 import { Program } from '../components/show/Program';
 import { RosView } from '../components/RosView';
 import { StatusPill } from './Contribute';
-import { useMatchData, useConnState, useLive, useNow, useRos, useSocket, useTournament, query } from '../lib/hooks';
+import { useMatchData, useConnState, useLive, useNow, useRos, useSocket, useTournament, useWildcard, query } from '../lib/hooks';
 
 /** /crew?key=… — read-only page for casters & crew: what's on air + run of show + producer messages. */
 export function Crew() {
@@ -13,6 +13,7 @@ export function Crew() {
   const ros = useRos(sock);
   const tournament = useTournament(sock);
   const bnl = useMatchData(sock);
+  const wc = useWildcard(sock);
   const now = useNow(ros?.skew ?? live?.skew ?? 0, 500);
   return (
     <div className="min-h-screen bg-[#121212] text-white">
@@ -35,7 +36,7 @@ export function Crew() {
                 <span className="text-[11px] text-white/40">Cameras not shown here</span>
               </div>
               <div className="monitor-bg aspect-video overflow-hidden rounded-md border border-[#e5484d]/50">
-                <ScaledCanvas>{live && <Program scene={live.scene} show={live.show} now={now} tournament={tournament} viewer={null} embeds={false} bnl={bnl} />}</ScaledCanvas>
+                <ScaledCanvas>{live && <Program scene={live.scene} show={live.show} transition={live.transition} now={now} tournament={tournament} viewer={null} embeds={false} bnl={bnl} wc={wc} />}</ScaledCanvas>
               </div>
             </div>
           </div>

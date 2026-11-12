@@ -1,13 +1,21 @@
+import type { TransitionKind } from '../../../shared/engine';
+import { GameFeedSettingsCard } from './GameFeedSettings';
+import { boothScene } from '../../components/wildcard/Desk';
+import { BoothPicker, DeskPicker, InterviewControls } from './Talent';
+import type { WcOp } from '../../../shared/wildcard';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Logo } from '../../components/Brand';
 import { ScaledCanvas } from '../../components/Stage';
 import { Program } from '../../components/show/Program';
 import { formatRemaining } from '../../components/show/parts';
-import { useMatchData, useConnState, useNow, useSocket, useTournament, useViewer, useWantedCameras } from '../../lib/hooks';
+import { useMatchData, useConnState, useNow, useSocket, useTournament, useViewer, useWantedCameras, useWildcard } from '../../lib/hooks';
+import { WildcardPanel } from './WildcardPanel';
+import { TwitchPanel } from './TwitchPanel';
+import { PLAIN_SCREENS, SceneDock } from './SceneDock';
 import { compose } from '../../../shared/layout';
 import { sameScene, SCREEN_LABELS } from '../../../shared/defaults';
 import { SCREEN_IDS, THEMES } from '../../../shared/types';
-import type { QuickOp } from '../../../shared/protocol';
+import type { ClientMsg, QuickOp } from '../../../shared/protocol';
 import type { Caster, CasterId, ControllerState, LayoutMode, Scene, Show } from '../../../shared/types';
 import { CasterCard } from './CasterCard';
 import { ThemeProvider } from '../../lib/theme';
@@ -33,7 +41,7 @@ const LAYOUTS: { value: LayoutMode; label: string; hint: string }[] = [
 const OUTPUT_ROUTES: { route: string; label: string }[] = [
   { route: 'program', label: 'Whole show (recommended)' },
   { route: 'gameplay', label: 'Gameplay overlay' },
-  { route: 'warmup', label: 'Warm-up lobby cams' },
+  { route: 'warmup', label: 'Player / team card (lobby cams)' },
   { route: 'nextmatch', label: 'Next match counter only' },
   { route: 'music', label: 'Music (audio only)' },
   { route: 'player', label: 'Player spotlight only' },
@@ -48,33 +56,52 @@ const OUTPUT_ROUTES: { route: string; label: string }[] = [
   { route: 'ending', label: 'Thanks for watching' },
   { route: 'bracket', label: 'Bracket' },
   { route: 'matches', label: 'Upcoming & results' },
+  { route: 'major', label: 'Major bracket' },
+  { route: 'major/gameplay', label: 'Major gameplay popups' },
+  { route: 'major/waiting', label: 'Major waiting screen' },
+  { route: 'major/casters', label: 'Major casters card (up next)' },
+  { route: 'twitch', label: 'Twitch prediction / poll card' },
   { route: 'solo', label: 'Solo layout' },
   { route: 'duo', label: 'Duo layout' },
   { route: 'trio', label: 'Trio layout' },
 ];
 
-type Section = 'events' | 'live' | 'ros' | 'casters' | 'players' | 'match' | 'music' | 'screens' | 'tournament' | 'settings';
-const SECTIONS: { id: Section; label: string; hint: string }[] = [
-  { id: 'events', label: 'Events', hint: 'Switch production, brand kit' },
-  { id: 'live', label: 'Live', hint: 'Layout, score, presets' },
-  { id: 'ros', label: 'Run of show', hint: 'Rundown, caster messages' },
-  { id: 'casters', label: 'Casters', hint: 'Names, cameras' },
-  { id: 'players', label: 'Players', hint: 'Cams, spotlight, facts' },
-  { id: 'match', label: 'Match', hint: 'Score, timer' },
-  { id: 'music', label: 'Music', hint: 'Beds per screen, volume' },
-  { id: 'screens', label: 'Screens', hint: 'Texts, ticker, sponsors' },
-  { id: 'tournament', label: 'Tournament', hint: 'Bracket link' },
-  { id: 'settings', label: 'Settings', hint: 'OBS, API, reset' },
+type Section = 'links' | 'events' | 'live' | 'ros' | 'casters' | 'analysts' | 'interview' | 'players' | 'match' | 'wildcard' | 'twitch' | 'music' | 'screens' | 'tournament' | 'settings';
+/** Sidebar: what you use during the show first, then people, then setup you do once. */
+const NAV: { group: string; items: { id: Section; label: string; hint: string }[] }[] = [
+  { group: 'Show', items: [
+    { id: 'live', label: 'Live', hint: 'Layout, presets, quick toggles' },
+    { id: 'wildcard', label: 'Major', hint: 'Bracket, first round, intro, maps, popups' },
+    { id: 'interview', label: 'Interview', hint: 'Online player interview' },
+    { id: 'twitch', label: 'Twitch', hint: 'Viewer predictions & polls' },
+  ] },
+  { group: 'People', items: [
+    { id: 'casters', label: 'Casters', hint: '3 casters · who is on camera' },
+    { id: 'analysts', label: 'Analysts', hint: '2 analysts · the desk' },
+  ] },
+  { group: 'Setup', items: [
+    { id: 'links', label: 'Links', hint: 'One link per scene, for OBS or a browser' },
+    { id: 'screens', label: 'Screens', hint: 'Texts, ticker, sponsors' },
+    { id: 'match', label: 'Scoreboard', hint: 'Scoreboard, next-match counter, gameplay cams' },
+    { id: 'music', label: 'Music', hint: 'Beds per screen, volume' },
+    { id: 'players', label: 'Players', hint: 'Player cams, spotlight, facts' },
+    { id: 'ros', label: 'Run of show', hint: 'Rundown, caster messages' },
+    { id: 'events', label: 'Events', hint: 'Switch production, brand kit' },
+    { id: 'tournament', label: 'Tournament', hint: 'Bracket link' },
+    { id: 'settings', label: 'Settings', hint: 'OBS, API, reset' },
+  ] },
 ];
+const SECTIONS = NAV.flatMap(g => g.items);
 
-export function Controller({ onLogout }: { onLogout: () => void }) {
+export function Controller({ onLogout, dockOnly = false, dockAll = false }: { onLogout: () => void; dockOnly?: boolean; dockAll?: boolean }) {
   const sock = useSocket({ role: 'controller' });
   const conn = useConnState(sock);
   const [st, setSt] = useState<ControllerState | null>(null);
   const [draft, setDraft] = useState<Scene | null>(null);
   const [showDraft, setShowDraft] = useState<Show | null>(null);
+  const [stripUrls, setStripUrls] = useState(false);
   const [section, setSection] = useState<Section>(() => {
-    try { return (localStorage.getItem('overdrive.section') as Section) || 'live'; } catch { return 'live'; }
+    try { const v = localStorage.getItem('overdrive.section') as Section; return SECTIONS.some(x => x.id === v) ? v : 'live'; } catch { return 'live'; }
   });
   const lastEdit = useRef(0);
   const lastShowEdit = useRef(0);
@@ -83,7 +110,9 @@ export function Controller({ onLogout }: { onLogout: () => void }) {
   const viewer = useViewer(sock, 'lq');
   const tournament = useTournament(sock);
   const bnl = useMatchData(sock);
+  const wc = useWildcard(sock);
   const [skew, setSkew] = useState(0);
+  const [liveTr, setLiveTr] = useState<TransitionKind | undefined>(undefined);
   const now = useNow(skew, 250);
 
   useEffect(() => { try { localStorage.setItem('overdrive.section', section); } catch {} }, [section]);
@@ -96,6 +125,7 @@ export function Controller({ onLogout }: { onLogout: () => void }) {
       if (Date.now() - lastShowEdit.current > 600) setShowDraft(m.state.showPreview);
     } else if (m.t === 'live') {
       setSkew(m.now - Date.now());
+      setLiveTr(m.transition);
       setSt(s => (s ? { ...s, live: m.scene, showLive: m.show, liveVersion: m.version } : s));
     } else if (m.t === 'error' && m.code === 'auth') {
       onLogout();
@@ -135,7 +165,7 @@ export function Controller({ onLogout }: { onLogout: () => void }) {
   }, [take]);
 
   const showPreview = showDraft ?? st?.showPreview ?? null;
-  const liveComp = useMemo(() => (st ? compose(st.live) : null), [st]);
+  const liveComp = useMemo(() => (st ? compose(boothScene(st.live, wc?.state.booth ?? [])) : null), [st, wc?.state.booth]);
   if (!st || !preview || !showPreview || !liveComp) {
     return <div className="grid min-h-screen place-items-center bg-[#111] text-sm text-white/50">{conn === 'open' ? 'Loading…' : 'Connecting to server…'}</div>;
   }
@@ -150,6 +180,53 @@ export function Controller({ onLogout }: { onLogout: () => void }) {
   const keyQ = st.outputKey ? `?key=${encodeURIComponent(st.outputKey)}` : '';
   const outputCount = st.outputs.filter(o => !o.route.startsWith('audio')).reduce((a, o) => a + o.count, 0);
   const showProps: ShowProps = { show: showPreview, live: st.showLive, st, tournament, now, set: p => pushShow({ ...showPreview, ...p }), quick, send: m => sock.send(m) };
+
+  // OBS "everything" dock (/controller/dock/all): shared match controls once, then every scene with its own GO + controls.
+  if (dockAll) {
+    const dockProps = { live: st.live.screen, preview: preview.screen, show: st.showLive, wc, now, send: (m: ClientMsg) => { flushPending(); sock.send(m); }, quick, twConnected: !!st.twitch?.connected, casters: st.live.casters };
+    return (
+      <div className="min-h-screen space-y-2 bg-[#101010] p-2 text-white">
+        <div className="sticky top-0 z-10 -mx-2 -mt-2 space-y-2 bg-[#101010] px-2 pb-2 pt-2 shadow-[0_8px_16px_rgba(0,0,0,.5)]">
+          <div className="flex items-center gap-2 text-[10px] font-bold tracking-[0.18em] text-white/45">
+            <span className={`h-2 w-2 rounded-full ${conn === 'open' ? 'bg-emerald-400' : 'bg-amber-400'}`} />
+            ON AIR · <span className="text-white">{SCREEN_LABELS[st.live.screen]}</span>
+          </div>
+          <SceneDock {...dockProps} part="shared" />
+        </div>
+        <div className="flex flex-wrap gap-1.5 rounded-md border border-white/10 bg-[#171717] px-3 py-2">
+          {PLAIN_SCREENS.map(id => (
+            <button key={id} type="button" onClick={() => dockProps.send({ t: 'screen', screen: id, take: true })}
+              className={`btn-sm ${id === st.live.screen ? '!border-[#e5484d] !bg-[#e5484d]/30 !text-white' : ''}`}>{SCREEN_LABELS[id]}{id === st.live.screen ? ' · ON AIR' : ' · GO'}</button>
+          ))}
+        </div>
+        {SCREEN_IDS.filter(id => !PLAIN_SCREENS.includes(id)).map(id => <SceneDock key={id} {...dockProps} forScreen={id} part="scene" />)}
+        <RosBar ros={st.ros} now={now} send={m => sock.send(m)} onOpen={() => window.open('/controller', '_blank')} />
+      </div>
+    );
+  }
+
+  // OBS custom browser dock (/controller/dock): screen buttons + the on-air dock + run of show, nothing else.
+  if (dockOnly) return (
+    <div className="min-h-screen space-y-2 bg-[#101010] p-2 text-white">
+      <div className="flex items-center gap-2 text-[10px] font-bold tracking-[0.18em] text-white/45">
+        <span className={`h-2 w-2 rounded-full ${conn === 'open' ? 'bg-emerald-400' : 'bg-amber-400'}`} />
+        ON AIR · <span className="text-white">{SCREEN_LABELS[st.live.screen]}</span>
+      </div>
+      <div className="grid grid-cols-[repeat(auto-fill,minmax(130px,1fr))] gap-1">
+        {SCREEN_IDS.map(id => {
+          const isPgm = st.live.screen === id;
+          return (
+            <button key={id} type="button" title="Cut straight to air"
+              className={`truncate rounded-md border px-2 py-2 text-left text-[12px] font-semibold ${isPgm ? 'border-[#e5484d] bg-[#e5484d]/20' : 'border-white/10 bg-[#171717] hover:border-white/30'}`}
+              onClick={() => { flushPending(); sock.send({ t: 'screen', screen: id, take: true }); }}>{SCREEN_LABELS[id]}</button>
+          );
+        })}
+      </div>
+      <SceneDock live={st.live.screen} preview={preview.screen} show={st.showLive} wc={wc} now={now} send={m => { flushPending(); sock.send(m); }} quick={quick}
+        twConnected={!!st.twitch?.connected} onMore={() => window.open('/controller', '_blank')} casters={st.live.casters} />
+      <RosBar ros={st.ros} now={now} send={m => sock.send(m)} onOpen={() => window.open('/controller', '_blank')} />
+    </div>
+  );
 
   return (
     <div className="flex h-screen flex-col bg-[#101010] text-white">
@@ -188,12 +265,16 @@ export function Controller({ onLogout }: { onLogout: () => void }) {
       <div className="flex min-h-0 flex-1">
         {/* Section menu */}
         <nav className="flex w-[188px] flex-none flex-col border-r border-white/[0.07] p-3">
-          {SECTIONS.map(s => (
-            <button key={s.id} type="button" onClick={() => setSection(s.id)}
-              className={`mb-1 rounded-md px-3 py-2.5 text-left transition-colors ${section === s.id ? 'bg-white text-[#111]' : 'text-white/75 hover:bg-white/[0.06]'}`}>
-              <div className="text-[13.5px] font-semibold">{s.label}</div>
-              <div className={`text-[11px] ${section === s.id ? 'text-black/55' : 'text-white/35'}`}>{s.hint}</div>
-            </button>
+          {NAV.map(g => (
+            <div key={g.group} className="mb-4">
+              <div className="mb-1.5 px-3 text-[10px] font-bold uppercase tracking-[0.2em] text-white/30">{g.group}</div>
+              {g.items.map(s => (
+                <button key={s.id} type="button" title={s.hint} onClick={() => setSection(s.id)}
+                  className={`mb-0.5 block w-full rounded-md px-3 py-2 text-left text-[14px] font-semibold transition-colors ${section === s.id ? 'bg-white text-[#111]' : 'text-white/75 hover:bg-white/[0.06]'}`}>
+                  {s.label}
+                </button>
+              ))}
+            </div>
           ))}
           <div className="mt-auto space-y-2 px-1 text-[11px] text-white/35">
             <a href="/admin" target="_blank" rel="noreferrer" className="block hover:text-white/70">Tournament admin ↗</a>
@@ -205,12 +286,13 @@ export function Controller({ onLogout }: { onLogout: () => void }) {
         <main className="min-w-0 flex-1 overflow-y-auto p-5">
           {/* Always visible: big monitors + screen switcher */}
           <div className="mb-5 space-y-3">
-            <div className="grid grid-cols-2 gap-4">
+            {/* Monitors capped to ~38% of the window height, so the screen buttons and controls stay in view. */}
+            <div className="grid grid-cols-2 gap-4" style={{ maxWidth: "calc(38vh * 32 / 9 + 16px)" }}>
               <Monitor title="Preview" tone={dirty && !st.instant ? 'pending' : 'idle'} note={st.instant ? 'Instant mode' : dirty ? 'Not on air yet · TAKE LIVE to send' : 'Same as program'}>
-                <Program scene={preview} show={showPreview} now={now} tournament={tournament} viewer={viewer} monitor bnl={bnl} />
+                <Program instant scene={preview} show={showPreview} now={now} tournament={tournament} viewer={viewer} monitor bnl={bnl} wc={wc} />
               </Monitor>
               <Monitor title="Program" tone="live" note={`On air · ${SCREEN_LABELS[st.live.screen]}`}>
-                <Program scene={st.live} show={st.showLive} now={now} tournament={tournament} viewer={viewer} monitor bnl={bnl} />
+                <Program scene={st.live} show={st.showLive} now={now} tournament={tournament} viewer={viewer} monitor monitorFeeds bnl={bnl} wc={wc} transition={liveTr} />
               </Monitor>
             </div>
             <div className="grid grid-cols-5 gap-1.5">
@@ -228,6 +310,9 @@ export function Controller({ onLogout }: { onLogout: () => void }) {
                 );
               })}
             </div>
+            {/* Controls for the screen on air, always in sight (no scrolling during the show). */}
+            <SceneDock live={st.live.screen} preview={preview.screen} show={st.showLive} wc={wc} now={now} send={m => { flushPending(); sock.send(m); }} quick={quick}
+              twConnected={!!st.twitch?.connected} onMore={setSection} casters={st.live.casters} />
             <RosBar ros={st.ros} now={now} send={m => sock.send(m)} onOpen={() => setSection('ros')} />
           </div>
           <div className="space-y-5">
@@ -239,8 +324,11 @@ export function Controller({ onLogout }: { onLogout: () => void }) {
                     <Switch on={preview.showNames} onChange={v => setScene({ showNames: v })} label="Names" />
                     <Switch on={preview.showBranding} onChange={v => setScene({ showBranding: v })} label="Logo" />
                   </div>
-                  <div className="grid grid-cols-3 gap-2.5">
-                    {preview.casters.map(c => {
+                  {([['Casters', false], ['Analysts', true]] as const).map(([grp, an]) => (
+                  <div key={grp} className="mb-2.5">
+                    <div className="mb-1.5 text-[10.5px] font-bold uppercase tracking-[0.16em] text-white/40">{grp}</div>
+                    <div className={`grid gap-2 ${an ? 'grid-cols-2' : 'grid-cols-3'}`}>
+                    {preview.casters.filter(c => (an ? c.id === 4 || c.id === 5 : c.id <= 3)).map(c => {
                       const onAir = liveComp.tiles.some(t => t.casterId === c.id);
                       const cam = st.contributors[c.id];
                       return (
@@ -263,8 +351,10 @@ export function Controller({ onLogout }: { onLogout: () => void }) {
                         </div>
                       );
                     })}
+                    </div>
                   </div>
-                  <button type="button" className="mt-3 text-[12px] text-white/45 hover:text-white/80" onClick={() => setSection('casters')}>Edit names & cameras →</button>
+                  ))}
+                  <button type="button" className="mt-3 text-[12px] text-white/45 hover:text-white/80" onClick={() => setSection('casters')}>Edit casters →</button><button type="button" className="ml-4 mt-3 text-[12px] text-white/45 hover:text-white/80" onClick={() => setSection('analysts')}>Edit analysts →</button>
                 </Block>
 
                 <div className="grid grid-cols-2 gap-5">
@@ -316,10 +406,19 @@ export function Controller({ onLogout }: { onLogout: () => void }) {
 
             {section === 'players' && <PlayersPanel st={st} now={now} send={m => sock.send(m)} quick={quick} show={showPreview} setShow={p => pushShow({ ...showPreview, ...p })} />}
 
-            {section === 'casters' && (
+            {(section === 'casters' || section === 'analysts' || section === 'interview') && (() => {
+              const analysts = section === 'analysts', interview = section === 'interview';
+              const list = preview.casters.filter(c => (interview ? c.id === 6 : analysts ? c.id === 4 || c.id === 5 : c.id <= 3));
+              const wcOp = (op: WcOp) => sock.send({ t: 'wc', op });
+              return (
               <>
-                <div className="grid grid-cols-3 gap-4">
-                  {preview.casters.map(c => (
+                {wc && (
+                  <Block title={interview ? 'Interview' : analysts ? 'At the desk' : 'On the Casters screen'} note={interview ? 'Instant · the Interview screen' : analysts ? 'Instant · the Pre-show / Analyst desk screen' : 'Instant · Casters screen and gameplay cams (max 3)'}>
+                    {interview ? <InterviewControls s={wc.state} casters={preview.casters} op={wcOp} /> : analysts ? <DeskPicker s={wc.state} casters={preview.casters} op={wcOp} /> : <BoothPicker s={wc.state} casters={preview.casters} op={wcOp} />}
+                  </Block>
+                )}
+                <div className={`grid gap-4 ${interview ? 'grid-cols-2' : analysts ? 'grid-cols-2' : 'grid-cols-3'}`}>
+                  {list.map(c => (
                     <CasterCard
                       key={c.id}
                       caster={c}
@@ -331,16 +430,29 @@ export function Controller({ onLogout }: { onLogout: () => void }) {
                       onAir={liveComp.tiles.some(t => t.casterId === c.id)}
                       obsScenes={st.obs.scenes}
                       vdoPassword={showPreview.vdo.password}
+                      liveVdo={{ id: st.live.casters[c.id - 1].source.vdo, password: st.showLive.vdo.password }}
                     />
                   ))}
                 </div>
-                <VdoCasterLinks casters={preview.casters} password={showPreview.vdo.password}
+                <Block title="Talent room (VDO.Ninja)" note="Goes to preview · TAKE LIVE">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <input className="input h-9 w-[260px] text-[13px]" placeholder="no room" value={showPreview.vdo.room}
+                      onChange={e => showProps.set({ vdo: { ...showPreview.vdo, room: e.target.value.replace(/[^A-Za-z0-9_]/g, '').slice(0, 30) } })} />
+                    <button type="button" className="btn-xs" onClick={() => showProps.set({ vdo: { ...showPreview.vdo, room: `od_talent_${Math.random().toString(36).slice(2, 8)}` } })}>New room name</button>
+                    {showPreview.vdo.room && <button type="button" className="btn-xs" onClick={() => showProps.set({ vdo: { ...showPreview.vdo, room: '' } })}>No room</button>}
+                  </div>
+                  <p className="mt-2 text-[12px] leading-relaxed text-white/45">
+                    With a room, everyone whose camera source is VDO.Ninja (casters, analysts, the interview guest) joins it from their own caster page: they see and hear each other in the VDO.Ninja box, with the ON AIR tally, game feed and run of show around it. Their cameras still reach OBS through their own view links. Uses the VDO password above ({showPreview.vdo.password ? 'set' : 'none set'}). Casters should wear headphones.
+                  </p>
+                </Block>
+                <VdoCasterLinks casters={list} password={showPreview.vdo.password}
                   onPrepare={() => pushPreview({ ...preview, casters: preview.casters.map(c => ({ ...c, source: { ...c.source, type: 'vdo', vdo: c.source.vdo || newCasterStreamId(c.id) } })) as Scene['casters'] }, true)} />
                 <p className="text-[12px] leading-relaxed text-white/40">
-                  Remote casters: send each one their camera link. They open it, pick a camera and press Start. Changes here go to preview; press TAKE LIVE.
+                  {interview ? 'The guest camera (slot 6) is for the player being interviewed: send them this link before the interview; they need nothing else. Pick the player above to show their name, team and country.' : analysts ? 'Analysts are slots 4 and 5: they appear on the Pre-show / Analyst desk screen only.' : 'Casters are slots 1 to 3: they appear on the Casters screen and the gameplay cams, and one can join the desk from the Analysts tab.'} Send each one their camera link: they open it, pick a camera and press Start. Name and camera changes go to preview; press TAKE LIVE.
                 </p>
               </>
-            )}
+              );
+            })()}
 
             {section === 'match' && (
               <>
@@ -383,6 +495,16 @@ export function Controller({ onLogout }: { onLogout: () => void }) {
               </>
             )}
 
+            {section === 'wildcard' && (
+              <WildcardPanel wc={wc} send={m => sock.send(m)} quick={quick} live={st.showLive} now={now} sheet={bnl?.sheet}
+                origin={origin} keyQ={keyQ} outputs={st.outputs} onOpenSheet={() => setSection('tournament')} casters={st.live.casters} />
+            )}
+
+            {section === 'twitch' && (
+              <TwitchPanel status={st.twitch} tw={wc?.tw} send={m => sock.send(m)} now={now}
+                teams={[wc?.state.intro.a ?? '', wc?.state.intro.b ?? '']} origin={origin} keyQ={keyQ} />
+            )}
+
             {section === 'events' && (
               <>
                 <Block title="Events" note="One click switches everything on air"><EventsPanel st={st} send={m => sock.send(m)} /></Block>
@@ -412,16 +534,54 @@ export function Controller({ onLogout }: { onLogout: () => void }) {
               </>
             )}
 
+            {section === 'links' && (
+              <>
+                <Block title="OBS dock" note="Docks → Custom Browser Docks">
+                  <p className="mb-2 text-[12px] text-white/50">The screen buttons and the controls for what's on air, inside OBS. In OBS: <b className="text-white/70">Docks → Custom Browser Docks…</b>, name it <b className="text-white/70">OverDrive</b>, paste one of these URLs, Apply. Sign in once with the producer password inside the dock.</p>
+                  {([['On air only', '/controller/dock'], ['Everything (every scene)', '/controller/dock/all']] as const).map(([label, path]) => (
+                    <div key={path} className="mt-1.5 flex items-center gap-2">
+                      <span className="w-[170px] text-[12px] text-white/60">{label}</span>
+                      <input readOnly className="input h-8 flex-1 font-mono text-[12px]" value={`${origin}${path}`} onFocus={e => e.currentTarget.select()} />
+                      <button type="button" className="btn-sm" onClick={() => navigator.clipboard?.writeText(`${origin}${path}`)}>Copy</button>
+                    </div>
+                  ))}
+                </Block>
+                <Block title="Scene links" note="Open = scene + its controls in a browser tab · OBS: 1920 × 1480, Crop Bottom 400">
+                  <p className="mb-3 text-[12px] text-white/50">Each scene has its own page with the picture on top and that scene's controls underneath. <b className="text-white/70">Open</b> runs it in a browser tab; <b className="text-white/70">OBS + controls</b> is the same link for an OBS browser source (1920 × 1480, Crop Bottom 400, click with right-click → Interact); <b className="text-white/70">Clean</b> is the picture only (1920 × 1080). These links carry your control token: keep them to yourself.</p>
+                  <div className="divide-y divide-white/[0.06]">
+                    <LinkRow label="Whole show" sub="Follows the live screen · has screen buttons" path="/output/program" origin={origin} keyQ={keyQ} token={st.apiToken} count={st.outputs.find(o => o.route === 'program')?.count ?? 0} />
+                    {SCREEN_IDS.map(id => (
+                      <LinkRow key={id} label={SCREEN_LABELS[id]} onAir={st.live.screen === id} path={`/output/screen/${id}`} origin={origin} keyQ={keyQ} token={st.apiToken} count={st.outputs.find(o => o.route === `screen/${id}`)?.count ?? 0} />
+                    ))}
+                  </div>
+                </Block>
+                <Block title="Single overlays" note="Picture only · 1920 × 1080">
+                  <div className="divide-y divide-white/[0.06]">
+                    {OUTPUT_ROUTES.filter(r => r.route !== 'program').map(({ route, label }) => (
+                      <LinkRow key={route} label={label} path={`/output/${route}`} origin={origin} keyQ={keyQ} token={st.apiToken} count={st.outputs.find(o => o.route === route)?.count ?? 0} clean />
+                    ))}
+                  </div>
+                </Block>
+              </>
+            )}
+
             {section === 'settings' && (
               <>
+                <Block title="Game feed for casters" note="Low-latency OBS feed from your stream server (WebRTC / WHEP)">
+                  <GameFeedSettingsCard />
+                </Block>
                 <Block title="Branding theme" note="Goes to preview · TAKE LIVE to switch">
                   <Segmented value={showPreview.theme} onChange={v => showProps.set({ theme: v })} options={THEMES.map(t => ({ value: t.id, label: t.label }))} />
                 </Block>
-                <Block title="OBS browser sources" note="1920 × 1080">
+                <Block title="OBS browser sources" note={stripUrls ? '1920 × 1480 · crop bottom 400 · controls via Interact' : '1920 × 1080'}>
+                  <div className="mb-3">
+                    <Switch on={stripUrls} onChange={setStripUrls} label="With controls underneath (source 1920 × 1480, Crop Bottom 400 in OBS, click them with right-click → Interact)" />
+                  </div>
                   <div className="grid grid-cols-2 gap-x-5 gap-y-3">
                     {OUTPUT_ROUTES.map(({ route, label }) => {
                       const n = st.outputs.find(o => o.route === route)?.count ?? 0;
-                      return <CopyField key={route} value={`${origin}/output/${route}${keyQ}`} label={<>{label} {n > 0 && <span className="ml-1 text-emerald-400/80">● {n}</span>}</>} />;
+                      const strip = stripUrls ? `${keyQ ? '&' : '?'}controls&token=${encodeURIComponent(st.apiToken)}` : '';
+                      return <CopyField key={route} value={`${origin}/output/${route}${keyQ}${strip}`} label={<>{label} {n > 0 && <span className="ml-1 text-emerald-400/80">● {n}</span>}</>} />;
                     })}
                   </div>
                 </Block>
@@ -458,6 +618,33 @@ export function Controller({ onLogout }: { onLogout: () => void }) {
         </main>
 
       </div>
+    </div>
+  );
+}
+
+/** One output as a row: name, on-air / connected dots, and Open / copy buttons. */
+function LinkRow({ label, sub, path, origin, keyQ, token, count, onAir, clean }: { label: string; sub?: string; path: string; origin: string; keyQ: string; token: string; count: number; onAir?: boolean; clean?: boolean }) {
+  const base = `${origin}${path}${keyQ}`;
+  const withControls = `${base}${keyQ ? '&' : '?'}controls&token=${encodeURIComponent(token)}`;
+  const [copied, setCopied] = useState('');
+  const copy = async (what: string, v: string) => {
+    try { await navigator.clipboard.writeText(v); } catch { window.prompt('Copy this link', v); }
+    setCopied(what); setTimeout(() => setCopied(''), 1200);
+  };
+  return (
+    <div className="flex items-center gap-3 py-2">
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-2 truncate text-[13px] font-semibold">
+          {label}
+          {onAir && <span className="rounded bg-red-500/90 px-1.5 py-px text-[9px] font-bold uppercase tracking-[0.14em] text-white">On air</span>}
+          {count > 0 && <span className="text-[11px] font-normal text-emerald-400/80">● {count} open</span>}
+        </div>
+        <div className="truncate font-mono text-[10px] text-white/35">{sub ?? path}</div>
+      </div>
+      {!clean && <a className="btn-sm" href={withControls} target="_blank" rel="noreferrer">Open</a>}
+      {!clean && <button type="button" className="btn-sm" onClick={() => copy('obs', withControls)}>{copied === 'obs' ? 'Copied' : 'OBS + controls'}</button>}
+      {clean && <a className="btn-sm" href={base} target="_blank" rel="noreferrer">Open</a>}
+      <button type="button" className="btn-sm" onClick={() => copy('clean', base)}>{copied === 'clean' ? 'Copied' : 'Clean'}</button>
     </div>
   );
 }

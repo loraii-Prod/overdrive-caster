@@ -2,7 +2,7 @@
 # Set CONTROLLER_PASSWORD and ADMIN_PASSWORD in the Render dashboard when prompted.
 services:
   - type: web
-    name: bnl-caster
+    name: overdrive-caster
     runtime: node
     plan: starter
     region: frankfurt

@@ -20,10 +20,10 @@ export class ObsBridge {
   private base: { w: number; h: number } = { w: CANVAS.w, h: CANVAS.h };
   private itemIds = new Map<string, number>();
   private lastScene: Scene | null = null;
-  private lastTheme: ThemeId = 'glacial';
+  private lastTheme: ThemeId = 'classic';
   private retry: NodeJS.Timeout | null = null;
 
-  constructor(private onChange: () => void, saved?: { url?: string; password?: string }) {
+  constructor(private onChange: () => void, saved?: { url?: string; password?: string }, private onConnected?: () => void) {
     this.obs.on('ConnectionClosed', () => {
       if (this.status.connected) console.log('[obs] disconnected');
       this.status = { ...this.status, connected: false };
@@ -32,6 +32,9 @@ export class ObsBridge {
       if (this.url) this.schedule();
     });
     this.obs.on('CurrentProgramSceneChanged', e => { this.status.currentScene = e.sceneName; this.onChange(); });
+    // Studio Mode awareness: OBS's own Preview is separate from Overdrive's draft.
+    this.obs.on('StudioModeStateChanged', e => { this.status.studioMode = e.studioModeEnabled; if (!e.studioModeEnabled) this.status.previewScene = undefined; this.onChange(); });
+    this.obs.on('CurrentPreviewSceneChanged', e => { this.status.previewScene = e.sceneName; this.onChange(); });
     this.obs.on('SceneListChanged', () => this.refreshScenes());
     this.obs.on('SceneItemCreated', () => this.itemIds.clear());
     this.obs.on('SceneItemRemoved', () => this.itemIds.clear());
@@ -65,6 +68,7 @@ export class ObsBridge {
       console.log(`[obs] connected (${v.baseWidth}x${v.baseHeight})`);
       await this.refreshScenes();
       if (this.lastScene) await this.apply(this.lastScene, this.lastTheme);
+      this.onConnected?.();
     } catch (e: any) {
       const msg = e?.message ?? String(e);
       this.status = { ...this.status, connected: false, error: /auth/i.test(msg) ? 'Wrong OBS WebSocket password.' : /ECONNREFUSED|connect/i.test(msg) ? 'OBS not reachable: is OBS open with Tools → WebSocket Server Settings → Enable turned on?' : msg };
@@ -78,14 +82,28 @@ export class ObsBridge {
       const r = await this.obs.call('GetSceneList');
       this.status.scenes = (r.scenes as any[]).map(s => String(s.sceneName)).reverse();
       this.status.currentScene = r.currentProgramSceneName;
+      try { const sm = await this.obs.call('GetStudioModeEnabled'); this.status.studioMode = !!sm.studioModeEnabled; this.status.previewScene = sm.studioModeEnabled ? (r as any).currentPreviewSceneName ?? undefined : undefined; } catch {}
       this.onChange();
     } catch {}
   }
 
-  async setScene(name: string) {
-    if (!this.status.connected) return;
-    try { await this.obs.call('SetCurrentProgramScene', { sceneName: name }); }
-    catch (e: any) { this.status.error = e.message; this.onChange(); }
+  /**
+   * Switch OBS Program. With `transition`, OBS performs that transition (found by type, so it works whatever
+   * the transitions are called in the user's OBS language). Returns false if OBS refused.
+   */
+  async setScene(name: string, transition?: 'stinger' | 'fade' | 'cut'): Promise<boolean> {
+    if (!this.status.connected) return false;
+    if (transition) {
+      const kind = { stinger: 'obs_stinger_transition', fade: 'fade_transition', cut: 'cut_transition' }[transition];
+      try {
+        const r = await this.obs.call('GetSceneTransitionList');
+        const t = (r.transitions as any[]).find(x => x.transitionKind === kind);
+        if (t) await this.obs.call('SetCurrentSceneTransition', { transitionName: String(t.transitionName) });
+        else { this.status.error = `OBS has no ${transition} transition (add one under Scene Transitions); used OBS's current transition.`; this.onChange(); }
+      } catch (e: any) { this.status.error = `Could not set the OBS transition: ${e.message}`; this.onChange(); }
+    }
+    try { await this.obs.call('SetCurrentProgramScene', { sceneName: name }); return true; }
+    catch (e: any) { this.status.error = e.message; this.onChange(); return false; }
   }
 
   private async itemId(scene: string, source: string): Promise<number | null> {
@@ -101,7 +119,7 @@ export class ObsBridge {
   }
 
   /** Mirror the live composition onto OBS camera sources. */
-  async apply(scene: Scene, theme: ThemeId = 'glacial') {
+  async apply(scene: Scene, theme: ThemeId = 'classic') {
     this.lastScene = scene;
     this.lastTheme = theme;
     if (!this.status.connected) return;
@@ -140,85 +158,8 @@ export class ObsBridge {
   }
 
   /**
-   * Create a ready-to-go BNL scene collection inside the current OBS profile:
-   * one scene PER broadcast screen, each with its OWN browser source pointed
-   * at that screen's dedicated /output/<screen> page (not a shared /output/program
-   * source — that would show identical content in every OBS scene, defeating
-   * the point of OBS doing the switching), a nested caster-audio scene, and a
-   * game capture under the gameplay overlay. Safe to run again: existing
-   * scenes/sources are reused. Returns the screen → OBS scene mapping.
+   * Raw OBS WebSocket v5 request over THIS connection (the scene builder uses it: one OBS connection only).
+   * The old build() lives in server/obsSetup.ts now: one OBS scene per Overdrive output, dry run first.
    */
-  async build(o: { base: string; key: string; screens: { id: string; label: string; route: string }[]; gameCapture: boolean; audio: boolean }): Promise<Record<string, string> | null> {
-    const lines: string[] = [];
-    const done = (ok: boolean) => { this.status.build = { at: Date.now(), ok, lines }; this.onChange(); };
-    if (!this.status.connected) { lines.push('OBS is not connected.'); done(false); return null; }
-    const q = (path: string) => `${o.base}${path}${o.key ? `?key=${encodeURIComponent(o.key)}` : ''}`;
-    const AUDIO_SCENE = 'BNL · Caster audio', GAME = 'BNL Game capture';
-    const css = 'body { background-color: rgba(0, 0, 0, 0); margin: 0px auto; overflow: hidden; }';
-    try {
-      const v = await this.obs.call('GetVideoSettings');
-      this.base = { w: v.baseWidth, h: v.baseHeight };
-      const inputs = new Set(((await this.obs.call('GetInputList')).inputs as any[]).map(i => String(i.inputName)));
-      const scenes = new Set(((await this.obs.call('GetSceneList')).scenes as any[]).map(s => String(s.sceneName)));
-      const ensureScene = async (name: string) => {
-        if (scenes.has(name)) return false;
-        await this.obs.call('CreateScene', { sceneName: name }); scenes.add(name); return true;
-      };
-      const hasItem = async (scene: string, source: string) => {
-        try { await this.obs.call('GetSceneItemId', { sceneName: scene, sourceName: source }); return true; } catch { return false; }
-      };
-      const fill = async (scene: string, source: string) => {
-        const { sceneItemId } = await this.obs.call('GetSceneItemId', { sceneName: scene, sourceName: source });
-        await this.obs.call('SetSceneItemTransform', { sceneName: scene, sceneItemId, sceneItemTransform: { positionX: 0, positionY: 0, alignment: 5, boundsType: 'OBS_BOUNDS_STRETCH', boundsAlignment: 0, boundsWidth: this.base.w, boundsHeight: this.base.h } });
-      };
-      /** Put an input in a scene: create it the first time, reuse it afterwards. */
-      const place = async (scene: string, name: string, kind: string, settings: Record<string, any>) => {
-        if (!inputs.has(name)) {
-          await this.obs.call('CreateInput', { sceneName: scene, inputName: name, inputKind: kind, inputSettings: settings as any });
-          inputs.add(name); return 'created';
-        }
-        if (await hasItem(scene, name)) return 'kept';
-        await this.obs.call('CreateSceneItem', { sceneName: scene, sourceName: name }); return 'added';
-      };
-
-      // Caster audio (remote casters' mics, controlled in the OBS audio mixer)
-      if (o.audio) {
-        if (await ensureScene(AUDIO_SCENE)) lines.push(`Created scene "${AUDIO_SCENE}"`);
-        for (const n of [1, 2, 3]) {
-          const r = await place(AUDIO_SCENE, `BNL Caster ${n} audio`, 'browser_source', { url: q(`/output/audio/${n}`), width: 320, height: 180, reroute_audio: true, shutdown: false, restart_when_active: false });
-          if (r === 'created') lines.push(`Created "BNL Caster ${n} audio" (mic of caster ${n})`);
-        }
-        const mr = await place(AUDIO_SCENE, 'BNL Music', 'browser_source', { url: q('/output/music'), width: 320, height: 180, reroute_audio: true, shutdown: false, restart_when_active: false });
-        if (mr === 'created') lines.push('Created "BNL Music" (music beds, own fader in the audio mixer)');
-      }
-      const map: Record<string, string> = {};
-      for (const s of o.screens) {
-        const name = `BNL · ${s.label}`;
-        const overlay = `BNL · ${s.label} overlay`;
-        map[s.id] = name;
-        const made = await ensureScene(name);
-        if (s.id === 'gameplay' && o.gameCapture) {
-          try {
-            const r = await place(name, GAME, 'game_capture', { capture_mode: 'any_fullscreen', capture_cursor: false });
-            if (r === 'created') lines.push(`Created "${GAME}" (any fullscreen game) under the gameplay overlay`);
-          } catch (e: any) { lines.push(`Game capture skipped: ${e.message}`); }
-        }
-        const r = await place(name, overlay, 'browser_source', { url: q(s.route), width: 1920, height: 1080, fps_custom: true, fps: 60, css, shutdown: false, restart_when_active: false, reroute_audio: false });
-        if (r !== 'kept') await fill(name, overlay);
-        if (r === 'created') lines.push(`Created "${overlay}" → ${q(s.route)}`);
-        // keep each screen's own URL current (port / output key may have changed)
-        await this.obs.call('SetInputSettings', { inputName: overlay, inputSettings: { url: q(s.route) } });
-        if (o.audio && !(await hasItem(name, AUDIO_SCENE))) await this.obs.call('CreateSceneItem', { sceneName: name, sourceName: AUDIO_SCENE });
-        lines.push(`${made ? 'Created' : 'Updated'} scene "${name}"`);
-      }
-      await this.refreshScenes();
-      lines.push('Scene switching is linked: GO / TAKE LIVE on a screen now also switches OBS.');
-      done(true);
-      return map;
-    } catch (e: any) {
-      lines.push(`Stopped: ${e?.message ?? e}`);
-      done(false);
-      return null;
-    }
-  }
+  request = (req: string, data?: Record<string, any>): Promise<any> => this.obs.call(req as any, data as any) as Promise<any>;
 }

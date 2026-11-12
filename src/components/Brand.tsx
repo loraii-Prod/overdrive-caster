@@ -35,14 +35,14 @@ export function Mark({ height, style, className }: { height: number; style?: CSS
   return <img src={brand?.mark || brand?.logo || BRAND.mark} alt="" draggable={false} className={className} style={{ height, width: 'auto', display: 'block', ...style }} />;
 }
 
-/** Repeating Glacial pattern, shown only when an event has no skin/background of its own. */
+/** Repeating background pattern, shown only when an event has no skin/background of its own. */
 export function Pattern({ opacity = 1, drift = false, size = 560, className = '' }: { opacity?: number; drift?: boolean; size?: number; className?: string }) {
   const { brand } = useTheme();
   if (brand?.skin || brand?.bg) return null;
   return (
     <div
       aria-hidden
-      className={`pointer-events-none absolute inset-0 ${drift ? 'glacial-drift' : ''} ${className}`}
+      className={`pointer-events-none absolute inset-0 ${drift ? 'od-drift' : ''} ${className}`}
       style={{ backgroundImage: `url(${BRAND.pattern})`, backgroundSize: `${size}px auto`, backgroundRepeat: 'repeat', opacity }}
     />
   );

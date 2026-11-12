@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import type { ControllerState } from '../../../shared/types';
 import { Dot, Label, Switch, TextField } from './ui';
 
-/** Connect to OBS and build the whole BNL scene setup in one click. */
+/** Connect to OBS and build the whole Overdrive scene setup in one click. */
 export function ObsPanel({ st, send }: { st: ControllerState; send: (m: any) => void }) {
   const o = st.obs;
   const [url, setUrl] = useState(o.url ?? '');
@@ -38,9 +38,9 @@ export function ObsPanel({ st, send }: { st: ControllerState; send: (m: any) => 
       </p>
 
       <div className="rounded-md border border-white/10 bg-white/[0.02] p-3">
-        <div className="text-[13px] font-semibold">Import the BNL setup into OBS</div>
+        <div className="text-[13px] font-semibold">Import the Overdrive setup into OBS</div>
         <p className="mt-1 text-[12px] leading-relaxed text-white/50">
-          Creates one scene per screen (BNL · Starting soon, BNL · Casters, BNL · Gameplay, …), each with its own 1920×1080 browser source pointed at that screen, and links them so GO / TAKE LIVE also switches OBS. Safe to run again: nothing is deleted, existing scenes are reused.
+          Creates one scene per legacy screen (Overdrive · Starting soon, Overdrive · Casters, Overdrive · Gameplay, …), each with its own 1920×1080 browser source pointed at that screen, and links them so GO / TAKE LIVE also switches OBS. Safe to run again: nothing is deleted, existing scenes are reused, building never switches OBS. For every output (graphics-engine instances included), a preview of the changes, per-scene repair and verify: Producer → Studio → OBS Setup.
         </p>
         <div className="mt-3 flex flex-wrap items-center gap-x-6 gap-y-2">
           <Switch on={game} onChange={setGame} label="Game capture under the gameplay overlay" />

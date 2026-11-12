@@ -2,6 +2,10 @@
 
 Requires Node.js >= 20.
 
+**Windows:** double-click `start.cmd`. The first run installs and builds (a few minutes), then the controller opens in your browser. After updating the files, run `start.cmd rebuild`. Passwords, port and OBS go in `settings.bat` (copy `settings.example.bat`).
+
+Other systems:
+
 ```bash
 npm install
 npm run build
@@ -24,4 +28,4 @@ CONTROLLER_PASSWORD=overdrive-pass ADMIN_PASSWORD=overdrive-admin npm run dev
 
 All Overdrive brand assets (stinger, replay/highlight overlays, blank loops, duo/trio caster backgrounds, start/BRB/end plates) are already in `public/brand/overdrive/` — verified identical to the files you supplied separately.
 
-This is Overdrive's own standalone caster system (forked from the GLACIAL Caster codebase, now rebranded throughout). See README.md for the full feature/route rundown.
+This is Overdrive's own standalone caster system. See README.md for the full feature/route rundown.

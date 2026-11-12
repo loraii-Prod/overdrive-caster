@@ -299,10 +299,10 @@ export function IntegrationsTab({ show, set, st, send }: ShowProps) {
           {SCREEN_IDS.map((k: ScreenId) => (
             <div key={k} className="grid grid-cols-[150px_1fr] items-center gap-2">
               <span className="text-[12px] text-white/60">{SCREEN_LABELS[k]}</span>
-              <TextField value={show.obsScenes[k]} onChange={v => set({ obsScenes: { ...show.obsScenes, [k]: v } })} placeholder="OBS scene name" list="glacial-obs-scenes-all" />
+              <TextField value={show.obsScenes[k]} onChange={v => set({ obsScenes: { ...show.obsScenes, [k]: v } })} placeholder="OBS scene name" list="od-obs-scenes-all" />
             </div>
           ))}
-          <datalist id="glacial-obs-scenes-all">{st.obs.scenes.map(s => <option key={s} value={s} />)}</datalist>
+          <datalist id="od-obs-scenes-all">{st.obs.scenes.map(s => <option key={s} value={s} />)}</datalist>
         </div>
         <p className="mt-2 text-[11px] leading-relaxed text-white/40">Needs OBS WebSocket (OBS_WS_URL on the server). Leave empty to keep everything in /output/program.</p>
       </div>

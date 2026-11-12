@@ -1,3 +1,6 @@
+import { SEATS, SEAT_LABELS, seatOf, talentLabel, type Seat } from '../shared/talent';
+import { createEngine, type Engine } from './engine';
+import type { ProducerCmd, TransitionKind } from '../shared/engine';
 import type { IncomingMessage, Server } from 'node:http';
 import { WebSocketServer, WebSocket } from 'ws';
 import crypto from 'node:crypto';
@@ -8,14 +11,20 @@ import { applyOp, isTeam, resolve, type TournamentOp } from '../shared/tournamen
 import { ensureStreamIds, matchPlayer, sanitizePlayers, sanitizeStories, STORY_LABELS } from '../shared/players';
 import { db, newKey, sanitizeFollow, save } from './store';
 import { iceServers } from './turn';
+import { Twitch } from './twitch';
 import { ObsBridge } from './obs';
+import { createObsSetup } from './obsSetup';
+import { pkgById } from '../shared/gfx';
 import { createEvent, deleteEvent, renameEvent, switchEvent } from './events';
 import { applyFeatured, syncSheet } from './sheet';
 import { parseSheetUrl } from '../shared/sheet';
 import { compose } from '../shared/layout';
-import { SCREEN_LABELS, clone, defaultScene, defaultShow, sanitizeRos, sanitizeScene, sanitizeShow, sameScene } from '../shared/defaults';
+import { clone, defaultScene, defaultShow, sanitizeRos, sanitizeScene, sanitizeShow, sameScene } from '../shared/defaults';
 import type { ClientMsg, QuickOp, Role, ServerMsg, WatchRequest } from '../shared/protocol';
-import { SCREEN_IDS, type CasterId, type ContributorStatus, type ControllerState, type Preset, type Scene, type Show } from '../shared/types';
+import { CASTER_IDS, SCREEN_IDS, type CasterId, type ContributorStatus, type ControllerState, type Preset, type Scene, type ScreenId, type Show } from '../shared/types';
+import { seasonOf } from '../shared/season';
+import { isMapId, majorMap } from '../shared/maps';
+import { GRAND_FINAL, sanitizeInterview, sanitizePb, sanitizeVeto, vetoApply, WC_IDS, matchName, realTeam, wcLogo, wcResolve, applyMatchOp, sanitizePick, demoEvent, diffEvents, isWcBackup, isWcId, mergeSheet, sanitizeIntro, sanitizeShowcase, sanitizeWildcard, updateDone, wcSnapshot, type WcOp, type WcPop, type WcSheetRow } from '../shared/wildcard';
 
 interface Client {
   id: string;
@@ -24,13 +33,15 @@ interface Client {
   authRole: AuthRole | null;
   role?: Role;
   route?: string;
-  slot?: CasterId; // contributors
+  slot?: CasterId; // contributors (legacy per-slot link)
+  talent?: string; // contributors (2.0 personal talent link)
   watching: Map<CasterId, WatchRequest>;
   alive: boolean;
   pub?: { publishing: boolean; hasAudio: boolean; label?: string };
 }
 
-const isSlot = (v: unknown): v is CasterId => v === 1 || v === 2 || v === 3;
+const isSlot = (v: unknown): v is CasterId => CASTER_IDS.includes(v as CasterId);
+const DEFAULT_SEAT_NAMES: Record<Seat, string> = { 1: 'Caster 1', 2: 'Caster 2', 3: 'Caster 3', 4: 'Analyst 1', 5: 'Analyst 2', 6: 'Guest' };
 
 export function createHub(server: Server) {
   const wss = new WebSocketServer({ noServer: true, maxPayload: 512 * 1024 });
@@ -38,7 +49,42 @@ export function createHub(server: Server) {
   const publishers = new Map<CasterId, string>();
 
   let stateTimer: NodeJS.Timeout | null = null;
-  const obs = new ObsBridge(() => pushState(), { url: db.obsUrl, password: db.obsPassword });
+  const obs = new ObsBridge(() => pushState(), { url: db.obsUrl, password: db.obsPassword }, () => { void obsSetup.scan(); });
+  // OBS Scene Builder: one OBS scene per Overdrive output, over the same OBS connection. Never switches OBS.
+  const obsSetup = createObsSetup({
+    call: () => (obs.status.connected ? obs.request : null),
+    connected: () => obs.status.connected,
+    obsUrl: () => obs.status.url ?? '',
+    graphics: () => db.graphics,
+    obsScenes: () => db.showLive.obsScenes,
+    store: () => db.obsSetup,
+    outputKey: config.outputKey,
+    port: config.port,
+    lanUrls: () => lanUrls(),
+    publicUrl: () => publicOrigin(),
+    save: () => save(),
+    onChange: () => pushState(),
+    applyMapping: built => {
+      let gfxChanged = false;
+      const scenes = { ...db.showLive.obsScenes };
+      const known = new Set(obs.status.scenes);
+      for (const { target, scene } of built) {
+        if (target.kind === 'gfx') {
+          const g = db.graphics.find(x => `g:${x.id}` === target.id);
+          if (g && g.obsScene !== scene) { g.obsScene = scene; gfxChanged = true; }
+          // a graphics-engine instance that replaces a legacy screen: fill the screen mapping if it is empty or stale
+          const p = g ? pkgById(g.pkg) : undefined;
+          const key = p && p.id.replace(/^od\./, '') === g!.id ? (p.obsKey as ScreenId | undefined) : undefined;
+          if (key && key in scenes && (!scenes[key] || !known.has(scenes[key]))) scenes[key] = scene;
+        } else if (target.screen) scenes[target.screen] = scene;
+      }
+      db.showPreview = { ...db.showPreview, obsScenes: { ...db.showPreview.obsScenes, ...scenes } };
+      db.showLive = { ...db.showLive, obsScenes: scenes };
+      save();
+      if (gfxChanged) pushGfx();
+    },
+  });
+  const tw = new Twitch(db.twitch, save, () => pushState(), () => each(c => c.role === 'output' || c.role === 'controller' || c.role === 'crew', { t: 'twitch', tw: tw.pub }));
 
   // ---------- helpers ----------
   const send = (c: Client | undefined, m: ServerMsg) => {
@@ -49,8 +95,16 @@ export function createHub(server: Server) {
     for (const c of clients.values()) if (pred(c) && c.ws.readyState === WebSocket.OPEN) c.ws.send(data);
   };
 
+  /** 2.0: who publishes the camera of a position: the talent seated there, else a legacy per-slot link. */
+  const talentPubs = new Map<string, string>();
+  function pubOf(slot: CasterId): string | undefined {
+    const t = db.seats[slot as Seat];
+    return (t ? talentPubs.get(t) : undefined) ?? publishers.get(slot);
+  }
+  const seatOfTalent = (id: string): CasterId | null => (seatOf(db.seats, id) as CasterId | null);
+
   function contributorStatus(slot: CasterId): ContributorStatus {
-    const pid = publishers.get(slot);
+    const pid = pubOf(slot);
     const p = pid ? clients.get(pid) : undefined;
     let viewers = 0;
     for (const c of clients.values()) if (c.watching.has(slot)) viewers++;
@@ -80,10 +134,20 @@ export function createHub(server: Server) {
       instant: db.instant,
       presets: db.presets,
       contributorKeys: db.contributorKeys,
-      contributors: { 1: contributorStatus(1), 2: contributorStatus(2), 3: contributorStatus(3) },
+      contributors: Object.fromEntries(CASTER_IDS.map(id => [id, contributorStatus(id)])) as Record<CasterId, ContributorStatus>,
       outputs: [...routes].map(([route, count]) => ({ route, count })).sort((a, b) => a.route.localeCompare(b.route)),
       obs: obs.status,
+      obsSetup: obsSetup.state(),
       outputKey: config.outputKey,
+      twitch: tw.status,
+      engine: engine?.state(),
+      talent: db.talent.map(t => { const pid = talentPubs.get(t.id), cl = pid ? clients.get(pid) : undefined; return { ...t, online: !!cl, publishing: !!cl?.pub?.publishing, hasAudio: !!cl?.pub?.hasAudio, seat: seatOfTalent(t.id) }; }),
+      seats: db.seats,
+      media: db.media,
+      studio: db.studio,
+      graphics: db.graphics,
+      rundown: db.rundown,
+      gfxHealth,
     };
   }
 
@@ -99,10 +163,12 @@ export function createHub(server: Server) {
   function casterInfo(slot: CasterId): ServerMsg {
     const c = db.live.casters[slot - 1];
     const tile = compose(db.live, undefined, db.showLive.theme).tiles.find(t => t.casterId === slot);
-    return { t: 'caster-info', name: c.name, role: c.role, cameraVisible: !!tile && tile.kind === 'video' && c.source.type === 'webrtc' };
+    const vdo = c.source.type === 'vdo' && c.source.vdo ? { id: c.source.vdo, password: db.showLive.vdo.password, room: db.showLive.vdo.room } : null;
+    return { t: 'caster-info', name: c.name, role: c.role, cameraVisible: !!tile && tile.kind === 'video' && (c.source.type === 'webrtc' || !!vdo), vdo, talent: db.live.casters.filter(x => x.enabled).map(x => ({ id: x.id, name: x.name })) };
   }
 
-  const liveMsg = (): ServerMsg => ({ t: 'live', scene: db.live, show: db.showLive, version: db.liveVersion, now: Date.now() });
+  const liveMsg = (): ServerMsg => ({ t: 'live', scene: db.live, show: db.showLive, version: db.liveVersion, now: Date.now(), transition: db.liveTransition });
+  let engine: Engine | null = null;
 
   function broadcastLive() {
     db.liveVersion++;
@@ -113,18 +179,34 @@ export function createHub(server: Server) {
   }
 
   /** TAKE: atomically copy the whole preview (scene + show data) to program. */
-  function goLive() {
+  /**
+   * THE single place a Program screen change is aired. Exactly one party plays the transition:
+   * - OBS connected and the new screen has an OBS scene → OBS performs the transition (its stinger /
+   *   fade / cut) and the browser Program source just cuts (its scenes use /output/screen/* anyway).
+   * - otherwise → /output/program plays it, OBS is not touched.
+   * No screen change → no transition at all (overlay/flag changes just update).
+   */
+  function airProgram(prevScreen: ScreenId, t: TransitionKind) {
+    const changed = prevScreen !== db.live.screen;
+    const obsScene = changed ? db.showLive.obsScenes[db.live.screen] : undefined;
+    const obsOwns = !!obsScene && obs.status.connected;
+    db.liveTransition = !changed ? undefined : obsOwns ? 'cut' : t;
+    broadcastLive();
+    db.liveTransition = undefined;
+    if (obsOwns) obs.setScene(obsScene!, t);
+  }
+
+  function goLive(t: TransitionKind = 'stinger') {
     const sceneChanged = !sameScene(db.live, db.preview);
     const showChanged = JSON.stringify(db.showLive) !== JSON.stringify(db.showPreview);
     if (!sceneChanged && !showChanged) return;
     const prevScreen = db.live.screen;
     db.live = clone(db.preview);
     db.showLive = clone(db.showPreview);
-    broadcastLive();
-    for (const slot of [1, 2, 3] as CasterId[]) send(clients.get(publishers.get(slot) ?? ''), casterInfo(slot));
+    airProgram(prevScreen, t);
+    // Every open caster page (also VDO.Ninja casters, who never start this app's camera).
+    for (const v of clients.values()) if (v.role === 'contributor' && v.slot) send(v, casterInfo(v.slot));
     if (sceneChanged) obs.apply(db.live, db.showLive.theme);
-    const obsScene = db.showLive.obsScenes[db.live.screen];
-    if (prevScreen !== db.live.screen && obsScene) obs.setScene(obsScene);
   }
 
   function pushRos() {
@@ -142,23 +224,234 @@ export function createHub(server: Server) {
     each(c => c.role === 'output' || c.role === 'controller' || c.role === 'admin' || c.role === 'crew', matchDataMsg());
   }
 
-  let sheetBusy = false;
-  async function sheetNow() {
-    if (sheetBusy) return;
+  let sheetBusy = false, sheetAt = 0, wcForceNext = false;
+  /** Pull the sheet. `wcForce`: overwrite every wildcard score with the sheet's (controller "Pull from sheet now"). */
+  async function sheetNow(wcForce = false) {
+    if (sheetBusy) { if (wcForce) wcForceNext = true; return; }
     sheetBusy = true;
+    sheetAt = Date.now();
     const before = JSON.stringify([db.showLive.teamA, db.showLive.teamB, db.showLive.bestOf]);
     try { await syncSheet(); } finally { sheetBusy = false; }
     if (JSON.stringify([db.showLive.teamA, db.showLive.teamB, db.showLive.bestOf]) !== before) broadcastLive();
+    const force = wcForce || wcForceNext;
+    wcForceNext = false;
+    if (!db.sheet.error && (db.wildcard.sheetAuto || force) && mergeSheet(db.wildcard, wcSheetRows(), force)) wcChanged();
     pushMatchData();
     pushState();
   }
-  setInterval(() => { if (db.sheet.enabled && db.sheet.id) sheetNow(); }, 60_000);
+  // Every 60 s, or every 30 s while the wildcard bracket takes its scores from the sheet (as the standalone overlay did).
+  setInterval(() => {
+    if (!db.sheet.enabled || !db.sheet.id) return;
+    if ((db.wildcard.enabled && db.wildcard.sheetAuto) || Date.now() - sheetAt >= 59_000) sheetNow();
+  }, 30_000);
+
+  // ---------- OverDrive Wildcard bracket ----------
+  // Results are facts: every change goes out at once (no TAKE), like the tournament admin.
+  let wcSnap = wcSnapshot(db.wildcard);
+  let wcSeq = 0;
+  let wcLastPop: WcPop | null = null;
+  let wcLastRotate = Date.now();
+  // Contributors (casters' camera pages) get it too: they enter their match prediction there.
+  const wcAudience = (c: Client) => c.role === 'output' || c.role === 'controller' || c.role === 'crew' || c.role === 'contributor';
+  const wcMsg = (): ServerMsg => ({ t: 'wildcard', wc: db.wildcard });
+
+  function wcSheetRows(): WcSheetRow[] {
+    return db.sheet.matches.filter(m => isWcId(m.bracket)).map(m => ({ bracket: m.bracket, s1: m.s1, s2: m.s2, status: m.status, when: m.when ?? '' }));
+  }
+
+  function wcPop(p: Omit<WcPop, 'seq'>) {
+    const pop: WcPop = { ...p, seq: ++wcSeq };
+    wcLastPop = pop;
+    each(wcAudience, { t: 'wc-pop', pop });
+  }
+
+  /** After any change: result order, popups for new map/match wins (detected once, here), push to every source. */
+  /**
+   * The cast match is the one source of "who's playing": its teams, logos and series score go to the
+   * scoreboard (both shows), and its teams to the match intro / predictions (unless the intro is playing).
+   * Returns true if the shows changed.
+   */
+  function castSync(): boolean {
+    const wc = db.wildcard;
+    if (!wc.cast) return false;
+    const r = wcResolve(wc.matches, wc.teams)[wc.cast], st = wc.matches[wc.cast];
+    if (!realTeam(r.t1) || !realTeam(r.t2)) return false;
+    const n = (v: string) => (/^\d+$/.test(v) ? Number(v) : 0);
+    const tag = (x: string) => x.replace(/[^A-Za-z0-9]/g, '').slice(0, 4).toUpperCase();
+    let changed = false;
+    for (const show of [db.showLive, db.showPreview]) {
+      const A = { ...show.teamA, name: r.t1, tag: show.teamA.name === r.t1 ? show.teamA.tag : tag(r.t1), logo: wcLogo(r.t1) || show.teamA.logo, score: n(st.s1) };
+      const B = { ...show.teamB, name: r.t2, tag: show.teamB.name === r.t2 ? show.teamB.tag : tag(r.t2), logo: wcLogo(r.t2) || show.teamB.logo, score: n(st.s2) };
+      const game = Math.max(1, Math.min(9, n(st.s1) + n(st.s2) + (r.winner ? 0 : 1)));
+      if (JSON.stringify([show.teamA, show.teamB, show.bestOf, show.game]) !== JSON.stringify([A, B, 5, game])) {
+        show.teamA = A; show.teamB = B; show.bestOf = 5; show.game = game; changed = true;
+      }
+    }
+    const it = wc.intro;
+    if (!it.at && (it.a !== r.t1 || it.b !== r.t2)) {
+      wc.intro = { ...it, a: r.t1, b: r.t2, picks: {}, label: matchName(wc.cast), roadA: seasonOf(r.t1)?.road ?? '', roadB: seasonOf(r.t2)?.road ?? '' };
+      wc.veto = { ...wc.veto, done: [], at: null, pb: { map: null, at: null } }; // a new match starts a new veto
+    }
+    return changed;
+  }
+
+  /** Pick'em: when the cast match has a winner, keep that match's picks (once) so they can be scored. */
+  function pickemArchive() {
+    const wc = db.wildcard, id = wc.cast;
+    if (!id || wc.pickem[id] || !Object.keys(wc.intro.picks).length) return;
+    const r = wcResolve(wc.matches, wc.teams)[id];
+    if (r.winner && wc.intro.a === r.t1 && wc.intro.b === r.t2) wc.pickem = { ...wc.pickem, [id]: { ...wc.intro.picks } };
+  }
+
+  function wcChanged(popups = true) {
+    pickemArchive();
+    if (castSync()) broadcastLive();
+    updateDone(db.wildcard);
+    const snap = wcSnapshot(db.wildcard);
+    if (popups) for (const e of diffEvents(wcSnap, snap)) wcPop(e);
+    wcSnap = snap;
+    db.wildcard.rev = Date.now();
+    save();
+    each(wcAudience, wcMsg());
+  }
+
+  function wcOp(op: WcOp) {
+    if (!op || typeof op !== 'object') return;
+    const wc = db.wildcard;
+    switch (op.k) {
+      case 'score': case 'wo': case 'clear': case 'live': case 'time':
+        if (applyMatchOp(wc, op)) wcChanged();
+        return;
+      // Champions only once the Grand final has a winner (else it would pop up by itself when the final ends).
+      case 'champ': wc.champ = op.on === true && !!wcResolve(wc.matches, wc.teams)[GRAND_FINAL].winner; break;
+      case 'veto': wc.veto = vetoApply(wc.veto, op.map, Date.now()); break;
+      case 'pb': {
+        if (!isMapId(op.map) || typeof op.team !== 'string' || !op.team) return;
+        const forMap = { ...(wc.pbs[op.map] ?? {}) };
+        const pb = sanitizePb(op.pb);
+        if (pb) forMap[op.team] = pb; else delete forMap[op.team];
+        wc.pbs = { ...wc.pbs, [op.map]: forMap };
+        break;
+      }
+      case 'pb-show': wc.veto = { ...wc.veto, pb: { map: isMapId(op.map) ? op.map : null, at: isMapId(op.map) ? Date.now() : null } }; break;
+      case 'veto-undo': {
+        // Undo the decider together with the step that filled it in.
+        let done = wc.veto.done.slice(0, -1);
+        if (wc.veto.order[wc.veto.done.length - 1]?.by === 'd' && done.length) done = done.slice(0, -1);
+        wc.veto = { ...wc.veto, done, at: null };
+        break;
+      }
+      case 'veto-reset': wc.veto = { ...wc.veto, done: [], at: null, pb: { map: null, at: null } }; break;
+      case 'veto-order': wc.veto = sanitizeVeto({ order: op.order, done: [], at: null }); break;
+      case 'interview': wc.interview = sanitizeInterview({ ...wc.interview, ...op.patch }); break;
+      case 'pickem-reset': wc.pickem = {}; break;
+      case 'booth': wc.booth = sanitizeWildcard({ ...wc, booth: op.slots }).booth; break;
+      case 'map': {
+        // Plays the map card on the gameplay screen and names the map on the scoreboard.
+        const mp = majorMap(op.id);
+        wc.map = { id: mp ? mp.id : null, at: mp ? Date.now() : null };
+        for (const show of [db.showLive, db.showPreview]) show.mapName = mp ? mp.country : '';
+        broadcastLive();
+        break;
+      }
+      case 'map-photo': {
+        if (!majorMap(op.id)) return;
+        const ph = { ...wc.mapPhotos };
+        if (op.url) ph[op.id] = op.url; else delete ph[op.id];
+        wc.mapPhotos = sanitizeWildcard({ ...wc, mapPhotos: ph }).mapPhotos;
+        break;
+      }
+      case 'teams': wc.teams = sanitizeWildcard({ ...wc, teams: op.teams }).teams; wcChanged(); return;
+      case 'air': wc.air = op.part === 2 ? 2 : 1; wcLastRotate = Date.now(); break;
+      case 'opts':
+        wc.opts = sanitizeWildcard({ ...wc, opts: { ...wc.opts, ...(op.patch ?? {}) } }).opts;
+        if (op.patch && 'rotate' in op.patch) wcLastRotate = Date.now();
+        break;
+      case 'enabled': wc.enabled = op.on === true; break;
+      case 'cast': {
+        wc.cast = isWcId(op.id) ? op.id : null;
+        // The cast match is the scoreboard's featured match too (names, logos, series score from the sheet).
+        const m = wc.cast ? db.sheet.matches.find(x => x.bracket === wc.cast) : undefined;
+        const cur = db.sheet.matches.find(x => x.id === db.sheet.featured);
+        if (m || (!wc.cast && cur && isWcId(cur.bracket))) {
+          db.sheet.featured = m ? m.id : null;
+          applyFeatured();
+          broadcastLive();
+          pushMatchData();
+        }
+        break;
+      }
+      case 'sheet-auto': wc.sheetAuto = op.on === true; if (wc.sheetAuto && db.sheet.id) sheetNow(); break;
+      case 'pull': sheetNow(true); return;
+      case 'reset':
+        for (const id of WC_IDS) { const m = wc.matches[id]; m.s1 = m.s2 = ''; m.live = false; }
+        wcSnap = wcSnapshot(wc);
+        break;
+      case 'restore': {
+        // Accepts a backup from this controller or from the old standalone overlay ("Copy backup").
+        if (!isWcBackup(op.data)) return;
+        const d = op.data as any;
+        const next = sanitizeWildcard({ ...wc, matches: d.matches, opts: { ...wc.opts, ...(d.opts ?? {}) }, air: d.air ?? wc.air, cast: d.cast ?? wc.cast }, wc.enabled);
+        db.wildcard = { ...next, sheetAuto: wc.sheetAuto, sheetSeen: wc.sheetSeen, showcase: wc.showcase, intro: wc.intro, done: {} };
+        wcSnap = wcSnapshot(db.wildcard); // restored results are not news: no popups
+        break;
+      }
+      case 'test': wcPop(demoEvent(wc, op.kind === 'match' ? 'match' : 'map')); return;
+      case 'replay': if (wcLastPop) wcPop(wcLastPop); return;
+      case 'showcase': wc.showcase = sanitizeShowcase({ ...wc.showcase, ...(op.patch ?? {}), photos: wc.showcase.photos }); break;
+      case 'intro': {
+        const next = sanitizeIntro({ ...wc.intro, ...(op.patch ?? {}), picks: wc.intro.picks, at: wc.intro.at });
+        // New teams: the predictions were for the old match.
+        if (next.a !== wc.intro.a || next.b !== wc.intro.b) { next.picks = {}; next.picksLocked = false; }
+        wc.intro = next;
+        break;
+      }
+      case 'pick': {
+        if (!isSlot(op.slot)) return;
+        const p = sanitizePick(op.pick, [wc.intro.a, wc.intro.b].filter(Boolean));
+        const picks = { ...wc.intro.picks };
+        if (p) picks[String(op.slot)] = p; else delete picks[String(op.slot)];
+        wc.intro = { ...wc.intro, picks };
+        break;
+      }
+      case 'desk': wc.desk = sanitizeWildcard({ ...wc, desk: { panel: op.panel ?? wc.desk.panel, player: op.player === undefined ? wc.desk.player : op.player, slots: op.slots ?? wc.desk.slots, guest: op.guest === undefined ? wc.desk.guest : op.guest, strip: op.strip ?? wc.desk.strip, clock: op.clock ?? wc.desk.clock } }).desk; break;
+      case 'intro-play':
+        if (!wc.intro.a || !wc.intro.b) return;
+        wc.intro = { ...wc.intro, at: Date.now() };
+        wcChanged(false);
+        act({ t: 'screen', screen: 'warmup', take: true }); // the intro plays on the Warm-up screen: cut to it
+        return;
+      case 'intro-stop': wc.intro = { ...wc.intro, at: null }; break;
+      case 'photo': {
+        const key = String(op.player ?? '').toLowerCase().replace(/[^a-z0-9]/g, '');
+        if (!key) return;
+        const photos = { ...wc.showcase.photos };
+        if (op.url) photos[key] = op.url; else delete photos[key];
+        wc.showcase = sanitizeShowcase({ ...wc.showcase, photos });
+        break;
+      }
+      default: return;
+    }
+    wcChanged(false);
+  }
+
+  // Auto switch between Part 1 and Part 2, run here so every source flips together.
+  setInterval(() => {
+    const o = db.wildcard.opts;
+    if (o.rotate && Date.now() - wcLastRotate >= Math.max(5, o.rotateSec) * 1000) {
+      db.wildcard.air = db.wildcard.air === 1 ? 2 : 1;
+      wcLastRotate = Date.now();
+      wcChanged(false);
+    }
+  }, 500);
 
   function switchToEvent(id: string) {
     if (!switchEvent(id)) return pushState();
     broadcastLive();
     pushRos();
     pushMatchData();
+    wcSnap = wcSnapshot(db.wildcard);
+    each(wcAudience, wcMsg());
     each(c => c.role === 'output' || c.role === 'controller' || c.role === 'admin' || c.role === 'crew', { t: 'tournament', tournament: db.tournament });
     obs.apply(db.live, db.showLive.theme);
     const sc = db.showLive.obsScenes[db.live.screen];
@@ -253,6 +546,15 @@ export function createHub(server: Server) {
         case 'next-match': show.nextMatch = sanitizeShow({ ...show, nextMatch: { ...show.nextMatch, ...(op.patch ?? {}) } }).nextMatch; break;
         case 'lineup': show.lineup = op.ids.map(id => db.players.find(x => x.id === id)).filter(Boolean).slice(0, 32).map(x => ({ id: x!.id, vdo: x!.vdo })); break;
         case 'spotlight-hide': show.spotlight = null; break;
+        case 'matchup-casters': show.showMatchupOnCasters = op.on === true; break;
+        case 'flag': {
+          const on = op.on === true;
+          if (op.key === 'scoreboard') show.showScoreboard = on;
+          else if (op.key === 'ticker') show.ticker.onScreens = on;
+          else if (op.key === 'gameplay-ticker') show.gameplay.ticker = on;
+          else if (op.key === 'gameplay-cams') show.gameplay.cams = on;
+          break;
+        }
         case 'active-player': {
           const p = op.id ? db.players.find(x => x.id === op.id) : undefined;
           show.activePlayer = p ? { id: p.id, name: p.name, tag: p.input, vdo: p.vdo, at: Date.now(), via: op.via === 'game' ? 'game' : 'manual' } : null;
@@ -274,7 +576,7 @@ export function createHub(server: Server) {
     const prev = c.watching.get(req.slot);
     if (prev && prev.quality === req.quality && prev.video === req.video && prev.audio === req.audio) return;
     c.watching.set(req.slot, req);
-    const pid = publishers.get(req.slot);
+    const pid = pubOf(req.slot);
     if (pid) send(clients.get(pid), { t: 'rtc-viewer-join', viewerId: c.id, req });
     send(c, { t: 'rtc-publisher', slot: req.slot, online: !!pid });
     pushState();
@@ -282,7 +584,7 @@ export function createHub(server: Server) {
 
   function unwatch(c: Client, slot: CasterId) {
     if (!c.watching.delete(slot)) return;
-    const pid = publishers.get(slot);
+    const pid = pubOf(slot);
     if (pid) send(clients.get(pid), { t: 'rtc-viewer-leave', viewerId: c.id });
     pushState();
   }
@@ -306,14 +608,133 @@ export function createHub(server: Server) {
     pushState();
   }
 
+  /** What a talent's own page shows: name, current position, on-air tally, their VDO push id (only to them). */
+  function talentInfo(id: string): ServerMsg {
+    const t = db.talent.find(p => p.id === id)!;
+    const seat = seatOfTalent(id);
+    const base = seat ? (casterInfo(seat) as Extract<ServerMsg, { t: 'caster-info' }>) : null;
+    const vdo = t.mode === 'vdo' ? { id: t.vdoId, password: db.showLive.vdo.password, room: db.showLive.vdo.room } : null;
+    return { t: 'caster-info', name: talentLabel(t), role: seat ? SEAT_LABELS[seat as Seat] : 'Not in a position', cameraVisible: !!base?.cameraVisible, vdo, talent: base?.talent ?? [], seat };
+  }
+  const sendTalentInfo = (id: string) => { const pid = talentPubs.get(id); if (pid) send(clients.get(pid), talentInfo(id)); };
+
+  function registerTalent(c: Client) {
+    const id = c.talent!;
+    const old = talentPubs.get(id);
+    if (old && old !== c.id) {
+      const o = clients.get(old);
+      send(o, { t: 'error', code: 'replaced', message: 'This link was opened on another device.' });
+      o?.ws.close(4001, 'replaced');
+    }
+    talentPubs.set(id, c.id);
+    const seat = seatOfTalent(id);
+    if (seat) for (const v of clients.values()) {
+      const req = v.watching.get(seat);
+      if (req && pubOf(seat) === c.id) { send(c, { t: 'rtc-viewer-join', viewerId: v.id, req }); send(v, { t: 'rtc-publisher', slot: seat, online: true }); }
+    }
+    send(c, talentInfo(id));
+    pushState();
+  }
+
+  /** Re-point every viewer of a position from one publisher to another (no reconnection for the talent). */
+  function reroute(seat: CasterId, oldPid: string | undefined) {
+    const nextPid = pubOf(seat);
+    if (oldPid === nextPid) return;
+    for (const v of clients.values()) {
+      const req = v.watching.get(seat);
+      if (!req) continue;
+      if (oldPid) send(clients.get(oldPid), { t: 'rtc-viewer-leave', viewerId: v.id });
+      if (nextPid) send(clients.get(nextPid), { t: 'rtc-viewer-join', viewerId: v.id, req });
+      else send(v, { t: 'rtc-publisher', slot: seat, online: false });
+    }
+  }
+
+  /** Name and camera source of a position follow the talent seated there (both Preview and live). */
+  function applySeat(seat: Seat) {
+    const t = db.talent.find(p => p.id === db.seats[seat]);
+    const fix = (sc: Scene): Scene => ({ ...sc, casters: sc.casters.map(c => {
+      if (c.id !== seat) return c;
+      const src = c.source.type === 'webrtc' || c.source.type === 'vdo' ? { ...c.source, type: (t?.mode === 'vdo' ? 'vdo' : 'webrtc') as typeof c.source.type, vdo: t?.mode === 'vdo' ? t.vdoId : c.source.vdo } : c.source;
+      // A seated talent is in the show (their camera is requested by every source); an empty position is not.
+      return { ...c, enabled: !!t, name: t ? talentLabel(t) : DEFAULT_SEAT_NAMES[seat], source: src };
+    }) });
+    db.preview = fix(db.preview); db.live = fix(db.live);
+  }
+
+  function setSeat(seatN: number, talent: string | null): string | null {
+    if (!(SEATS as readonly number[]).includes(seatN)) return 'Unknown position';
+    const seat = seatN as Seat;
+    if (talent != null && !db.talent.some(p => p.id === talent)) return 'Unknown talent';
+    if (db.seats[seat] === talent) return null;
+    const from = talent ? seatOfTalent(talent) : null; // moving someone who already has a position = swap
+    const affected: Seat[] = [seat, ...(from ? [from as Seat] : [])];
+    const before = new Map(affected.map(s => [s, pubOf(s as CasterId)]));
+    const prevInSeat = db.seats[seat];
+    db.seats = { ...db.seats, [seat]: talent, ...(from ? { [from]: prevInSeat } : {}) };
+    for (const s of affected) { applySeat(s); reroute(s as CasterId, before.get(s)); }
+    for (const id of [talent, prevInSeat]) if (id) sendTalentInfo(id);
+    save();
+    broadcastLive(); // names / sources on every source (same screen: no transition)
+    return null;
+  }
+
+  function editTalent(id: string, patch: { name?: string; role?: 'caster' | 'analyst'; mode?: 'webrtc' | 'vdo' }): string | null {
+    const i = db.talent.findIndex(p => p.id === id);
+    if (i < 0) return 'Unknown talent';
+    const t = { ...db.talent[i] };
+    if (typeof patch.name === 'string') t.name = patch.name.trim().slice(0, 40);
+    if (patch.role === 'caster' || patch.role === 'analyst') t.role = patch.role;
+    if (patch.mode === 'webrtc' || patch.mode === 'vdo') t.mode = patch.mode;
+    db.talent = db.talent.map((p, j) => (j === i ? t : p));
+    const seat = seatOfTalent(id);
+    if (seat) { const before = pubOf(seat); applySeat(seat as Seat); reroute(seat, before); broadcastLive(); }
+    sendTalentInfo(id);
+    save();
+    return null;
+  }
+
+  function regenTalent(id: string): string | null {
+    const i = db.talent.findIndex(p => p.id === id);
+    if (i < 0) return 'Unknown talent';
+    db.talent = db.talent.map((p, j) => (j === i ? { ...p, key: newKey() } : p));
+    const pid = talentPubs.get(id), p = pid ? clients.get(pid) : undefined;
+    if (p) { send(p, { t: 'error', code: 'auth', message: 'This talent link has been replaced by the producer.' }); p.ws.close(4003, 'revoked'); }
+    save();
+    return null;
+  }
+
+  /** Renegotiate a position's feed for every viewer (fixes a frozen picture without the talent doing anything). */
+  function resyncSeat(seatN: number): string | null {
+    if (!(SEATS as readonly number[]).includes(seatN)) return 'Unknown position';
+    const pid = pubOf(seatN as CasterId);
+    if (!pid) return 'Nobody is connected in this position';
+    let n = 0;
+    for (const v of clients.values()) {
+      const req = v.watching.get(seatN as CasterId);
+      if (!req) continue;
+      send(clients.get(pid), { t: 'rtc-viewer-leave', viewerId: v.id });
+      send(clients.get(pid), { t: 'rtc-viewer-join', viewerId: v.id, req });
+      n++;
+    }
+    return n ? null : 'No browser source is showing this position right now';
+  }
+
+  const gfxHealth: Record<string, { ok: boolean; error?: string; at: number }> = {};
+  const gfxMsg = (): ServerMsg => ({ t: 'gfx', graphics: db.graphics, now: Date.now() });
+  const pushGfx = () => each(c => c.role === 'output' || c.role === 'controller', gfxMsg());
+  const mediaMsg = (): ServerMsg => ({ t: 'media', media: db.media, now: Date.now() });
+  const pushMedia = () => each(c => c.role === 'output' || c.role === 'controller', mediaMsg());
+
   function relay(c: Client, to: string, data: any) {
     const target = clients.get(to);
     if (!target || !data || typeof data !== 'object') return;
     if (JSON.stringify(data).length > 200_000) return;
-    if (c.role === 'contributor' && c.slot && target.watching.has(c.slot) && publishers.get(c.slot) === c.id) {
-      send(target, { t: 'rtc-signal', from: c.id, slot: c.slot, data });
-    } else if (target.role === 'contributor' && target.slot && c.watching.has(target.slot) && publishers.get(target.slot) === target.id) {
-      send(target, { t: 'rtc-signal', from: c.id, slot: target.slot, data });
+    const cs = c.role === 'contributor' ? (c.talent ? seatOfTalent(c.talent) : c.slot) : null;
+    const ts = target.role === 'contributor' ? (target.talent ? seatOfTalent(target.talent) : target.slot) : null;
+    if (cs && target.watching.has(cs) && pubOf(cs) === c.id) {
+      send(target, { t: 'rtc-signal', from: c.id, slot: cs, data });
+    } else if (ts && c.watching.has(ts) && pubOf(ts) === target.id) {
+      send(target, { t: 'rtc-signal', from: c.id, slot: ts, data });
     }
   }
 
@@ -340,6 +761,13 @@ export function createHub(server: Server) {
         send(c, { t: 'error', code: 'auth', message: 'Invalid output key.' });
         return c.ws.close(4003, 'auth');
       }
+    } else if (m.role === 'contributor' && typeof m.talent === 'string') {
+      const t = db.talent.find(p => p.id === m.talent);
+      if (!t || typeof m.key !== 'string' || !safeEq(m.key, t.key)) {
+        send(c, { t: 'error', code: 'auth', message: 'This talent link is invalid or has been revoked.' });
+        return c.ws.close(4003, 'auth');
+      }
+      c.talent = t.id;
     } else if (m.role === 'contributor') {
       if (!isSlot(m.slot) || typeof m.key !== 'string' || !safeEq(m.key, db.contributorKeys[m.slot])) {
         send(c, { t: 'error', code: 'auth', message: 'This camera link is invalid or has been revoked.' });
@@ -350,13 +778,16 @@ export function createHub(server: Server) {
 
     c.role = m.role;
     c.route = typeof m.route === 'string' ? m.route.slice(0, 64) : undefined;
-    const name = c.slot ? db.live.casters[c.slot - 1].name : undefined;
+    const name = c.talent ? talentLabel(db.talent.find(p => p.id === c.talent)) : c.slot ? db.live.casters[c.slot - 1].name : undefined;
     send(c, { t: 'welcome', id: c.id, role: c.role, iceServers: iceServers(c.id), slot: c.slot, name });
     if (c.role === 'output' || c.role === 'controller' || c.role === 'crew' || c.role === 'admin') send(c, liveMsg());
     if (c.role === 'controller' || c.role === 'contributor' || c.role === 'crew') send(c, { t: 'ros', ros: db.ros, now: Date.now() });
+    if (c.role === 'contributor' && c.slot && !c.talent) send(c, casterInfo(c.slot));
+    if (c.role === 'output' || c.role === 'controller') { send(c, mediaMsg()); send(c, gfxMsg()); }
     if (c.role === 'controller') send(c, { t: 'state', state: controllerState() });
     if (c.role !== 'contributor') { send(c, { t: 'tournament', tournament: db.tournament }); send(c, matchDataMsg()); }
-    if (c.role === 'contributor') registerPublisher(c, c.slot!);
+    if (wcAudience(c)) { send(c, wcMsg()); send(c, { t: 'twitch', tw: tw.pub }); }
+    if (c.role === 'contributor') { if (c.talent) registerTalent(c); else registerPublisher(c, c.slot!); }
     pushState();
   }
 
@@ -376,8 +807,23 @@ export function createHub(server: Server) {
       return pushState();
     }
 
+    if (m.t === 'media-ended' && c.role === 'output') { engine?.mediaEnded(Number(m.seq)); return; }
+    if (m.t === 'gfx-health' && c.role === 'output' && typeof m.id === 'string' && db.graphics.some(g => g.id === m.id)) {
+      gfxHealth[m.id] = { ok: m.ok === true, error: typeof m.error === 'string' ? m.error.slice(0, 300) : undefined, at: Date.now() };
+      return pushState();
+    }
     if (m.t === 't-op' && (c.role === 'admin' || c.role === 'controller')) return tournamentOp(m.op);
+    // Picks are entered by the producer (scene dock / Major tab); caster pages no longer send them.
+    if (m.t === 'caster-pick') return;
     if (c.role !== 'controller') return; // everything below mutates state
+    if (m.t === 'cmd') {
+      if (!engine) return send(c, { t: 'ack', id: String(m.id), ok: false, version: 0, error: 'Engine not ready' });
+      const id = String(m.id);
+      engine.run(m.cmd, c.id, m.source === 'auto' ? 'auto' : 'manual', typeof m.base === 'number' ? m.base : undefined)
+        .catch(e => ({ ok: false as const, version: 0, error: `Server error: ${(e as Error).message}` }))
+        .then(r => send(c, { t: 'ack', id, ...r }));
+      return;
+    }
     act(m);
   }
 
@@ -432,10 +878,9 @@ export function createHub(server: Server) {
         if (db.instant) goLive();
         else if (m.take && db.live.screen !== m.screen) {
           // Cut only the screen; other prepared preview changes stay in preview.
+          const prev = db.live.screen;
           db.live = { ...db.live, screen: m.screen };
-          broadcastLive();
-          const obsScene = db.showLive.obsScenes[m.screen];
-          if (obsScene) obs.setScene(obsScene);
+          airProgram(prev, 'stinger');
         }
         break;
       case 'set-preview':
@@ -511,15 +956,15 @@ export function createHub(server: Server) {
         obs.apply(db.live, db.showLive.theme);
         break;
       case 'event-create': {
-        const id = createEvent(String(m.name ?? ''), m.from === 'copy' || m.from === 'overdrive' ? m.from : 'blank', m.theme === 'glacial' ? 'glacial' : 'bnl');
+        const id = createEvent(String(m.name ?? ''), m.from === 'copy' || m.from === 'overdrive' ? m.from : 'blank', m.theme === 'classic' ? 'classic' : 'bnl');
         if (m.activate) switchToEvent(id); else pushState();
         break;
       }
       case 'event-switch': switchToEvent(String(m.id)); break;
       case 'sheet-set': {
         const p = parseSheetUrl(String(m.url ?? ''));
-        if (p) { db.sheet.id = p.id; db.sheet.gid = p.gid; }
-        else if (!String(m.url ?? '').trim()) { db.sheet.id = ''; db.sheet.gid = ''; }
+        if (p) { db.sheet.id = p.id; db.sheet.gid = p.gid; db.sheet.pub = p.pub; }
+        else if (!String(m.url ?? '').trim()) { db.sheet.id = ''; db.sheet.gid = ''; db.sheet.pub = false; }
         db.sheet.enabled = m.enabled === true && !!db.sheet.id;
         save();
         sheetNow();
@@ -531,8 +976,15 @@ export function createHub(server: Server) {
         applyFeatured();
         broadcastLive();
         pushMatchData();
+        { // Featuring a wildcard match makes it the cast match on the bracket graphics too.
+          const fm = db.sheet.matches.find(x => x.id === db.sheet.featured);
+          const cast = fm && isWcId(fm.bracket) ? fm.bracket : db.sheet.featured ? db.wildcard.cast : null;
+          if (cast !== db.wildcard.cast) { db.wildcard.cast = cast; wcChanged(false); }
+        }
         break;
       }
+      case 'wc': wcOp(m.op); break;
+      case 'tw': if (m.op && typeof m.op === 'object') tw.op(m.op); break;
       case 'badge': {
         const k = m.kind === 'replay' || m.kind === 'highlights' ? m.kind : 'none';
         db.showLive = { ...db.showLive, badge: { kind: k, at: Date.now() } };
@@ -553,19 +1005,17 @@ export function createHub(server: Server) {
         break;
       }
       case 'obs-build': {
-        obs.build({
-          base: `http://localhost:${config.port}`, key: config.outputKey,
-          screens: SCREEN_IDS.map(id => ({ id, label: SCREEN_LABELS[id], route: `/output/${id}` })),
-          gameCapture: m.gameCapture !== false, audio: m.audio !== false,
-        }).then(map => {
-          if (!map) return;
-          db.showPreview = { ...db.showPreview, obsScenes: { ...db.showPreview.obsScenes, ...map } };
-          db.showLive = { ...db.showLive, obsScenes: { ...db.showLive.obsScenes, ...map } };
-          save();
-          broadcastLive();
-          const sc = map[db.live.screen];
-          if (sc) obs.setScene(sc);
-        });
+        // Legacy controller button: builds the 11 legacy screen scenes with the new builder (the click confirms).
+        // It no longer switches OBS afterwards. Studio Mode → OBS Setup shows the preview and every output.
+        obsSetup.setOptions({ gameCapture: m.gameCapture !== false, audio: m.audio !== false });
+        const ids = obsSetup.targets().filter(t => t.kind === 'screen').map(t => t.id);
+        void (async () => {
+          const p = await obsSetup.preview('build', ids);
+          const r = typeof p === 'string' ? p : await obsSetup.apply(p.hash, false);
+          const lines = typeof r === 'string' ? [r] : [r.summary, ...Object.entries(r.perTarget).flatMap(([k, v]) => v.lines.map(l => `${k}: ${l}`))];
+          obs.status.build = { at: Date.now(), ok: typeof r !== 'string' && r.ok, lines: lines.slice(0, 80) };
+          pushState();
+        })();
         break;
       }
     }
@@ -575,8 +1025,13 @@ export function createHub(server: Server) {
   function onClose(c: Client) {
     clients.delete(c.id);
     for (const slot of c.watching.keys()) {
-      const pid = publishers.get(slot);
+      const pid = pubOf(slot);
       if (pid) send(clients.get(pid), { t: 'rtc-viewer-leave', viewerId: c.id });
+    }
+    if (c.role === 'contributor' && c.talent && talentPubs.get(c.talent) === c.id) {
+      talentPubs.delete(c.talent);
+      const seat = seatOfTalent(c.talent);
+      if (seat && !pubOf(seat)) for (const v of clients.values()) if (v.watching.has(seat)) send(v, { t: 'rtc-publisher', slot: seat, online: false });
     }
     if (c.role === 'contributor' && c.slot && publishers.get(c.slot) === c.id) {
       publishers.delete(c.slot);
@@ -594,6 +1049,7 @@ export function createHub(server: Server) {
       const sameOrigin = !origin || new URL(origin).host === req.headers.host;
       const authRole = sameOrigin ? roleFrom(req) : null;
       const c: Client = { id: crypto.randomUUID(), ws, authed: authRole === 'producer', authRole, watching: new Map(), alive: true };
+      if (authRole === 'producer') notePublicOrigin(req);
       clients.set(c.id, c);
       ws.on('pong', () => (c.alive = true));
       ws.on('message', raw => {
@@ -620,7 +1076,50 @@ export function createHub(server: Server) {
 
   obs.apply(db.live, db.showLive.theme);
 
+  engine = createEngine({
+    db,
+    save,
+    goLive,
+    airProgram,
+    broadcastLive,
+    pushWc: () => { db.wildcard.rev = Date.now(); save(); each(wcAudience, wcMsg()); },
+    wcOp,
+    quickBadge: kind => act({ t: 'badge', kind }),
+    clearPopups: () => wcPop({ kind: 'clear', id: '', side: 0 } as Omit<WcPop, 'seq'>),
+    reloadOutputs: () => { let n = 0; for (const c of clients.values()) if (c.role === 'output' && c.ws.readyState === WebSocket.OPEN) { c.ws.send(JSON.stringify({ t: 'reload' })); n++; } return n; },
+    pushState,
+    pushMedia,
+    pushGfx,
+    quick,
+    setSeat,
+    editTalent,
+    regenTalent,
+    resyncSeat,
+    obsSetup: async cmd => {
+      switch (cmd.action) {
+        case 'scan': { const e = await obsSetup.scan(); return e ? { error: e } : { note: 'OBS scanned' }; }
+        case 'verify': { const r = await obsSetup.verify(); return typeof r === 'string' ? { error: r } : { note: `${r.bad ? `${r.ok} scene${r.ok === 1 ? '' : 's'} correct, ${r.bad} need attention` : `All ${r.ok} scenes are correct`}${r.leaks ? ` · ⚠ ${r.leaks} OBS source${r.leaks === 1 ? '' : 's'} show an Overdrive controller page` : ''}` }; }
+        case 'preview': {
+          const ids = cmd.targets === 'all' ? 'all' as const : Array.isArray(cmd.targets) ? cmd.targets.map(String).slice(0, 200) : [];
+          const r = await obsSetup.preview(cmd.mode === 'repair' ? 'repair' : 'build', ids);
+          return typeof r === 'string' ? { error: r } : { note: r.ops.length ? `${r.ops.length} change${r.ops.length === 1 ? '' : 's'} to confirm` : 'Nothing to change' };
+        }
+        case 'apply': { const r = await obsSetup.apply(String(cmd.hash ?? ''), cmd.allowLive === true); return typeof r === 'string' ? { error: r } : r.ok ? { note: r.summary } : { error: r.summary }; }
+        case 'cancel': obsSetup.clearPlan(); return {};
+        case 'options': { const e = obsSetup.setOptions(cmd.options ?? {}); return e ? { error: e } : {}; }
+      }
+      return { error: 'Unknown OBS Setup action' };
+    },
+    obsSwitch: async (scene, t) => {
+      if (!obs.status.connected) return obs.status.enabled ? `OBS is not connected (${obs.status.error ?? 'offline'})` : 'OBS is not set up (Settings → OBS)';
+      if (!obs.status.scenes.includes(scene)) return `OBS has no scene named "${scene}"`;
+      return (await obs.setScene(scene, t)) ? null : (obs.status.error ?? 'OBS refused the scene switch');
+    },
+  });
+
   const api = {
+    /** Overdrive 2.0 engine for HTTP automation (Stream Deck, Companion): same commands and acks. */
+    engine: (cmd: ProducerCmd, source: 'manual' | 'auto' = 'auto') => engine!.run(cmd, 'api', source),
     act,
     tournamentOp,
     spectate,
@@ -631,6 +1130,7 @@ export function createHub(server: Server) {
       timer: { target: db.showLive.timer.target, remaining: db.showLive.timer.target ? Math.max(0, db.showLive.timer.target - Date.now()) : null },
       presets: db.presets.map(p => ({ id: p.id, name: p.name })),
       obs: { connected: obs.status.connected, scene: obs.status.currentScene },
+      wildcard: { enabled: db.wildcard.enabled, part: db.wildcard.air, autoSwitch: db.wildcard.opts.rotate, cast: db.wildcard.cast, sheetAuto: db.wildcard.sheetAuto },
     }),
   };
   return { clients, obs, api };
@@ -646,6 +1146,20 @@ function applyPreset(current: Scene, p: Preset): Scene {
     });
   }
   return next;
+}
+
+/** Overdrive's public origin when hosted remotely: env first, else the last producer page that connected from a non-local host. */
+let seenOrigin = '';
+function publicOrigin(): string {
+  const env = (process.env.PUBLIC_URL || process.env.RENDER_EXTERNAL_URL || '').trim().replace(/\/$/, '');
+  if (/^https?:\/\/[^\s/?#]+$/i.test(env)) return env;
+  return seenOrigin;
+}
+function notePublicOrigin(req: IncomingMessage) {
+  const host = String(req.headers['x-forwarded-host'] ?? req.headers.host ?? '').split(',')[0].trim();
+  if (!host || /^(localhost|127\.|\[::1\]|0\.0\.0\.0)/.test(host) || /^(192\.168\.|10\.|172\.(1[6-9]|2\d|3[01])\.)/.test(host)) return;
+  const proto = String(req.headers['x-forwarded-proto'] ?? '').split(',')[0].trim() || ((req.socket as any).encrypted ? 'https' : 'http');
+  if (/^[\w.-]+(:\d+)?$/.test(host)) seenOrigin = `${proto === 'https' ? 'https' : 'http'}://${host}`;
 }
 
 function lanUrls(): string[] {

@@ -11,12 +11,12 @@ body { background: #101010; color: #fff; font-family: var(--font-sans); -webkit-
 /* OBS browser sources: fully transparent page, no scrollbars. */
 html.output, html.output body, html.output #root { background: transparent !important; overflow: hidden; height: 100%; }
 
-.glacial-stage { font-family: var(--font-sans); color: #fff; }
+.od-stage { font-family: var(--font-sans); color: #fff; }
 
-/* Slow, broadcast-safe drift of the Glacial pattern. */
-@keyframes glacial-drift { from { background-position: 0 0; } to { background-position: 560px 470px; } }
-.glacial-drift { animation: glacial-drift 90s linear infinite; }
-@media (prefers-reduced-motion: reduce) { .glacial-drift { animation: none; } }
+/* Slow, broadcast-safe drift of the background pattern. */
+@keyframes od-drift { from { background-position: 0 0; } to { background-position: 560px 470px; } }
+.od-drift { animation: od-drift 90s linear infinite; }
+@media (prefers-reduced-motion: reduce) { .od-drift { animation: none; } }
 
 /* Controller monitors: checkerboard shows where outputs are transparent. */
 .monitor-bg {
@@ -50,14 +50,14 @@ html.output, html.output body, html.output #root { background: transparent !impo
   .btn:disabled, .btn-primary:disabled, .btn-sm:disabled, .btn-xs:disabled { opacity: 0.35; pointer-events: none; }
 }
 
-@keyframes glacial-drift-rev { from { background-position: 0 0; } to { background-position: -1100px -923px; } }
-.glacial-drift-rev { animation: glacial-drift-rev 160s linear infinite; }
-@keyframes glacial-ticker { from { transform: translateX(0); } to { transform: translateX(calc(-1 * var(--ticker-w))); } }
-.glacial-ticker { animation: glacial-ticker linear infinite; will-change: transform; }
-@media (prefers-reduced-motion: reduce) { .glacial-drift-rev { animation: none; } }
+@keyframes od-drift-rev { from { background-position: 0 0; } to { background-position: -1100px -923px; } }
+.od-drift-rev { animation: od-drift-rev 160s linear infinite; }
+@keyframes od-ticker { from { transform: translateX(0); } to { transform: translateX(calc(-1 * var(--ticker-w))); } }
+.od-ticker { animation: od-ticker linear infinite; will-change: transform; }
+@media (prefers-reduced-motion: reduce) { .od-drift-rev { animation: none; } }
 
 /* Benelux Pro League theme: condensed type to match the broadcast package. */
 [data-theme='bnl'] { --font-display: var(--brand-display, "Bebas Neue", "Barlow Condensed", system-ui, sans-serif); --font-sans: "Barlow Condensed", "Inter", system-ui, sans-serif; --accent: var(--brand-accent, #e23b3b); }
-[data-theme='glacial'] { --font-display: var(--brand-display, "Sora", "Inter", system-ui, sans-serif); --accent: var(--brand-accent, #e23b3b); }
+[data-theme='classic'] { --font-display: var(--brand-display, "Sora", "Inter", system-ui, sans-serif); --accent: var(--brand-accent, #e23b3b); }
 [data-theme='bnl'] .font-display { font-weight: 400 !important; }
 [data-theme='bnl'] .font-sans { font-weight: 600; }

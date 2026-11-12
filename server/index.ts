@@ -1,3 +1,4 @@
+import { gameFeed } from './gamefeed';
 import http from 'node:http';
 import path from 'node:path';
 import fs from 'node:fs';
@@ -7,7 +8,7 @@ import { config } from './config';
 import { announcePassword, checkPassword, COOKIE, cookieOptions, createSession, destroySession, loginAllowed, noteFailure, roleFrom, sessionFrom } from './auth';
 import { flush } from './store';
 import { createHub } from './hub';
-import { controlApi, music, pluginDownload, uploads } from './api';
+import { controlApi, media, music, pluginDownload, uploads } from './api';
 
 const app = express();
 app.disable('x-powered-by');
@@ -16,8 +17,10 @@ app.use(express.json({ limit: '64kb' }));
 const server = http.createServer(app);
 const hub = createHub(server);
 app.use('/api/v1', controlApi(hub.api));
+app.use(gameFeed());
 app.use(uploads());
 app.use(music());
+app.use(media());
 app.use(pluginDownload());
 
 app.get('/api/health', (_req, res) => res.json({ ok: true, uptime: process.uptime() }));
@@ -60,7 +63,7 @@ if (clientDir) {
     },
   }));
   const html = path.join(clientDir, 'index.html');
-  app.get(/^\/(?!api\/|ws|uploads\/|music\/).*/, (_req, res) => {
+  app.get(/^\/(?!api\/|ws|uploads\/|music\/|media\/).*/, (_req, res) => {
     res.setHeader('Cache-Control', 'no-cache');
     res.sendFile(html);
   });
@@ -70,7 +73,7 @@ server.listen(config.port, config.host, () => {
   console.log(`Overdrive caster system on http://localhost:${config.port}`);
   console.log(`  controller  /controller`);
   console.log(`  outputs     /output/casters  /output/solo  /output/duo  /output/trio  /output/names  /output/branding  /output/audio/1..3`);
-  console.log(`  cameras     /contribute/1..3?key=…  (links shown in the controller)`);
+  console.log(`  cameras     /contribute/1..6?key=…  (1–3 casters, 4–5 analysts, 6 interview guest; links in the controller)`);
   console.log(`  screens     /output/program  /output/starting  /output/brb  /output/ending  /output/scoreboard  /output/ticker`);
   console.log(`  control API /api/v1/…  (token shown in the controller → Integrations)`);
   if (!clientDir) console.log('  (no built client found – run `npm run dev` or `npm run build`)');

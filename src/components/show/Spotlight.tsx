@@ -5,20 +5,20 @@ import { useTheme } from '../../lib/theme';
 import { Mark } from '../Brand';
 
 /**
- * Player spotlight / story card, lower-left. Styled after the BNL caster
+ * Player spotlight / story card, lower-left. Styled after the boxed caster
  * frames: black panel, trophy box, light-grey tag for the label.
  */
 export function SpotlightCard({ spot, now, bottom = 40, left = 40 }: { spot: SpotlightState | null; now: number; bottom?: number; left?: number }) {
   const visible = spot && (spot.until == null || spot.until > now);
   const { theme } = useTheme();
-  const glacial = theme !== 'bnl';
+  const classic = theme !== 'bnl';
   return (
     <AnimatePresence>
       {visible && spot && (
         <motion.div key={spot.at} className="absolute" style={{ left, bottom, width: 820 }}
           initial={{ opacity: 0, x: -40 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -30, transition: { duration: 0.25, ease: EASE } }} transition={{ duration: 0.4, ease: EASE }}>
-          <div className={`inline-flex h-[42px] items-center px-4 font-display uppercase leading-none ${glacial ? 'bg-white text-[#111] font-bold' : 'bg-[#E8E8E8] text-[#111]'}`}
-            style={{ fontSize: glacial ? 15 : 27, letterSpacing: glacial ? '0.24em' : '0.06em', paddingTop: glacial ? 0 : 3 }}>
+          <div className={`inline-flex h-[42px] items-center px-4 font-display uppercase leading-none ${classic ? 'bg-white text-[#111] font-bold' : 'bg-[#E8E8E8] text-[#111]'}`}
+            style={{ fontSize: classic ? 15 : 27, letterSpacing: classic ? '0.24em' : '0.06em', paddingTop: classic ? 0 : 3 }}>
             {spot.kind === 'player' ? 'Player spotlight' : spot.data.label || 'Did you know'}
           </div>
           <div className="flex bg-[#050505]/95" style={{ boxShadow: '0 14px 40px rgba(0,0,0,0.45)' }}>
@@ -26,7 +26,7 @@ export function SpotlightCard({ spot, now, bottom = 40, left = 40 }: { spot: Spo
               {spot.data.photo ? <img src={spot.data.photo} alt="" className="h-full w-full object-cover" /> : <Mark height={64} />}
             </div>
             <div className="min-w-0 flex-1 px-6 py-4">
-              {spot.kind === 'player' ? <PlayerBody d={spot.data} glacial={glacial} /> : <StoryBody d={spot.data} glacial={glacial} />}
+              {spot.kind === 'player' ? <PlayerBody d={spot.data} classic={classic} /> : <StoryBody d={spot.data} classic={classic} />}
             </div>
           </div>
           {spot.until != null && (
@@ -39,30 +39,30 @@ export function SpotlightCard({ spot, now, bottom = 40, left = 40 }: { spot: Spo
   );
 }
 
-function PlayerBody({ d, glacial }: { d: Record<string, string>; glacial: boolean }) {
+function PlayerBody({ d, classic }: { d: Record<string, string>; classic: boolean }) {
   const stats = [
     ['Input', d.input], ['Style', d.style], ['Age', d.age], ['Favourite player', d.favPlayer],
   ].filter(([, v]) => v);
   return (
     <>
-      <div className={`truncate font-display uppercase leading-none text-white ${glacial ? 'font-bold' : ''}`} style={{ fontSize: glacial ? 46 : 64 }}>{d.name}</div>
+      <div className={`truncate font-display uppercase leading-none text-white ${classic ? 'font-bold' : ''}`} style={{ fontSize: classic ? 46 : 64 }}>{d.name}</div>
       {stats.length > 0 && (
         <div className="mt-3 flex flex-wrap gap-x-7 gap-y-2">
           {stats.map(([k, v]) => (
             <div key={k} className="min-w-0 max-w-[300px]">
               <div className="font-sans font-bold uppercase text-white/45" style={{ fontSize: 13, letterSpacing: '0.2em' }}>{k}</div>
-              <div className="truncate font-sans font-semibold text-white" style={{ fontSize: glacial ? 20 : 24 }}>{v}</div>
+              <div className="truncate font-sans font-semibold text-white" style={{ fontSize: classic ? 20 : 24 }}>{v}</div>
             </div>
           ))}
         </div>
       )}
       {d.funFact && (
-        <div className="mt-3 border-l-2 border-white/30 pl-3 font-sans font-medium leading-snug text-white/90" style={{ fontSize: glacial ? 19 : 23 }}>
+        <div className="mt-3 border-l-2 border-white/30 pl-3 font-sans font-medium leading-snug text-white/90" style={{ fontSize: classic ? 19 : 23 }}>
           “{d.funFact}”
         </div>
       )}
       {d.rival && (
-        <div className="mt-2.5 font-sans text-white/70" style={{ fontSize: glacial ? 16 : 20 }}>
+        <div className="mt-2.5 font-sans text-white/70" style={{ fontSize: classic ? 16 : 20 }}>
           <span className="mr-2 font-bold uppercase text-white/45" style={{ fontSize: 13, letterSpacing: '0.2em' }}>Biggest rival</span>{d.rival}
         </div>
       )}
@@ -70,11 +70,11 @@ function PlayerBody({ d, glacial }: { d: Record<string, string>; glacial: boolea
   );
 }
 
-function StoryBody({ d, glacial }: { d: Record<string, string>; glacial: boolean }) {
+function StoryBody({ d, classic }: { d: Record<string, string>; classic: boolean }) {
   return (
     <>
-      <div className={`truncate font-display uppercase leading-none text-white ${glacial ? 'font-bold' : ''}`} style={{ fontSize: glacial ? 40 : 56 }}>{d.title}</div>
-      <div className="mt-3 font-sans font-medium leading-snug text-white/90" style={{ fontSize: glacial ? 21 : 26 }}>{d.text}</div>
+      <div className={`truncate font-display uppercase leading-none text-white ${classic ? 'font-bold' : ''}`} style={{ fontSize: classic ? 40 : 56 }}>{d.title}</div>
+      <div className="mt-3 font-sans font-medium leading-snug text-white/90" style={{ fontSize: classic ? 21 : 26 }}>{d.text}</div>
     </>
   );
 }

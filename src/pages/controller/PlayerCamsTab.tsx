@@ -130,12 +130,12 @@ export function PlayerCamsTab({ st, show, setShow, send, quick, now }: {
       <section className="rounded-lg border border-white/[0.08] bg-[#171717] p-4">
         <h2 className="mb-2 text-[11px] font-semibold uppercase tracking-[0.22em] text-white/70">Openplanet plugin: auto-follow</h2>
         <ol className="list-decimal space-y-1 pl-5 text-[12.5px] leading-relaxed text-white/65">
-          <li><a className="font-semibold text-white underline" href="/api/plugin/BNLCamFollow.op">Download BNLCamFollow.op</a> (already set up with this server and your token).</li>
+          <li><a className="font-semibold text-white underline" href="/api/plugin/OverdriveCamFollow.op">Download OverdriveCamFollow.op</a> (already set up with this server and your token).</li>
           <li>Put it in <code className="text-white/80">C:\Users\&lt;you&gt;\OpenplanetNext\Plugins</code> on the PC that runs Trackmania for spectating.</li>
           <li>In game, open Openplanet (F3) → Developer → Load plugin, or restart the game. If Openplanet refuses an unsigned plugin, set Settings → Developer → Signature mode to “Developer”.</li>
           <li>Spectate a player: the status above shows who the game is on, and the cam follows.</li>
         </ol>
-        <p className="mt-2 text-[11.5px] text-white/40">If the game runs on another PC, change the plugin's Server URL (Openplanet → Settings → BNL Cam Follow) to this PC's address. Names are matched loosely (colours, dots and “tm” ignored); use “Link” above for anyone whose in-game name is different.</p>
+        <p className="mt-2 text-[11.5px] text-white/40">If the game runs on another PC, change the plugin's Server URL (Openplanet → Settings → Overdrive Cam Follow) to this PC's address. Names are matched loosely (colours, dots and “tm” ignored); use “Link” above for anyone whose in-game name is different.</p>
       </section>
     </div>
   );

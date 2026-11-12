@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useLive, useSocket, query } from '../lib/hooks';
 import { sectionFor, type MusicSection } from '../../shared/music';
 
-type Track = { name: string; url: string };
+type Track = { name: string; url: string; shared?: boolean };
 export type MusicLibrary = Record<MusicSection, Track[]>;
 
 export function useMusicLibrary(pollMs = 15000) {
@@ -15,7 +15,7 @@ export function useMusicLibrary(pollMs = 15000) {
 
 /**
  * /output/music: plays the music bed of the screen on air, crossfading on every
- * screen change; silent on gameplay. Add it to OBS as a browser source with
+ * screen change; each scene has its own tracks and level (0 = silent). Add it to OBS as a browser source with
  * "Control audio via OBS" so it gets its own mixer fader.
  */
 export function MusicOutput() {
@@ -32,7 +32,8 @@ export function MusicOutput() {
   const [np, setNp] = useState('');
 
   const m = live?.show.music;
-  const section = live && m?.enabled ? sectionFor(live.scene.screen) : null;
+  const sec0 = live && m?.enabled ? sectionFor(live.scene.screen) : null;
+  const section = sec0 && m && m.levels[sec0] > 0 ? sec0 : null; // level 0 = this scene is silent
   const target = section && m ? m.volume * m.levels[section] : 0;
   const tracks = section && lib ? lib[section] : [];
   const targetRef = useRef(0); targetRef.current = target;

@@ -1,12 +1,15 @@
 import { useEffect, useMemo, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
-import type { Show } from '../../../shared/types';
+import type { Caster, Show } from '../../../shared/types';
 import type { MatchData } from '../../../shared/protocol';
 import { vdoViewUrl } from '../../../shared/players';
 import { EASE } from '../../lib/motion';
 import { Mark } from '../Brand';
 import { VdoView } from './PlayerCam';
 import { Countdown, Rise, ScreenBackground, Ticker } from './parts';
+import { WcIntro, WcShowcase } from '../wildcard/Profiles';
+import { introScreen } from '../../../shared/major';
+import type { WildcardState } from '../../../shared/wildcard';
 
 const TAG = 'bg-[#E8E8E8] text-[#111]';
 const ord = (n: number) => `${n}${n === 1 ? 'ST' : n === 2 ? 'ND' : n === 3 ? 'RD' : 'TH'}`;
@@ -65,13 +68,21 @@ function CamBox({ p, show, embeds, w, h, active }: { p: LobbyPlayer; show: Show;
  * upcoming match on camera while they warm up on the map, with their
  * setup and a rotating fun fact.
  */
-export function WarmupScreen({ show, now, bnl, embeds = true }: { show: Show; now: number; bnl: MatchData | null; embeds?: boolean }) {
+export function WarmupScreen({ show, now, bnl, embeds = true, showcase = null, casters = [] }: { show: Show; now: number; bnl: MatchData | null; embeds?: boolean; showcase?: WildcardState | null; casters?: Caster[] }) {
   const lobby = useLobby(show, bnl);
   const [fi, setFi] = useState(0);
   const facts = lobby.filter(p => p.fact);
   useEffect(() => { const t = setInterval(() => setFi(i => i + 1), 9000); return () => clearInterval(t); }, []);
   const fact = facts.length ? facts[fi % facts.length] : null;
   const ticker = show.ticker.enabled && show.ticker.onScreens && show.ticker.items.length > 0;
+  // OverDrive Major: no player cams, a full-screen player showcase instead.
+  if (showcase) return (
+    <div className="absolute inset-0 overflow-hidden">
+      <ScreenBackground />
+      {/* A playing match intro takes over; otherwise the rotating player showcase. */}
+      {introScreen(showcase.intro, now, !!showcase.showcase.pin) ? <WcIntro wc={showcase} show={show} bnl={bnl} now={now} casters={casters} /> : <WcShowcase wc={showcase} show={show} bnl={bnl} now={now} />}
+    </div>
+  );
 
   // grid geometry (right side)
   const n = Math.max(1, lobby.length);

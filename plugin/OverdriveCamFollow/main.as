@@ -1,10 +1,10 @@
-// BNL Cam Follow — tells the caster system who you are spectating, so the
+// Overdrive Cam Follow — tells the caster system who you are spectating, so the
 // player cam on stream switches automatically when you switch target in game.
 
 [Setting category="General" name="Enabled"]
 bool S_Enabled = true;
 
-[Setting category="General" name="Server URL" description="Address of the caster system (Start Overdrive Caster.bat)"]
+[Setting category="General" name="Server URL" description="Address of the caster system (start.cmd)"]
 string S_Url = "__URL__";
 
 [Setting category="General" name="API token" password description="Controller → Settings → Stream Deck / Companion"]
@@ -62,7 +62,7 @@ void Tick() {
 }
 
 void RenderMenu() {
-    if (UI::MenuItem("\\$f33" + Icons::VideoCamera + "\\$z BNL Cam Follow", g_status, S_Enabled)) {
+    if (UI::MenuItem("\\$f33" + Icons::VideoCamera + "\\$z Overdrive Cam Follow", g_status, S_Enabled)) {
         S_Enabled = !S_Enabled;
     }
 }

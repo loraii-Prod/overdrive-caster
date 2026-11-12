@@ -9,7 +9,7 @@ const SIZES = {
   sm: { inset: 16, pad: '11px 18px 11px 14px', mark: 22, name: 23, role: 10.5, gap: 12 },
 };
 
-/** Glacial lower-third: mark │ NAME / ROLE on a dark translucent panel. */
+/** Lower-third: mark │ NAME / ROLE on a dark translucent panel. */
 export function Nameplate({ name, role, size }: { name: string; role: string; size: 'lg' | 'md' | 'sm' }) {
   const { theme } = useTheme();
   const s = SIZES[size];

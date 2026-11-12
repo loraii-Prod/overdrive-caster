@@ -3,12 +3,16 @@ export interface SheetTeam { id: string; name: string; seed: number; players: st
 export interface SheetMatch {
   id: string; bracket: string; side: 'winners' | 'losers' | 'grandfinal'; round: number;
   at: number | null; time: string;
+  /** Start exactly as written in the sheet (e.g. "11/7/2026 15:00:00"), so clients can read it in their own time zone. */
+  when?: string;
   t1: { id: string; name: string }; t2: { id: string; name: string };
   status: string; bo: number; s1: string; s2: string; winner: string;
 }
 export interface SheetState {
   /** Spreadsheet id + tab gid of the data tab; logos come from the "logos" tab when present. */
   id: string; gid: string; enabled: boolean;
+  /** id is a "Publish to the web" id (docs.google.com/spreadsheets/d/e/<id>/pub…) rather than a document id. */
+  pub?: boolean;
   featured: string | null;
   lastAt: number; error: string;
   title: string;
@@ -16,13 +20,22 @@ export interface SheetState {
 }
 
 export const emptySheet = (): SheetState => ({ id: '', gid: '', enabled: false, featured: null, lastAt: 0, error: '', title: '', teams: [], matches: [] });
+/** OverDrive season sheet, off until the Major tab's link is pasted in (Tournament → Google Sheet). */
+export const majorSheet = (): SheetState => ({ ...emptySheet(), id: '1wvKS0QsGqGUXCM2upmuFVw4pKUPPwYGi-D1o21v62gU', title: 'MAJOR' });
 
-export function parseSheetUrl(url: string): { id: string; gid: string } | null {
+export function parseSheetUrl(url: string): { id: string; gid: string; pub: boolean } | null {
+  const g = /[#&?]gid=(\d+)/.exec(url);
+  // "File → Share → Publish to the web" link (what the standalone wildcard overlay used).
+  const p = /\/spreadsheets\/d\/e\/([A-Za-z0-9_-]{20,})/.exec(url);
+  if (p) return { id: p[1], gid: g ? g[1] : '0', pub: true };
   const m = /\/spreadsheets\/d\/([A-Za-z0-9_-]{20,})/.exec(url);
   if (!m) return null;
-  const g = /[#&?]gid=(\d+)/.exec(url);
-  return { id: m[1], gid: g ? g[1] : '0' };
+  return { id: m[1], gid: g ? g[1] : '0', pub: false };
 }
+
+/** Link back to the sheet for the controller. */
+export const sheetLink = (s: { id: string; gid: string; pub?: boolean }) =>
+  !s.id ? '' : s.pub ? `https://docs.google.com/spreadsheets/d/e/${s.id}/pub?gid=${s.gid}&single=true&output=csv` : `https://docs.google.com/spreadsheets/d/${s.id}/edit#gid=${s.gid}`;
 
 export function parseCsv(text: string): string[][] {
   const rows: string[][] = []; let row: string[] = []; let cell = ''; let q = false;
@@ -85,7 +98,7 @@ export function parseEventTab(rows: string[][]) {
       const ts = parseSheetDate(time);
       matches.push({
         id: g(mId), bracket: g(mId + 1), side: side === 'losers' || side === 'grandfinal' ? side : 'winners', round: Number(g(mId + 3)) || 1,
-        at: ts, time: sheetTimeLabel(ts),
+        at: ts, time: sheetTimeLabel(ts), when: time,
         t1: { id: g(mId + 5), name: g(mId + 6) || slotLabel(g(mId + 5)) }, t2: { id: g(mId + 7), name: g(mId + 8) || slotLabel(g(mId + 7)) },
         status: g(mId + 9) || 'not played', bo: Number(g(mId + 11)) || 0, s1: g(mId + 13), s2: g(mId + 14), winner: g(mId + 15),
       });
@@ -113,6 +126,7 @@ export function sanitizeSheet(v: any): SheetState {
     id: typeof v.id === 'string' ? v.id.replace(/[^A-Za-z0-9_-]/g, '').slice(0, 80) : '',
     gid: typeof v.gid === 'string' ? v.gid.replace(/\D/g, '').slice(0, 20) : '',
     enabled: v.enabled === true,
+    pub: v.pub === true,
     featured: typeof v.featured === 'string' ? v.featured.slice(0, 40) : null,
     lastAt: Number(v.lastAt) || 0, error: typeof v.error === 'string' ? v.error.slice(0, 300) : '',
     title: typeof v.title === 'string' ? v.title.slice(0, 80) : '',

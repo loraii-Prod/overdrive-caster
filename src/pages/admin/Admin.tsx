@@ -70,7 +70,7 @@ export function Admin({ role, onLogout }: { role: 'producer' | 'admin'; onLogout
             <div className="aspect-video overflow-hidden rounded-md border border-white/10 bg-[#0b0b0b]">
               <ScaledCanvas>
                 <ThemeProvider theme={live?.show.theme ?? 'bnl'} brand={live?.show.brand ?? null}>
-                  <div className="glacial-stage relative h-[1080px] w-[1920px] overflow-hidden" data-theme={live?.show.theme ?? 'bnl'}>
+                  <div className="od-stage relative h-[1080px] w-[1920px] overflow-hidden" data-theme={live?.show.theme ?? 'bnl'}>
                     {view === 'bracket' ? <BracketView t={t} /> : live && <MatchesBoard t={t} show={live.show} />}
                   </div>
                 </ThemeProvider>

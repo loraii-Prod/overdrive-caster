@@ -4,10 +4,11 @@ import { clone, defaultPresets, defaultRos, defaultScene, defaultShow, emptyBran
 import { ensureStreamIds, sanitizePlayers, sanitizeStories } from '../shared/players';
 import { defaultTournament, sanitizeTournament } from '../shared/tournament';
 import type { ThemeId } from '../shared/types';
-import { emptySheet, sanitizeSheet } from '../shared/sheet';
+import { majorSheet, sanitizeSheet } from '../shared/sheet';
+import { MAJOR_TICKER, defaultWildcard, sanitizeWildcard } from '../shared/wildcard';
 
 /** Everything that belongs to one event (production). Logins, keys, OBS and API settings stay global. */
-const KEYS = ['preview', 'live', 'showPreview', 'showLive', 'players', 'stories', 'tournament', 'ros', 'presets', 'sheet'] as const;
+const KEYS = ['preview', 'live', 'showPreview', 'showLive', 'players', 'stories', 'tournament', 'ros', 'presets', 'sheet', 'wildcard'] as const;
 
 const snapshot = () => clone(Object.fromEntries(KEYS.map(k => [k, (db as any)[k]])));
 
@@ -23,6 +24,7 @@ function apply(data: any) {
   db.ros = d.ros ? sanitizeRos(d.ros) : defaultRos();
   db.presets = Array.isArray(d.presets) ? d.presets : defaultPresets(db.preview);
   db.sheet = sanitizeSheet(d.sheet);
+  db.wildcard = d.wildcard ? sanitizeWildcard(d.wildcard) : defaultWildcard(false);
 }
 
 function blankData(name: string, theme: ThemeId) {
@@ -39,6 +41,7 @@ function blankData(name: string, theme: ThemeId) {
   return {
     preview: scene, live: clone(scene), showPreview: show, showLive: clone(show), players: [], stories: [],
     tournament: { ...t, name: name.toUpperCase(), teams: [] }, ros: defaultRos(), presets: defaultPresets(scene),
+    wildcard: defaultWildcard(false),
   };
 }
 
@@ -91,13 +94,13 @@ function overdriveData(name: string) {
   const scene = { ...d.preview, casters: d.preview.casters.map((c, i) => ({ ...c, enabled: i < 2 })) as typeof d.preview.casters };
   for (const show of [d.showPreview, d.showLive]) {
     Object.assign(show, {
-      brand, tournament: 'OVERDRIVE GRAND LEAGUE', stage: '26S3 WILDCARD',
+      brand, tournament: 'OVERDRIVE GRAND LEAGUE', stage: '26S3 MAJOR',
       socials: [{ platform: 'twitch', handle: 'twitch.tv/overdrive_tm' }, { platform: 'discord', handle: 'discord.gg/tZV3Mu3Thb' }, { platform: 'x', handle: '@OVERDRIVE_TM' }],
-      ticker: { ...show.ticker, enabled: true, onScreens: true, items: ['2026 OverDrive Wildcard: top 4 qualify for the OverDrive Major', 'Live bracket & schedule: lavaaval.github.io/2026_overdrive_wildcard', 'Follow @OVERDRIVE_TM · twitch.tv/overdrive_tm', 'Join the community: discord.gg/tZV3Mu3Thb'] },
-      bestOf: 5, showMatchupOnScreens: true,
+      ticker: { ...show.ticker, enabled: true, onScreens: true, items: [...MAJOR_TICKER] },
+      bestOf: 5, showMatchupOnScreens: false, showMatchupOnCasters: false, showScoreboard: false,
       nextMatch: { ...show.nextMatch, enabled: true, corner: 'tr' },
       timer: { ...show.timer, label: 'STREAM STARTING IN' },
     });
   }
-  return { ...d, preview: scene, live: clone(scene), sheet: { ...emptySheet(), id: '1SgnXorS23IvBM2dbie_QOc756wnOTjqCvx3U2ensfi4', gid: '1222783107', enabled: true, title: 'WILDCARD' } };
+  return { ...d, preview: scene, live: clone(scene), wildcard: defaultWildcard(true), sheet: majorSheet() };
 }

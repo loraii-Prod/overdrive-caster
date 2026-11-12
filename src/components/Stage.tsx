@@ -63,14 +63,14 @@ export function Stage(props: Props) {
   );
 }
 
-function StageInner({ scene, forced, layers = ALL_LAYERS, viewer, monitor, theme = 'glacial' }: Props) {
+function StageInner({ scene, forced, layers = ALL_LAYERS, viewer, monitor, theme = 'classic' }: Props) {
   const { bgProvided } = useTheme();
   const comp = useMemo(() => compose(scene, forced, theme), [scene, forced, theme]);
   const sting = useSting(comp.arrangement, layers.branding && scene.showBranding);
   const bnl = theme === 'bnl';
 
   return (
-    <div className="glacial-stage relative overflow-hidden" data-theme={theme} style={{ width: CANVAS.w, height: CANVAS.h }}>
+    <div className="od-stage relative overflow-hidden" data-theme={theme} style={{ width: CANVAS.w, height: CANVAS.h }}>
       {/* Background */}
       <AnimatePresence>
         {layers.background && comp.background && !(bnl && bgProvided) && (
@@ -172,7 +172,7 @@ function TileView({ tile, caster, layers, viewer, monitor, count, audio }: {
   );
 }
 
-/** Benelux Pro League tile, rebuilt 1:1 from the supplied caster frame templates. */
+/** Boxed caster tile (used only when an event has no video skin). */
 function BnlTile({ tile, caster, layers, viewer, monitor, count }: {
   tile: Tile; caster: Caster; layers: Layers; viewer?: RtcViewer | null; monitor?: boolean; count: number;
 }) {

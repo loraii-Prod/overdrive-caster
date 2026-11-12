@@ -1,3 +1,5 @@
+import { MEDIA_EXT, mediaName } from '../shared/media';
+import type { ProducerCmd } from '../shared/engine';
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
@@ -6,12 +8,13 @@ import { config } from './config';
 import { isAdmin, isAuthed } from './auth';
 import { db } from './store';
 import { clone } from '../shared/defaults';
-import { MUSIC_SECTIONS, type MusicSection } from '../shared/music';
+import { LEGACY_FOLDER, MUSIC_FOLDERS, MUSIC_SECTIONS, type MusicSection } from '../shared/music';
 import type { ClientMsg } from '../shared/protocol';
 import type { LayoutMode, Scene, ScreenId } from '../shared/types';
 import { resolve, upcoming, results, champion, isTeam, type TournamentOp } from '../shared/tournament';
+import { isWcId } from '../shared/wildcard';
 
-interface Api { act: (m: ClientMsg) => void; tournamentOp: (op: TournamentOp) => void; spectate: (name: string, login: string) => void; state: () => unknown }
+interface Api { engine: (cmd: ProducerCmd, source?: 'manual' | 'auto') => Promise<{ ok: boolean; version: number; error?: string; note?: string }>; act: (m: ClientMsg) => void; tournamentOp: (op: TournamentOp) => void; spectate: (name: string, login: string) => void; state: () => unknown }
 
 import { SCREEN_IDS as SCREENS } from '../shared/types';
 const LAYOUTS: LayoutMode[] = ['auto', 'solo', 'duo', 'trio', 'mixed', 'audio'];
@@ -46,6 +49,15 @@ export function controlApi(api: Api) {
   };
 
   r.all('/state', (_req, res) => res.json(api.state()));
+
+  // Control strips under OBS sources (?controls&token=…): the same actions as the controller's scene dock.
+  const STRIP_MSGS = new Set(['quick', 'screen', 'take', 'wc', 'tw', 'badge']);
+  r.post('/msg', (req, res) => {
+    const m = req.body;
+    if (!m || typeof m !== 'object' || !STRIP_MSGS.has(m.t)) return res.status(400).json({ error: `t must be one of ${[...STRIP_MSGS].join(', ')}` });
+    api.act(m as ClientMsg);
+    res.json({ ok: true });
+  });
   r.all('/take', (_req, res) => { api.act({ t: 'take' }); done(res); });
 
   r.all('/screen/:screen', (req, res) => {
@@ -73,7 +85,7 @@ export function controlApi(api: Api) {
   r.all('/caster/:n/:field/:value', (req, res) => {
     const i = Number(req.params.n) - 1;
     const field = ({ camera: 'cameraOn', name: 'showName', enabled: 'enabled' } as const)[req.params.field as 'camera'];
-    if (!(i >= 0 && i < 3) || !field) return res.status(400).json({ error: 'use /caster/1-3/(camera|name|enabled)/(on|off|toggle)' });
+    if (!(i >= 0 && i < 6) || !field) return res.status(400).json({ error: 'use /caster/1-6/(camera|name|enabled)/(on|off|toggle)' });
     editScene(req, s => { s.casters[i][field] = flag(req.params.value, s.casters[i][field]); });
     done(res);
   });
@@ -122,6 +134,30 @@ export function controlApi(api: Api) {
   });
   r.all('/feature/:id', (req, res) => { api.tournamentOp({ k: 'feature', id: req.params.id === 'none' ? null : req.params.id }); done(res); });
 
+  // ---- OverDrive Wildcard bracket ----
+  r.all('/wildcard/part/:part', (req, res) => {
+    const v = req.params.part, cur = db.wildcard.air;
+    const part = v === 'toggle' ? (cur === 1 ? 2 : 1) : v === '2' ? 2 : v === '1' ? 1 : null;
+    if (!part) return res.status(400).json({ error: 'use /wildcard/part/(1|2|toggle)' });
+    api.act({ t: 'wc', op: { k: 'air', part } });
+    done(res);
+  });
+  r.all('/wildcard/auto/:value', (req, res) => { api.act({ t: 'wc', op: { k: 'opts', patch: { rotate: flag(req.params.value, db.wildcard.opts.rotate) } } }); done(res); });
+  r.all('/wildcard/cast/:id', (req, res) => {
+    const id = req.params.id.toUpperCase();
+    if (id !== 'NONE' && !isWcId(id)) return res.status(400).json({ error: 'use /wildcard/cast/(R1_UB2 … R5_LB2|none)' });
+    api.act({ t: 'wc', op: { k: 'cast', id: id === 'NONE' ? null : id } });
+    done(res);
+  });
+  r.all('/wildcard/pull', (_req, res) => { api.act({ t: 'wc', op: { k: 'pull' } }); done(res); });
+  r.all('/wildcard/popup/:kind', (req, res) => {
+    const k = req.params.kind;
+    if (k === 'replay') api.act({ t: 'wc', op: { k: 'replay' } });
+    else if (k === 'map' || k === 'match') api.act({ t: 'wc', op: { k: 'test', kind: k } });
+    else return res.status(400).json({ error: 'use /wildcard/popup/(map|match|replay)' });
+    done(res);
+  });
+
   r.all('/ros/next', (_req, res) => { const c = db.ros.current; api.act({ t: 'ros-go', index: c == null ? 0 : Math.min(c + 1, db.ros.items.length - 1) }); done(res); });
   r.all('/ros/prev', (_req, res) => { const c = db.ros.current; api.act({ t: 'ros-go', index: c == null ? 0 : Math.max(c - 1, 0) }); done(res); });
   r.all('/ros/message/:text', (req, res) => { api.act({ t: 'ros-message', text: req.params.text === 'clear' ? '' : req.params.text }); done(res); });
@@ -146,6 +182,16 @@ export function controlApi(api: Api) {
     done(res);
   });
 
+  // Overdrive 2.0 engine: POST a ProducerCmd as JSON ({"c":"take"}, {"c":"stage-screen","screen":"gameplay"}, ...).
+  // Answers with the engine's ack; HTTP 409 when the engine refused it (never a silent success).
+  // Commands from here count as automation unless ?source=manual (manual always wins over automation).
+  r.post('/engine', async (req, res) => {
+    const cmd = req.body && typeof req.body === 'object' ? req.body : null;
+    if (!cmd || typeof cmd.c !== 'string') return res.status(400).json({ ok: false, error: 'POST a JSON command, e.g. {"c":"publish"}' });
+    const ack = await api.engine(cmd, req.query.source === 'manual' ? 'manual' : 'auto');
+    res.status(ack.ok ? 200 : 409).json(ack);
+  });
+
   r.all('/instant/:value', (req, res) => { api.act({ t: 'set-instant', on: flag(req.params.value, db.instant) }); done(res); });
   r.all('/obs/scene/:name', (req, res) => { api.act({ t: 'obs-scene', name: req.params.name }); done(res); });
 
@@ -159,12 +205,13 @@ import { zip } from './zip';
 
 export function pluginDownload() {
   const r = express.Router();
-  r.get('/api/plugin/BNLCamFollow.op', (req, res) => {
+  // Old BNLCamFollow.op address kept so existing links still work.
+  r.get(['/api/plugin/OverdriveCamFollow.op', '/api/plugin/BNLCamFollow.op'], (req, res) => {
     if (!isAuthed(req)) return res.status(401).send('Sign in to the controller first.');
     const host = `http://localhost:${config.port}`;
     const main = pluginMain.replace('__URL__', host).replace('__TOKEN__', db.apiToken);
     res.setHeader('Content-Type', 'application/zip');
-    res.setHeader('Content-Disposition', 'attachment; filename="BNLCamFollow.op"');
+    res.setHeader('Content-Disposition', 'attachment; filename="OverdriveCamFollow.op"');
     res.send(zip([{ name: 'info.toml', data: Buffer.from(pluginInfo) }, { name: 'main.as', data: Buffer.from(main) }]));
   });
   return r;
@@ -209,10 +256,13 @@ export function music() {
   const ensure = (root: string) => { for (const s of MUSIC_SECTIONS) fs.mkdirSync(path.join(root, s), { recursive: true }); };
   ensure(base);
   const prefix = () => (rootOf() === base ? '/music' : `/music/events/${db.activeEvent}`);
+  const read = (root: string, folder: string) => { try { return fs.readdirSync(path.join(root, folder)).filter(f => AUDIO_EXT.test(f)).sort(); } catch { return []; } };
+  /** Each scene's own tracks; a scene with none yet uses its old shared folder (desk / results). */
   const list = () => { const root = rootOf(); ensure(root); return Object.fromEntries(MUSIC_SECTIONS.map(s => {
-    let files: string[] = [];
-    try { files = fs.readdirSync(path.join(root, s)).filter(f => AUDIO_EXT.test(f)).sort(); } catch {}
-    return [s, files.map(f => ({ name: f.replace(AUDIO_EXT, '').replace(/^[A-Za-z0-9_-]{6}_/, ''), url: `${prefix()}/${s}/${encodeURIComponent(f)}` }))];
+    let folder: string = s, files = read(root, s);
+    const legacy = LEGACY_FOLDER[s];
+    if (!files.length && legacy) { const old = read(root, legacy); if (old.length) { folder = legacy; files = old; } }
+    return [s, files.map(f => ({ name: f.replace(AUDIO_EXT, '').replace(/^[A-Za-z0-9_-]{6}_/, ''), url: `${prefix()}/${folder}/${encodeURIComponent(f)}`, shared: folder !== s }))];
   })); };
   const r = express.Router();
   r.get('/api/music', (_req, res) => { res.setHeader('Cache-Control', 'no-store'); res.json({ sections: list(), folder: rootOf() }); });
@@ -231,12 +281,41 @@ export function music() {
   });
   r.delete('/api/music/:section/:file', (req, res) => {
     if (!isAuthed(req)) return res.status(401).json({ error: 'not signed in' });
-    const s = String(req.params.section) as MusicSection;
+    const s = String(req.params.section);
     const f = path.basename(String(req.params.file));
-    if (!MUSIC_SECTIONS.includes(s) || !AUDIO_EXT.test(f)) return res.status(400).end();
+    if (!MUSIC_FOLDERS.includes(s) || !AUDIO_EXT.test(f)) return res.status(400).end();
     try { fs.unlinkSync(path.join(rootOf(), s, f)); } catch {}
     res.json({ sections: list() });
   });
   r.use('/music', express.static(base, { maxAge: '1h', setHeaders: res => res.setHeader('Content-Security-Policy', "default-src 'none'; sandbox") }));
+  return r;
+}
+
+/**
+ * 2.0 media library for /output/media: GET /api/media (list), POST /api/media (raw body + X-Filename),
+ * DELETE /api/media/:file. Files are served from /media/… (data/media).
+ */
+export function media() {
+  const r = express.Router();
+  const dir = path.join(config.dataDir, 'media');
+  fs.mkdirSync(dir, { recursive: true });
+  const list = () => fs.readdirSync(dir).filter(f => MEDIA_EXT.test(f)).sort().map(f => ({ url: `/media/${encodeURIComponent(f)}`, name: mediaName(f), size: fs.statSync(path.join(dir, f)).size }));
+  r.get('/api/media', (req, res) => { if (!isAuthed(req)) return res.status(401).json({ error: 'sign in' }); res.setHeader('Cache-Control', 'no-store'); res.json({ items: list() }); });
+  r.post('/api/media', express.raw({ type: () => true, limit: '1gb' }), (req, res) => {
+    if (!isAuthed(req)) return res.status(401).json({ error: 'sign in' });
+    const raw = path.basename(decodeURIComponent(String(req.header('X-Filename') ?? ''))).replace(/[^\w .()-]/g, '').slice(-120);
+    if (!MEDIA_EXT.test(raw) || !Buffer.isBuffer(req.body) || !req.body.length) return res.status(400).json({ error: 'Send a video, audio or image file (mp4, webm, mov, mp3, wav, png, jpg…)' });
+    const name = `${crypto.randomBytes(4).toString('base64url').slice(0, 6)}_${raw}`;
+    fs.writeFileSync(path.join(dir, name), req.body);
+    res.json({ ok: true, items: list() });
+  });
+  r.delete('/api/media/:file', (req, res) => {
+    if (!isAuthed(req)) return res.status(401).json({ error: 'sign in' });
+    const f = path.basename(String(req.params.file));
+    if (!MEDIA_EXT.test(f)) return res.status(400).end();
+    try { fs.unlinkSync(path.join(dir, f)); } catch {}
+    res.json({ ok: true, items: list() });
+  });
+  r.use('/media', express.static(dir, { maxAge: '1h', setHeaders: res => res.setHeader('Content-Security-Policy', "default-src 'none'; sandbox") }));
   return r;
 }

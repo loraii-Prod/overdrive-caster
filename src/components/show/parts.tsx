@@ -76,6 +76,7 @@ export function formatRemaining(ms: number) {
   const s = Math.max(0, Math.ceil(ms / 1000));
   const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60;
   const p = (n: number) => String(n).padStart(2, '0');
+  if (h >= 24) return `${Math.floor(h / 24)}d ${h % 24}h`;
   return h > 0 ? `${h}:${p(m)}:${p(sec)}` : `${p(m)}:${p(sec)}`;
 }
 
@@ -147,9 +148,9 @@ export function Matchup({ show, mode, scale = 1, width = 860, stacked = false }:
   );
 }
 
-function Score({ n, size, dim }: { n: number; size: number; dim?: boolean }) {
+function Score({ n, size, dim, inherit }: { n: number; size: number; dim?: boolean; /** keep the parent's font (skins) */ inherit?: boolean }) {
   return (
-    <span className="relative inline-block overflow-hidden text-center font-display font-bold leading-none" style={{ fontSize: size, width: '0.8em', height: '1em', opacity: dim ? 0.5 : 1 }}>
+    <span className={`relative inline-block overflow-hidden text-center leading-none ${inherit ? '' : 'font-display font-bold'}`} style={{ fontSize: size, width: n > 9 ? '1.3em' : '0.8em', height: '1em', opacity: dim ? 0.5 : 1 }}>
       <AnimatePresence initial={false}>
         <motion.span key={n} className="absolute inset-0" initial={{ y: '-100%' }} animate={{ y: 0 }} exit={{ y: '100%' }} transition={{ duration: 0.35, ease: EASE }}>{n}</motion.span>
       </AnimatePresence>
@@ -252,7 +253,7 @@ export function Ticker({ show, height = 48 }: { show: Show; height?: number }) {
         {show.tournament || 'OVERDRIVE'}
       </div>
       <div className="relative flex-1 overflow-hidden">
-        <div ref={track} className="glacial-ticker absolute top-0 flex h-full items-center whitespace-nowrap font-sans font-medium text-white/90"
+        <div ref={track} className="od-ticker absolute top-0 flex h-full items-center whitespace-nowrap font-sans font-medium text-white/90"
           style={{ fontSize: height * 0.4, animationDuration: `${Math.max(5, w / show.ticker.speed)}s`, ['--ticker-w' as string]: `${w}px` }}>
           {row(false)}{row(true)}
         </div>

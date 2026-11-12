@@ -2,7 +2,7 @@ import type { Caster, Composition, ForcedLayout, Rect, Scene, ThemeId, Tile, Til
 
 export const CANVAS = { w: 1920, h: 1080 } as const;
 
-/** 16:9 camera geometry for 1, 2 and 3 tiles on a 1920x1080 canvas (Glacial). */
+/** 16:9 camera geometry for 1, 2 and 3 tiles on a 1920x1080 canvas. */
 const VIDEO_RECTS: Record<number, Rect[]> = {
   1: [{ x: 288, y: 150, w: 1344, h: 756 }],
   2: [
@@ -31,7 +31,7 @@ const CARD_RECTS: Record<number, Rect[]> = {
 };
 
 /**
- * Benelux Pro League frames, measured from the supplied 2560x1440 templates
+ * Boxed caster frames, measured from the original 2560x1440 templates
  * (×0.75): 7.5px black border, 66.75px name bar with 60px trophy box, and a
  * 190x42 grey tag hanging under the bar. Rect = border + camera + bar.
  */
@@ -76,7 +76,7 @@ export function visibleCasters(scene: Scene): Caster[] {
  * (/output/solo etc.) and caps the tile count; layouts always adapt downwards
  * so a disabled caster never leaves an empty box.
  */
-export function compose(scene: Scene, forced?: ForcedLayout, theme: ThemeId = 'glacial'): Composition {
+export function compose(scene: Scene, forced?: ForcedLayout, theme: ThemeId = 'classic'): Composition {
   const audio = scene.layout === 'audio';
   const cap = Math.min(CAP[scene.layout] ?? 3, forced ? CAP[forced] : 3);
   const shown = visibleCasters(scene).slice(0, cap);

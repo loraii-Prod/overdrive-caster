@@ -9,7 +9,7 @@ interface ThemeValue {
   brand: BrandKit | null;
 }
 
-const Ctx = createContext<ThemeValue>({ theme: 'glacial', bgProvided: false, brand: null });
+const Ctx = createContext<ThemeValue>({ theme: 'classic', bgProvided: false, brand: null });
 
 const FONTS: Record<string, string> = {
   bebas: '"Bebas Neue", "Barlow Condensed", system-ui, sans-serif',

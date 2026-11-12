@@ -1,14 +1,19 @@
-import { useEffect, useMemo, useState } from 'react';
+import type { TransitionKind } from '../../shared/engine';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Socket, type ConnState } from './socket';
 import { RtcViewer } from './rtcViewer';
 import type { Role } from '../../shared/protocol';
 import type { CasterId, RunOfShow, Scene, Show } from '../../shared/types';
 import type { Tournament } from '../../shared/tournament';
 import type { MatchData } from '../../shared/protocol';
+import type { WcPop, WildcardState } from '../../shared/wildcard';
+import type { TwitchPublic } from '../../shared/twitch';
 
-export function useSocket(hello: { role: Role; route?: string; slot?: CasterId; key?: string }) {
+export function useSocket(hello: { role: Role; route?: string; slot?: CasterId; key?: string; talent?: string }) {
   const sock = useMemo(() => new Socket(hello), []); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => () => sock.close(), [sock]);
+  // Producer recovery: every browser source reloads (and resyncs from the server) on request.
+  useEffect(() => (hello.role === 'output' ? sock.on(m => { if (m.t === 'reload') window.location.reload(); }) : undefined), [sock]); // eslint-disable-line react-hooks/exhaustive-deps
   return sock;
 }
 
@@ -18,12 +23,12 @@ export function useConnState(sock: Socket) {
   return s;
 }
 
-export interface LiveState { scene: Scene; show: Show; version: number; /** server clock − local clock (ms) */ skew: number }
+export interface LiveState { scene: Scene; show: Show; version: number; /** server clock − local clock (ms) */ skew: number; /** set on a TAKE / CUT broadcast */ transition?: TransitionKind }
 
 export function useLive(sock: Socket) {
   const [live, setLive] = useState<LiveState | null>(null);
   useEffect(() => sock.on(m => {
-    if (m.t === 'live') setLive({ scene: m.scene, show: m.show, version: m.version, skew: m.now - Date.now() });
+    if (m.t === 'live') setLive({ scene: m.scene, show: m.show, version: m.version, skew: m.now - Date.now(), transition: m.transition });
   }), [sock]);
   return live;
 }
@@ -75,4 +80,33 @@ export function useMatchData(sock: Socket) {
   return d;
 }
 
+/** OverDrive Wildcard bracket state + the latest popup event received live (null until one arrives). */
+export interface WcLive { state: WildcardState; pop: WcPop | null; /** Twitch predictions & polls */ tw: TwitchPublic | null }
+
+export function useWildcard(sock: Socket) {
+  const [d, setD] = useState<WcLive | null>(null);
+  // Twitch state can arrive before the wildcard state: keep it until then.
+  const pendingTw = useRef<TwitchPublic | null>(null);
+  useEffect(() => sock.on(m => {
+    if (m.t === 'wildcard') setD(p => ({ state: m.wc, pop: p?.pop ?? null, tw: p?.tw ?? pendingTw.current }));
+    else if (m.t === 'wc-pop') setD(p => (p ? { ...p, pop: m.pop } : p));
+    else if (m.t === 'twitch') { pendingTw.current = m.tw; setD(p => (p ? { ...p, tw: m.tw } : p)); }
+  }), [sock]);
+  return d;
+}
+
 export const query = () => new URLSearchParams(location.search);
+
+/** 2.0 media playback state (server clock). */
+export function useMedia(sock: Socket) {
+  const [m, setM] = useState<{ media: import('../../shared/media').MediaState; skew: number } | null>(null);
+  useEffect(() => sock.on(msg => { if (msg.t === 'media') setM({ media: msg.media, skew: msg.now - Date.now() }); }), [sock]);
+  return m;
+}
+
+/** Graphics engine instances (published config, drafts, animation state). */
+export function useGraphics(sock: Socket) {
+  const [g, setG] = useState<import('../../shared/gfx').GfxInstance[] | null>(null);
+  useEffect(() => sock.on(msg => { if (msg.t === 'gfx') setG(msg.graphics); }), [sock]);
+  return g;
+}

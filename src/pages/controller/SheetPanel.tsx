@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react';
-import type { SheetState } from '../../../shared/sheet';
+import { sheetLink, type SheetState } from '../../../shared/sheet';
 import { Dot, Switch, TextField } from './ui';
 
 /** Google Sheet (read-only) source: teams, players, bracket, schedule, live scores of the featured match. */
 export function SheetPanel({ sheet, send }: { sheet: SheetState | undefined; send: (m: any) => void }) {
   const s = sheet;
-  const cur = s?.id ? `https://docs.google.com/spreadsheets/d/${s.id}/edit#gid=${s.gid}` : '';
+  const cur = s ? sheetLink(s) : '';
   const [url, setUrl] = useState(cur);
   useEffect(() => { setUrl(cur); }, [cur]);
   const upcoming = (s?.matches ?? []).filter(m => m.status !== 'COMPLETED' && m.status.toLowerCase() !== 'not played').sort((a, b) => (a.at ?? 9e15) - (b.at ?? 9e15));
@@ -13,7 +13,7 @@ export function SheetPanel({ sheet, send }: { sheet: SheetState | undefined; sen
   return (
     <div className="space-y-3">
       <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_auto_auto] md:items-center">
-        <TextField value={url} onChange={setUrl} placeholder="https://docs.google.com/spreadsheets/d/…/edit#gid=… (the event data tab)" mono />
+        <TextField value={url} onChange={setUrl} placeholder="https://docs.google.com/spreadsheets/d/…/edit#gid=… (the event data tab) or a “Publish to the web” CSV link" mono />
         <Switch on={!!s?.enabled} onChange={v => send({ t: 'sheet-set', url, enabled: v })} label="Auto-sync (60 s)" />
         <button type="button" className="btn-primary" onClick={() => send({ t: 'sheet-set', url, enabled: s?.enabled ?? true })}>Save & sync</button>
       </div>

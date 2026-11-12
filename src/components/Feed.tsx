@@ -46,15 +46,17 @@ export function Feed({ caster, viewer, size, showName, monitor }: {
   }, [type, url]);
 
   if (type === 'vdo') {
-    const live = vdo.embeds && !monitor && !!caster.source.vdo;
+    // OBS outputs get the full feed; the controller's Program monitor a small, low-bitrate one.
+    const live = !!caster.source.vdo && (monitor ? !!vdo.monitorFeeds : vdo.embeds);
+    const params = monitor ? '&cleanoutput&noaudio&cover&scale=33&bitrate=400' : '&cleanoutput&noaudio&cover';
     return (
       <>
         <IdentityCard caster={caster} size={size} showName={false} />
         {live && (
-          <iframe src={vdoViewUrl({ vdo: caster.source.vdo }, vdo.password, '&cleanoutput&noaudio&cover')} title={`caster ${caster.id}`} allow="autoplay; fullscreen"
+          <iframe src={vdoViewUrl({ vdo: caster.source.vdo }, vdo.password, params)} title={`caster ${caster.id}`} allow="autoplay; fullscreen"
             className="absolute inset-0 h-full w-full border-0" style={{ background: 'transparent' }} />
         )}
-        {monitor && (
+        {monitor && !live && (
           <div className="absolute right-3 top-3 rounded bg-black/70 px-2 py-1 font-sans text-[16px] font-semibold tracking-[0.14em] text-white/70">VDO.NINJA</div>
         )}
       </>

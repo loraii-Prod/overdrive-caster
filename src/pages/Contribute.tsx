@@ -1,8 +1,11 @@
+import { GameFeed } from '../components/GameFeed';
+import { VdoSender } from '../components/VdoSender';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { Logo } from '../components/Brand';
 import { RtcPublisher } from '../lib/rtcPublisher';
-import { useConnState, useNow, useRos, useSocket, query } from '../lib/hooks';
+import { useConnState, useNow, useRos, useSocket, useWildcard, query } from '../lib/hooks';
+import { MatchStrip } from '../components/MatchStrip';
 import { RosView } from '../components/RosView';
 import type { CasterId } from '../../shared/types';
 
@@ -18,16 +21,21 @@ const QUALITIES = {
 
 /** /contribute/:slot?key=… — a remote caster sends their webcam (and optional mic). */
 export function Contribute() {
-  const slot = Number(useParams().slot) as CasterId;
+  const params = useParams();
+  const talent = typeof params.talent === 'string' ? params.talent : undefined; // 2.0 personal link /talent/:id
   const key = query().get('key') ?? '';
-  const sock = useSocket({ role: 'contributor', slot, key });
+  const sock = useSocket(talent ? { role: 'contributor', talent, key } : { role: 'contributor', slot: Number(params.slot) as CasterId, key });
+  // Position on the show: fixed for a slot link, follows the producer's assignment for a talent link.
+  const slotOf = (seat: number | null | undefined) => (talent ? (seat ?? 0) : Number(params.slot)) as CasterId;
   const conn = useConnState(sock);
+  const wc = useWildcard(sock);
   const pub = useMemo(() => new RtcPublisher(sock), [sock]);
   useEffect(() => () => pub.destroy(), [pub]);
 
   const ros = useRos(sock);
   const now = useNow(ros?.skew ?? 0, 500);
-  const [info, setInfo] = useState<{ name: string; role: string; cameraVisible: boolean } | null>(null);
+  const [info, setInfo] = useState<{ name: string; role: string; cameraVisible: boolean; vdo: { id: string; password: string; room: string } | null; talent: { id: number; name: string }[]; seat?: number | null } | null>(null);
+  const slot = slotOf(info?.seat);
   const [error, setError] = useState('');
   const [devices, setDevices] = useState<MediaDeviceInfo[]>([]);
   const [camId, setCamId] = useState(store.get('overdrive.cam'));
@@ -41,7 +49,7 @@ export function Contribute() {
 
   useEffect(() => { pub.onViewers = setViewers; }, [pub]);
   useEffect(() => sock.on(m => {
-    if (m.t === 'caster-info') setInfo({ name: m.name, role: m.role, cameraVisible: m.cameraVisible });
+    if (m.t === 'caster-info') setInfo({ name: m.name, role: m.role, cameraVisible: m.cameraVisible, vdo: m.vdo ?? null, talent: m.talent ?? [], seat: m.seat });
     if (m.t === 'error') setError(m.message);
     if (m.t === 'welcome') setError('');
   }), [sock]);
@@ -107,8 +115,10 @@ export function Contribute() {
           <StatusPill conn={conn} />
         </div>
 
-        <div className="mb-1 text-xs font-semibold uppercase tracking-[0.24em] text-white/50">Camera link · Caster {slot}</div>
+        <div className="mb-1 text-xs font-semibold uppercase tracking-[0.24em] text-white/50">{talent ? 'Talent link · ' : 'Camera link · '}{!slot ? 'Not in a position yet' : slot === 6 ? "Interview guest" : slot >= 4 ? `Analyst ${slot - 3}` : `Caster ${slot}`}</div>
         <h1 className="mb-8 font-display text-3xl font-semibold uppercase tracking-wide">{info?.name ?? '—'} <span className="ml-2 align-middle text-sm tracking-[0.2em] text-white/50">{info?.role}</span></h1>
+        <MatchStrip wc={wc?.state} slot={slot} casters={info?.talent} />
+        <GameFeed auth={talent ? `?talent=${talent}&key=${encodeURIComponent(key)}` : `?slot=${slot}&key=${encodeURIComponent(key)}`} />
 
         {(denied || error) && (
           <div className="mb-6 rounded-md border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm text-red-200">
@@ -116,6 +126,7 @@ export function Contribute() {
           </div>
         )}
 
+        {info?.vdo ? <VdoSender vdo={info.vdo} name={info.name} onAir={!!info.cameraVisible} /> : <>
         <div className="relative mb-6 aspect-video overflow-hidden rounded-lg border border-white/10 bg-[#1a1a1a]">
           <video ref={previewRef} muted playsInline autoPlay className="h-full w-full -scale-x-100 object-cover" />
           {!started && <div className="absolute inset-0 grid place-items-center text-sm text-white/50">Camera preview</div>}
@@ -157,6 +168,7 @@ export function Contribute() {
             ? <button className="btn-primary" disabled={denied} onClick={acquire}>Start camera</button>
             : <button className="btn" onClick={stop}>Stop camera</button>}
         </div>
+        </>}
         {ros && (
           <div className="mt-10">
             <div className="mb-3 text-[11px] font-semibold uppercase tracking-[0.24em] text-white/50">Run of show</div>

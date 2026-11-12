@@ -7,7 +7,7 @@ import { ConfirmButton, Label, Segmented, Switch, TextField } from './ui';
 export function EventsPanel({ st, send }: { st: ControllerState; send: (m: any) => void }) {
   const [name, setName] = useState('');
   const [from, setFrom] = useState<'blank' | 'copy' | 'overdrive'>('blank');
-  const [theme, setTheme] = useState<ThemeId>('glacial');
+  const [theme, setTheme] = useState<ThemeId>('classic');
   const [activate, setActivate] = useState(false);
   const [edit, setEdit] = useState<string | null>(null);
   const [editName, setEditName] = useState('');

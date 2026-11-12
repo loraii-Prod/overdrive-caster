@@ -1,4 +1,5 @@
-import { DEFAULT_LEVELS, MUSIC_SECTIONS } from './music';
+import { DEFAULT_LEVELS, LEGACY_FOLDER, MUSIC_SECTIONS } from './music';
+import { CASTER_IDS } from './types';
 import type { Caster, CasterId, LayoutMode, Preset, RosItem, RunOfShow, Scene, ScreenId, Show, Social, SocialPlatform, SourceType, Team } from './types';
 
 export const ROLE_SUGGESTIONS = ['HOST', 'PLAY-BY-PLAY', 'ANALYST', 'COLOR', 'GUEST', 'INTERVIEWER'];
@@ -7,8 +8,8 @@ export function defaultCaster(id: CasterId): Caster {
   return {
     id,
     enabled: true,
-    name: `Caster ${id}`,
-    role: id === 1 ? 'PLAY-BY-PLAY' : id === 2 ? 'ANALYST' : 'HOST',
+    name: id <= 3 ? `Caster ${id}` : id <= 5 ? `Analyst ${id - 3}` : 'Guest',
+    role: id === 1 ? 'PLAY-BY-PLAY' : id === 2 ? 'COLOUR' : id === 3 ? 'HOST' : id <= 5 ? 'ANALYST' : 'PLAYER',
     cameraOn: true,
     showName: true,
     offMode: 'card',
@@ -19,7 +20,7 @@ export function defaultCaster(id: CasterId): Caster {
 export function defaultScene(): Scene {
   return {
     layout: 'auto',
-    casters: [defaultCaster(1), defaultCaster(2), defaultCaster(3)],
+    casters: CASTER_IDS.map(defaultCaster),
     showBranding: true,
     showNames: true,
     showBackground: false,
@@ -32,7 +33,7 @@ export const SOCIAL_LABELS: Record<SocialPlatform, string> = {
 };
 
 export const SCREEN_LABELS: Record<ScreenId, string> = {
-  casters: 'Casters', warmup: 'Warm-up', gameplay: 'Gameplay', starting: 'Starting soon', brb: 'Be right back', ending: 'Thanks for watching', bracket: 'Bracket', matches: 'Matches',
+  casters: 'Casters', analysis: 'Pre-show / Analyst desk', interview: 'Interview', veto: 'Map veto', warmup: 'Player / team card', gameplay: 'Gameplay', starting: 'Starting soon', brb: 'Be right back', ending: 'Thanks for watching', bracket: 'Bracket', matches: 'Matches',
 };
 
 export function defaultShow(): Show {
@@ -44,9 +45,9 @@ export function defaultShow(): Show {
     bestOf: 5,
     game: 1,
     mapName: '',
-    showScoreboard: true,
-    showMatchupOnCasters: true,
-    showMatchupOnScreens: true,
+    showScoreboard: false,
+    showMatchupOnCasters: false,
+    showMatchupOnScreens: false,
     timer: { target: null, label: 'BROADCAST STARTS IN', endText: 'STARTING NOW', showOn: { starting: true, brb: true, ending: false } },
     screens: {
       starting: { title: 'STARTING SOON', subtitle: 'The broadcast will begin shortly' },
@@ -58,7 +59,7 @@ export function defaultShow(): Show {
     sponsors: [],
     sponsorSeconds: 8,
     ticker: { enabled: true, items: BNL_TICKER(), speed: 90, onScreens: true },
-    obsScenes: { casters: '', warmup: '', gameplay: '', starting: '', brb: '', ending: '', bracket: '', matches: '' },
+    obsScenes: { casters: '', analysis: '', interview: '', veto: '', warmup: '', gameplay: '', starting: '', brb: '', ending: '', bracket: '', matches: '' },
     prize: defaultPrize(),
     brand: emptyBrand(),
     music: { enabled: true, volume: 0.6, levels: { ...DEFAULT_LEVELS }, skip: 0, fadeMs: 2500 },
@@ -69,7 +70,7 @@ export function defaultShow(): Show {
     spotlight: null,
     activePlayer: null,
     playerCam: { enabled: true, corner: 'right', size: 'md', mode: 'single' },
-    vdo: { password: '', params: '&cleanoutput&noaudio&cover' },
+    vdo: { password: '', params: '&cleanoutput&noaudio&cover', room: '' },
     lineup: [],
     scheduleFromBracket: false,
     bracketView: 'full',
@@ -81,7 +82,7 @@ export function defaultShow(): Show {
 function variant(base: Scene, layout: LayoutMode, on: [boolean, boolean, boolean], cams: [boolean, boolean, boolean], extra?: Partial<Scene>): Scene {
   const s = clone(base);
   s.layout = layout;
-  s.casters.forEach((c, i) => { c.enabled = on[i]; c.cameraOn = cams[i]; });
+  s.casters.forEach((c, i) => { c.enabled = on[i] ?? false; c.cameraOn = cams[i] ?? true; });
   return { ...s, ...extra };
 }
 
@@ -109,7 +110,7 @@ export function sameScene(a: Scene, b: Scene): boolean {
 
 // ---------- validation (server trusts nothing from the wire) ----------
 
-const SCREENS: ScreenId[] = ['starting', 'casters', 'warmup', 'gameplay', 'brb', 'bracket', 'matches', 'ending'];
+const SCREENS: ScreenId[] = ['starting', 'casters', 'analysis', 'interview', 'veto', 'warmup', 'gameplay', 'brb', 'bracket', 'matches', 'ending'];
 const PLATFORMS = Object.keys(SOCIAL_LABELS) as SocialPlatform[];
 const int = (v: unknown, min: number, max: number, d: number) => (typeof v === 'number' && Number.isFinite(v) ? Math.max(min, Math.min(max, Math.round(v))) : d);
 
@@ -159,7 +160,8 @@ export function sanitizeScene(v: any): Scene {
   const cs = Array.isArray(v.casters) ? v.casters : [];
   return {
     layout: LAYOUTS.includes(v.layout) ? v.layout : d.layout,
-    casters: [sanitizeCaster(cs[0], 1), sanitizeCaster(cs[1], 2), sanitizeCaster(cs[2], 3)],
+    // A save from the 3-slot version: slot 2 was the analyst by default; analysts now have slots 4–5.
+    casters: CASTER_IDS.map((id, i) => { const c = sanitizeCaster(cs[i], id); if (cs.length === 3 && id === 2 && c.role === 'ANALYST') c.role = 'COLOUR'; return c; }),
     showBranding: bool(v.showBranding, d.showBranding),
     showNames: bool(v.showNames, d.showNames),
     showBackground: bool(v.showBackground, d.showBackground),
@@ -228,7 +230,7 @@ export function sanitizeShow(v: any): Show {
     music: {
       enabled: bool(v.music?.enabled, true),
       volume: num01(v.music?.volume, 0.6),
-      levels: Object.fromEntries(MUSIC_SECTIONS.map(s => [s, num01(v.music?.levels?.[s], DEFAULT_LEVELS[s])])) as Show['music']['levels'],
+      levels: Object.fromEntries(MUSIC_SECTIONS.map(s => [s, num01((v.music?.levels as Record<string, unknown> | undefined)?.[s] ?? (v.music?.levels as Record<string, unknown> | undefined)?.[LEGACY_FOLDER[s] ?? ''], DEFAULT_LEVELS[s])])) as Show['music']['levels'],
       skip: Number.isFinite(v.music?.skip) ? Number(v.music.skip) : 0,
       fadeMs: Math.max(0, Math.min(10000, Number(v.music?.fadeMs) || 2500)),
     },
@@ -238,7 +240,7 @@ export function sanitizeShow(v: any): Show {
       label: str(v.nextMatch?.label, 60),
       time: /^\d{1,2}:\d{2}$/.test(String(v.nextMatch?.time ?? '')) ? String(v.nextMatch.time) : '',
     },
-    theme: v.theme === 'glacial' ? 'glacial' : 'bnl',
+    theme: v.theme === 'classic' || v.theme === 'glacial' ? 'classic' : 'bnl', // 'glacial' = old saves
     spotlight: sanitizeSpotlight(v.spotlight),
     activePlayer: v.activePlayer && typeof v.activePlayer.id === 'string'
       ? { id: str(v.activePlayer.id, 60), name: str(v.activePlayer.name, 60), tag: str(v.activePlayer.tag, 40), vdo: str(v.activePlayer.vdo, 60), at: Number(v.activePlayer.at) || Date.now(), via: v.activePlayer.via === 'game' ? 'game' : 'manual' }
@@ -249,7 +251,7 @@ export function sanitizeShow(v: any): Show {
       size: ['sm', 'md', 'lg'].includes(v.playerCam?.size) ? v.playerCam.size : d.playerCam.size,
       mode: v.playerCam?.mode === 'strip' ? 'strip' : 'single',
     },
-    vdo: { password: str(v.vdo?.password, 60), params: typeof v.vdo?.params === 'string' ? v.vdo.params.slice(0, 300) : d.vdo.params },
+    vdo: { password: str(v.vdo?.password, 60), params: typeof v.vdo?.params === 'string' ? v.vdo.params.slice(0, 300) : d.vdo.params, room: typeof v.vdo?.room === 'string' ? v.vdo.room.replace(/[^A-Za-z0-9_]/g, '').slice(0, 30) : '' },
     lineup: Array.isArray(v.lineup) ? v.lineup.filter((x: any) => x && typeof x.id === 'string').slice(0, 32).map((x: any) => ({ id: str(x.id, 60), vdo: str(x.vdo, 60) })) : [],
     badge: { kind: ['replay', 'highlights'].includes(v.badge?.kind) ? v.badge.kind : 'none', at: Number(v.badge?.at) || 0 },
     gameplay: {

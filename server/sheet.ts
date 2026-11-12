@@ -27,11 +27,11 @@ export async function syncSheet(): Promise<void> {
   const sh = db.sheet;
   if (!sh.id) return;
   try {
-    const csv = await get(`${BASE}${sh.id}/export?format=csv&gid=${sh.gid || '0'}`);
+    const csv = await get(sh.pub ? `${BASE}e/${sh.id}/pub?gid=${sh.gid || '0'}&single=true&output=csv` : `${BASE}${sh.id}/export?format=csv&gid=${sh.gid || '0'}`);
     const data = parseEventTab(parseCsv(csv));
     if (!data.matches.length && !data.teams.length) throw new Error('No team_id / match_id columns found in that tab.');
     let logos: Record<string, string> = {};
-    try { logos = parseLogos(parseCsv(await get(`${BASE}${sh.id}/gviz/tq?tqx=out:csv&sheet=logos`))); } catch { /* optional tab */ }
+    if (!sh.pub) try { logos = parseLogos(parseCsv(await get(`${BASE}${sh.id}/gviz/tq?tqx=out:csv&sheet=logos`))); } catch { /* optional tab */ }
     sh.teams = data.teams.map(t => ({ ...t, logo: logos[t.id] ?? '' }));
     sh.matches = data.matches;
     sh.lastAt = Date.now();

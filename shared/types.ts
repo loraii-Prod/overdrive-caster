@@ -1,7 +1,10 @@
+import type { EngineState } from './engine';
 // Shared model used by the server, the controller and every OBS output.
 
-export type CasterId = 1 | 2 | 3;
-export const CASTER_IDS: CasterId[] = [1, 2, 3];
+/** Camera slots: 3 casters (1–3), 2 analysts (4–5) and the interview guest (6, a player joining remotely). */
+export type CasterId = 1 | 2 | 3 | 4 | 5 | 6;
+export const CASTER_IDS: CasterId[] = [1, 2, 3, 4, 5, 6];
+export const GUEST_SLOT = 6;
 
 export type SourceType = 'none' | 'webrtc' | 'vdo' | 'url' | 'obs';
 
@@ -34,17 +37,17 @@ export interface Caster {
 export type LayoutMode = 'auto' | 'solo' | 'duo' | 'trio' | 'mixed' | 'audio';
 
 /** Full-screen scene shown on /output/program. */
-export type ScreenId = 'starting' | 'casters' | 'warmup' | 'gameplay' | 'brb' | 'bracket' | 'matches' | 'ending';
-export const SCREEN_IDS: ScreenId[] = ['starting', 'casters', 'warmup', 'gameplay', 'brb', 'bracket', 'matches', 'ending'];
+export type ScreenId = 'starting' | 'casters' | 'analysis' | 'interview' | 'veto' | 'warmup' | 'gameplay' | 'brb' | 'bracket' | 'matches' | 'ending';
+export const SCREEN_IDS: ScreenId[] = ['starting', 'casters', 'analysis', 'interview', 'veto', 'warmup', 'gameplay', 'brb', 'bracket', 'matches', 'ending'];
 
-// 'bnl' is a legacy internal id for the boxed/ticker layout (vs. 'glacial' for
+// 'bnl' is a legacy internal id for the boxed/ticker layout (vs. 'classic' for
 // the original pattern-background look) — purely a layout bucket now. Any
 // event with its own video skin and brand kit (which Overdrive always has)
 // renders through Skin.tsx and never touches this layout at all.
-export type ThemeId = 'glacial' | 'bnl';
+export type ThemeId = 'classic' | 'bnl';
 export const THEMES: { id: ThemeId; label: string }[] = [
   { id: 'bnl', label: 'Boxed / ticker' },
-  { id: 'glacial', label: 'Classic' },
+  { id: 'classic', label: 'Classic' },
 ];
 
 /** Player spotlight / story card currently on screen (resolved data, so outputs need no database). */
@@ -134,7 +137,8 @@ export interface Show {
   /** Prizepool + donation goals (Matcherino). */
   prize: { enabled: boolean; raised: number; currency: string; link: string; splits: { place: string; pct: number }[]; goals: { amount: number; label: string }[] };
   /** VDO.Ninja settings for player cams. */
-  vdo: { password: string; params: string };
+  /** room: VDO.Ninja room the talent joins on their caster page to see and hear each other ('' = no room). */
+  vdo: { password: string; params: string; room: string };
   /** Player ids in the current match: their cams are preloaded for instant switching. */
   lineup: { id: string; vdo: string }[];
   /** Gameplay screen: transparent over the game capture. */
@@ -151,11 +155,11 @@ export interface Show {
 
 export interface Scene {
   layout: LayoutMode;
-  casters: [Caster, Caster, Caster];
+  casters: Caster[];
   showBranding: boolean;
   /** Master nameplate switch (AND-ed with each caster's showName). */
   showNames: boolean;
-  /** Animated Glacial background behind the camera layout. Audio mode always shows it. */
+  /** Animated background behind the camera layout. Audio mode always shows it. */
   showBackground: boolean;
   /** Which full-screen scene /output/program shows. */
   screen: ScreenId;
@@ -212,6 +216,9 @@ export interface ContributorStatus {
 export interface ObsStatus {
   enabled: boolean;
   connected: boolean;
+  /** OBS Studio Mode on (OBS has its own Preview, separate from Overdrive drafts). */
+  studioMode?: boolean;
+  previewScene?: string;
   error?: string;
   /** WebSocket URL in use (the password is never sent to browsers). */
   url?: string;
@@ -224,6 +231,18 @@ export interface ObsStatus {
 
 /** Everything a controller sees. Never sent to output clients. */
 export interface ControllerState {
+  /** Overdrive 2.0 production engine (Preview stage, transition, undo, automation hold). */
+  engine?: EngineState;
+  /** 2.0 talent pool, positions and live status (producer only: contains link keys). */
+  talent?: (import('./talent').TalentProfile & { online: boolean; publishing: boolean; hasAudio: boolean; seat: number | null })[];
+  seats?: import('./talent').Seats;
+  media?: import('./media').MediaState;
+  studio?: import('./registry').Studio;
+  graphics?: import('./gfx').GfxInstance[];
+  rundown?: import('./rundown').Rundown;
+  /** OBS Scene Builder (Studio Mode → OBS Setup). */
+  obsSetup?: import('./obsSetup').ObsSetupState;
+  gfxHealth?: Record<string, import('./gfx').GfxHealth>;
   preview: Scene;
   live: Scene;
   showPreview: Show;
@@ -252,6 +271,8 @@ export interface ControllerState {
   ros: RunOfShow;
   /** This machine's addresses on the local network, e.g. http://192.168.1.20:8787 */
   lanUrls: string[];
+  /** Twitch predictions & polls connection. */
+  twitch: import('./twitch').TwitchStatus;
 }
 
 /** Tile placement in the 1920x1080 canvas. */

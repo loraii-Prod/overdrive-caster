@@ -1,5 +1,7 @@
+import type { TransitionKind } from '../../../shared/engine';
+import { Reveal } from '../Reveal';
 import { useEffect, useRef, useState } from 'react';
-import type { CasterId } from '../../../shared/types';
+import { CASTER_IDS, type CasterId } from '../../../shared/types';
 import { AnimatePresence, motion } from 'motion/react';
 import type { Scene, ScreenId, Show } from '../../../shared/types';
 import type { Tournament } from '../../../shared/tournament';
@@ -14,6 +16,7 @@ import { SheetBracket, SheetMatches } from './SheetBracket';
 import { NextMatchCorner, OtherMatchPopout } from './NextMatch';
 import { VdoContext } from '../../lib/vdo';
 import { skinBackground, skinOf } from '../../../shared/skins';
+import { SkinAnalystDesk } from './AnalystDesk';
 import { SkinBadge, SkinCasters, SkinIntermission, SkinStinger, SkinTicker, SkinVideo } from './Skin';
 import type { MatchData } from '../../../shared/protocol';
 import { BrbScreen, EndingScreen, StartingScreen } from './Screens';
@@ -22,6 +25,31 @@ import { MatchBar, Scoreboard } from './Overlays';
 import { Feed } from '../Feed';
 import { Nameplate } from '../Nameplate';
 import { ScreenBackground, Ticker } from './parts';
+import { WcMapCard } from '../wildcard/MapCard';
+import { WcChampions } from '../wildcard/Champions';
+import { WcInterview } from '../wildcard/Interview';
+import { WcVeto } from '../wildcard/Veto';
+import { WcBracket, WcCasters, WcMatchesBoard, WcPopups, WcWaiting } from '../wildcard/Wildcard';
+import { TwitchOnScreen } from '../wildcard/Twitch';
+import { WcDesk, boothScene } from '../wildcard/Desk';
+import { EASE } from '../../lib/motion';
+import type { WcLive } from '../../lib/hooks';
+import type { Skin } from '../../../shared/skins';
+
+type WcPlace = 'inBracket' | 'inIntermission' | 'inCasters' | 'inGameplay' | 'inWarmup';
+/** Whether the OverDrive Wildcard graphics replace the generic ones in this part of the program. */
+const wcOn = (wc: WcLive | null | undefined, k: WcPlace): wc is WcLive => !!wc && wc.state.enabled && wc.state.opts[k];
+
+/** Starting soon / BRB / Thanks with the wildcard: skin plate (title) on top, up next + countdown, latest result in the bottom bar. */
+function WcIntermission({ skin, kind, show, now, wc }: { skin: Skin; kind: 'starting' | 'brb' | 'ending'; show: Show; now: number; wc: WcLive }) {
+  const timer = show.timer.target != null && show.timer.showOn[kind] ? show.timer.target : null;
+  return (
+    <div className="absolute inset-0">
+      <motion.img src={skin.plates[kind]} alt="" className="pointer-events-none absolute inset-0 h-full w-full" initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, ease: EASE }} />
+      <WcWaiting wc={wc.state} now={now} title="" timer={timer} />
+    </div>
+  );
+}
 
 const STING_IN = 380; // ms until the panel fully covers the frame
 const STING_HOLD = 160;
@@ -29,40 +57,66 @@ const STING_HOLD = 160;
 /** Renders one full-screen scene by id. */
 export function ScreenView(props: Parameters<typeof ScreenViewInner>[0]) {
   const v = props.show.vdo;
-  return <VdoContext.Provider value={{ password: v.password, params: v.params, embeds: props.embeds !== false && !props.monitor }}><ScreenViewInner {...props} /></VdoContext.Provider>;
+  return (
+    <VdoContext.Provider value={{ password: v.password, params: v.params, embeds: props.embeds !== false && !props.monitor, monitorFeeds: !!props.monitorFeeds }}>
+      {/* The desk picks its own people; every other screen shows the booth (up to 3 of the 5 slots). */}
+      <ScreenViewInner {...props} scene={props.id === 'analysis' || props.id === 'interview' ? props.scene : boothScene(props.scene, props.wc?.state.booth ?? [])} />
+      {/* Twitch prediction / poll card on the screens switched on in the Twitch settings. */}
+      <TwitchOnScreen tw={props.wc?.tw} id={props.id} now={props.now} />
+      <WcChampions wc={props.wc?.state} />
+    </VdoContext.Provider>
+  );
 }
 
 function ScreenViewInner(props: {
-  id: ScreenId; scene: Scene; show: Show; now: number; tournament: Tournament | null; viewer?: RtcViewer | null; monitor?: boolean; embeds?: boolean; bnl?: MatchData | null;
+  id: ScreenId; scene: Scene; show: Show; now: number; tournament: Tournament | null; viewer?: RtcViewer | null; monitor?: boolean; embeds?: boolean; bnl?: MatchData | null; wc?: WcLive | null; monitorFeeds?: boolean;
 }) {
   const skin = skinOf(props.show.brand.skin);
   if (!skin) return <ScreenBody {...props} />;
-  const { id, scene, show, now, viewer, monitor, bnl = null } = props;
-  const bg = skinBackground(skin, id);
-  const body = id === 'starting' || id === 'brb' || id === 'ending'
-    ? <SkinIntermission skin={skin} kind={id} show={show} now={now} bnl={bnl} />
-    : id === 'casters' ? <SkinCasters skin={skin} scene={scene} show={show} viewer={viewer} monitor={monitor} />
+  const { id, scene, show, now, viewer, monitor, bnl = null, wc = null } = props;
+  const inter = id === 'starting' || id === 'brb' || id === 'ending';
+  const wcInter = inter && wcOn(wc, 'inIntermission');
+  // The wildcard bracket fills the whole frame: plain loop (no bottom bar) and no ticker under it.
+  const wcBracket = ((id === 'bracket' || id === 'matches') && wcOn(wc, 'inBracket')) || id === 'interview' || id === 'veto';
+  // Analyst desk: one composition for every panel; it owns its frame and background videos (no remount on panel changes).
+  const desk = id === 'analysis';
+  const bg = wcBracket ? skin.loop : desk ? null : skinBackground(skin, id);
+  const body = inter
+    ? (wcInter && wc ? <WcIntermission skin={skin} kind={id} show={show} now={now} wc={wc} /> : <SkinIntermission skin={skin} kind={id} show={show} now={now} bnl={bnl} />)
+    : id === 'casters' ? <><SkinCasters skin={skin} scene={scene} show={show} viewer={viewer} monitor={monitor} picks={wc?.state.intro.picksShow ? wc.state.intro.picks : undefined} /><Reveal show={wcOn(wc, 'inCasters')} from="left">{wc && <WcCasters wc={wc.state} now={now} />}</Reveal></>
+    : desk ? <SkinAnalystDesk skin={skin} scene={scene} show={show} wc={wc?.state ?? null} now={now} bnl={bnl} viewer={viewer} monitor={monitor} />
     : <ScreenBody {...props} />;
   return (
     <div className="absolute inset-0">
       {bg && <SkinVideo src={bg} />}
       {body}
-      {id !== 'gameplay' && show.ticker.onScreens && <SkinTicker skin={skin} show={show} />}
+      <Reveal show={id !== 'gameplay' && !wcInter && !wcBracket && show.ticker.onScreens} from="up" id="s-ticker"><SkinTicker skin={skin} show={show} /></Reveal>
     </div>
   );
 }
 
-function ScreenBody({ id, scene, show, now, tournament, viewer, monitor, embeds = true, bnl = null }: {
-  id: ScreenId; scene: Scene; show: Show; now: number; tournament: Tournament | null; viewer?: RtcViewer | null; monitor?: boolean; embeds?: boolean; bnl?: MatchData | null;
+function ScreenBody({ id, scene, show, now, tournament, viewer, monitor, embeds = true, bnl = null, wc = null }: {
+  id: ScreenId; scene: Scene; show: Show; now: number; tournament: Tournament | null; viewer?: RtcViewer | null; monitor?: boolean; embeds?: boolean; bnl?: MatchData | null; wc?: WcLive | null;
 }) {
+  if (id === 'bracket' && wcOn(wc, 'inBracket')) return <><ScreenBackground /><WcBracket wc={wc.state} part={wc.state.air} /></>;
+  if (id === 'matches' && wcOn(wc, 'inBracket')) return <><ScreenBackground /><WcMatchesBoard wc={wc.state} /></>;
   switch (id) {
     case 'starting': return <StartingScreen show={show} now={now} tournament={tournament} />;
     case 'brb': return <BrbScreen show={show} now={now} />;
     case 'ending': return <EndingScreen show={show} now={now} />;
     case 'bracket': return bnl?.sheet?.matches.length ? <><ScreenBackground /><SheetBracket sheet={bnl.sheet} show={show} /></> : tournament ? <BracketView t={tournament} view={show.bracketView} /> : <ScreenBackground />;
     case 'matches': return bnl?.sheet?.matches.length ? <><ScreenBackground /><SheetMatches sheet={bnl.sheet} show={show} /></> : tournament ? <MatchesBoard t={tournament} show={show} /> : <ScreenBackground />;
-    case 'warmup': return <WarmupScreen show={show} now={now} bnl={bnl} embeds={embeds && !monitor} />;
-    case 'gameplay': return <GameplayScreen scene={scene} show={show} now={now} viewer={viewer} monitor={monitor} embeds={embeds && !monitor} bnl={bnl} />;
+    case 'warmup': return <WarmupScreen show={show} now={now} bnl={bnl} embeds={embeds && !monitor} showcase={wcOn(wc, 'inWarmup') ? wc.state : null} casters={scene.casters} />;
+    case 'veto': return <><ScreenBackground />{wc && <WcVeto wc={wc.state} show={show} now={now} />}</>;
+    case 'interview': return <><ScreenBackground /><WcInterview scene={scene} show={show} wc={wc?.state ?? null} viewer={viewer} monitor={monitor} /></>;
+    case 'analysis': return <><ScreenBackground /><WcDesk scene={scene} show={show} wc={wc?.state ?? null} bnl={bnl} viewer={viewer} monitor={monitor} /></>;
+    case 'gameplay': return (
+      <>
+        <GameplayScreen scene={scene} show={show} now={now} viewer={viewer} monitor={monitor} embeds={embeds && !monitor} bnl={bnl} />
+        {wcOn(wc, 'inGameplay') && <WcPopups pop={wc.pop} />}
+        {wc && <WcMapCard wc={wc.state} show={show} now={now} />}
+      </>
+    );
     default: {
       const ticker = show.ticker.enabled && show.ticker.onScreens && show.ticker.items.length > 0;
       return (
@@ -70,7 +124,7 @@ function ScreenBody({ id, scene, show, now, tournament, viewer, monitor, embeds 
           <ScreenBackground />
           <Stage scene={{ ...scene, showBackground: false }} viewer={viewer} monitor={monitor} layers={{ ...ALL_LAYERS, background: false }} />
           {scene.showBranding && <MatchBar show={show} />}
-          {ticker && <div className="absolute inset-x-0 bottom-0"><Ticker show={show} height={56} /></div>}
+          <Reveal show={!!ticker} from="up" id="g-ticker"><div className="absolute inset-x-0 bottom-0"><Ticker show={show} height={56} /></div></Reveal>
         </div>
       );
     }
@@ -81,7 +135,7 @@ function useConnectedCams(viewer?: RtcViewer | null) {
   const [ids, setIds] = useState<Set<CasterId>>(new Set());
   useEffect(() => {
     if (!viewer) return;
-    const offs = ([1, 2, 3] as CasterId[]).map(id => viewer.subscribe(id, s => {
+    const offs = CASTER_IDS.map(id => viewer.subscribe(id, s => {
       setIds(prev => {
         const has = !!s && s.getVideoTracks().length > 0;
         if (has === prev.has(id)) return prev;
@@ -145,18 +199,25 @@ export function GameplayScreen({ scene, show, now, viewer, monitor, embeds = tru
 
 /**
  * /output/program — the complete show in one browser source. Switching
- * screens plays a Glacial stinger: a panel wipes across, the mark holds
+ * screens plays an Overdrive stinger: a panel wipes across, the mark holds
  * for a beat, and the new screen is revealed underneath.
  */
-export function Program(props: { scene: Scene; show: Show; now: number; tournament: Tournament | null; viewer?: RtcViewer | null; monitor?: boolean; embeds?: boolean; bnl?: MatchData | null }) {
+export function Program(props: { scene: Scene; show: Show; now: number; tournament: Tournament | null; viewer?: RtcViewer | null; monitor?: boolean; embeds?: boolean; bnl?: MatchData | null; wc?: WcLive | null; monitorFeeds?: boolean; /** transition of the TAKE that changed the screen (default stinger) */ transition?: TransitionKind; /** Preview monitors: screen changes are instant, never a transition */ instant?: boolean }) {
   const target = props.scene.screen;
   const [shown, setShown] = useState<ScreenId>(target);
   const [sting, setSting] = useState(0);
+  const [fade, setFade] = useState(0.01);
   const first = useRef(true);
 
   useEffect(() => {
     if (first.current) { first.current = false; setShown(target); return; }
     if (target === shown) return;
+    // Preview is instant: selecting / preparing a scene never plays a broadcast transition.
+    if (props.instant) { setSting(0); setFade(0.01); setShown(target); return; }
+    // CUT: straight swap. FADE: crossfade. STINGER (default): the skin's stinger covers the swap.
+    if (props.transition === 'cut') { setFade(0.01); setShown(target); return; }
+    if (props.transition === 'fade') { setFade(0.45); setShown(target); return; }
+    setFade(0.01);
     setSting(n => n + 1);
     const t = setTimeout(() => setShown(target), skinOf(props.show.brand.skin)?.stinger.cut ?? STING_IN);
     return () => clearTimeout(t);
@@ -173,11 +234,11 @@ export function Program(props: { scene: Scene; show: Show; now: number; tourname
   const skin = skinOf(props.show.brand.skin);
   return (
     <ThemeProvider theme={theme} bgProvided={bnl || !!props.show.brand.bg || !!skin} brand={props.show.brand}>
-    <div className="glacial-stage absolute inset-0 overflow-hidden" data-theme={theme}>
+    <div className="od-stage absolute inset-0 overflow-hidden" data-theme={theme}>
       {/* One continuous background video behind every screen (not restarted per cut). */}
       {(bnl || !!props.show.brand.bg || !!skin) && <div className="absolute inset-0 transition-opacity duration-300" style={{ opacity: shown === 'gameplay' ? 0 : 1 }}><BgVideo /></div>}
       <AnimatePresence initial={false}>
-        <motion.div key={shown} className="absolute inset-0" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.01 }}>
+        <motion.div key={shown} className="absolute inset-0" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: fade }}>
           <ScreenView id={shown} {...props} />
         </motion.div>
       </AnimatePresence>
