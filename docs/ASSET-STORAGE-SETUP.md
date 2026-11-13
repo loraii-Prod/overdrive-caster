@@ -55,18 +55,19 @@ Render masks secret values. Never paste them into chat, issues or commits.
 
 The running 2.2.4 server keeps everything on the disk that the deploy will wipe. Do this once, just before that deploy:
 
-1. **Studio → Show file → Export show…** (graphics, presets, rundown, layouts, talent, playlist).
-2. **Controller → Wildcard → backup export**: the bracket results and teams.
-3. Copy the uploaded files into the bucket. This only reads from the live server:
+Full procedure, with the backup and the rollback, in **`docs/BACKUP-AND-ROLLBACK.md`** (rehearsed with the real 2.2.4 build: `e2e-rig/persist/first_deploy.py`). In short:
+
+1. Back up the live data folder (Render SSH tar) and run `scripts/backup-live.ts`.
+2. Seed the bucket with the files **and** the show state (read-only on the live server):
 
    ```
-   OD_URL=https://overdrive-caster.onrender.com OD_PASSWORD=… R2_ACCOUNT_ID=… R2_BUCKET=overdrive-assets \
-   R2_ACCESS_KEY_ID=… R2_SECRET_ACCESS_KEY=… npx tsx scripts/migrate-live.ts --dry-run   # list only
-   …same command without --dry-run                                                       # copy
+   OD_URL=https://overdrive-caster.onrender.com OD_PASSWORD=… STATE_SNAPSHOT_KEY=… R2_ACCOUNT_ID=… R2_BUCKET=overdrive-assets \
+   R2_ACCESS_KEY_ID=… R2_SECRET_ACCESS_KEY=… npx tsx scripts/migrate-live.ts --state ./state.json --dry-run   # list only
+   …same command without --dry-run                                                                          # copy
    ```
 
-   It writes `asset-migration-report.md`: every file, what uses it, and anything that failed or could not be linked to a player ID. The new server imports the list at its first start, so the old addresses keep working.
-4. Deploy. Import the show file and the Wildcard backup. Then check **Studio → Assets → Migration report** and **Studio → Show file → Durable show state** (both should show "on").
+   It writes `asset-migration-report.md`: every file, what uses it, and anything that failed or could not be linked to a player ID. The new server imports the list at its first start, so the old addresses keep working. `--state` stores the live `state.json` (from the SSH backup) as an encrypted snapshot. The first start, with an empty disk and an empty database, restores it, so the show, Wildcard bracket, talent and OBS token come across unchanged.
+3. Deploy by hand. Check `/api/version`, **Studio → Assets → Migration report** and **Studio → Show file → Recovery** (restored from snapshot; database and snapshots ok; banner clear).
 
 From then on, deploys and restarts keep everything.
 

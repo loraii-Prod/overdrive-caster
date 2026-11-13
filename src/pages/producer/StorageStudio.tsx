@@ -108,6 +108,7 @@ export function Recovery() {
       </div>}
       <div className="flex flex-wrap items-center gap-1">
         <Btn disabled={s?.snapshots !== 'ok'} onClick={async () => { const r = await fetch('/api/persist/snapshot', { method: 'POST' }); const j = await r.json(); setMsg(r.ok ? `Snapshot saved: ${j.key.split('/').pop()}` : j.error); load(); }}>Snapshot now</Btn>
+        <a className="rounded border border-white/15 px-3 py-1.5 text-sm text-white/80 hover:bg-white/10" href="/api/persist/download" title="state.json as it is now: keep it private (contains tokens/keys)">Download show state</a>
         <select value={sel} onChange={e => setSel(e.target.value)} className="h-[26px] max-w-[420px] rounded-[2px] border border-white/15 bg-black px-1 text-[11.5px]">
           <option value="">Restore a snapshot…</option>{(p?.snapshots ?? []).map(x => <option key={x.key} value={x.key}>{x.key.split('/').pop()}</option>)}
         </select>

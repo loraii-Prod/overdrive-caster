@@ -84,10 +84,11 @@ export async function restore(): Promise<void> {
         status.rev = Number(r.rows[0].rev);
         const dbAt = +r.rows[0].saved_at;
         if (!localAt || dbAt > localAt + 1000) {
-          if (validState(r.rows[0].data)) { writeLocal(r.rows[0].data); status.restoredFrom = 'database'; console.log(`[persist] restored show state from the database (rev ${status.rev})`); }
+          if (validState(r.rows[0].data)) { writeLocal(r.rows[0].data); status.restoredFrom = 'database'; console.log(`[persist] restored show state from the database (rev ${status.rev})`); return; }
         }
       }
-      return;
+      // An empty database (first deploy with it) and no local file: fall through to the latest snapshot.
+      if (localAt) { status.restoredFrom = 'local'; return; }
     } catch (e: any) {
       status.database = 'error'; status.error = `database: ${e.message}`;
       console.error('[persist] database not reachable at boot:', e.message);

@@ -80,6 +80,8 @@ import { sniff, imageInfo } from './filecheck';
 
 // ---------------------------------------------------------------- registry
 
+/** music/<section>/… or music/events/<event>/<section>/… → the section. */
+const musicSection = (rel: string) => { const p = rel.split(path.sep); return p[0] === 'events' ? p[2] ?? null : p[0] ?? null; };
 const LOCAL: Record<string, string> = { uploads: path.join(config.dataDir, 'uploads'), media: path.join(config.dataDir, 'media'), music: path.join(config.dataDir, 'music') };
 /** Local cache file of a public address (null = not a registry address). */
 export function localOf(p: string): string | null {
@@ -296,7 +298,7 @@ export async function migrate(): Promise<AssetReport> {
         const t = sniff(b);
         if (!t) { rep.failed.push({ path: pub, error: 'unknown file type, not registered' }); continue; }
         const role: AssetRole = dir === 'music' ? 'music' : dir === 'media' ? 'media' : t.kind === 'video' ? 'video' : 'image';
-        const rec = await register(pub, b, prev?.role ?? role, prev?.ref ?? (dir === 'music' ? rel.split(path.sep)[0] : null));
+        const rec = await register(pub, b, prev?.role ?? role, prev?.ref ?? (dir === 'music' ? musicSection(rel) : null));
         rep.registered++; if (rec.state === 'stored') rep.uploaded++; if (s3 && rec.state !== 'stored') rep.failed.push({ path: pub, error: `not in storage yet (${rec.state}): ${rec.lastError ?? ''}` });
       } catch (e: any) { rep.failed.push({ path: pub, error: String(e.message) }); }
     }

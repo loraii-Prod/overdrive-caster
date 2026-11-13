@@ -1,5 +1,8 @@
 /** Producer-only recovery API: status, snapshot list, snapshot now, restore (then the server restarts). */
 import express from 'express';
+import fs from 'node:fs';
+import path from 'node:path';
+import { config } from './config';
 import { isAuthed } from './auth';
 import { flush, freeze } from './store';
 import { applyRestore, history, listSnapshots, readSnapshot, snapshot, status } from './durable';
@@ -17,6 +20,18 @@ export function persistApi() {
     flush();
     const k = await snapshot('manual');
     k ? res.json({ ok: true, key: k }) : res.status(503).json({ error: status.snapshots === 'off' ? 'Snapshot storage is not configured' : status.error ?? 'Snapshot failed' });
+  });
+  // The current show state as a file, for an off-site copy or a rollback to an older build. It holds the API token
+  // and talent/camera keys: producer only, never cached.
+  r.get('/api/persist/download', (req, res) => {
+    if (!isAuthed(req)) return res.status(401).json({ error: 'sign in' });
+    flush();
+    const f = path.join(config.dataDir, 'state.json');
+    if (!fs.existsSync(f)) return res.status(404).json({ error: 'No saved state yet' });
+    res.setHeader('Cache-Control', 'no-store');
+    res.setHeader('Content-Type', 'application/json');
+    res.setHeader('Content-Disposition', `attachment; filename="overdrive-state-${new Date().toISOString().replace(/[:.]/g, '-')}.json"`);
+    fs.createReadStream(f).pipe(res);
   });
   r.post('/api/persist/restore', express.json(), async (req, res) => {
     if (!isAuthed(req)) return res.status(401).json({ error: 'sign in' });
