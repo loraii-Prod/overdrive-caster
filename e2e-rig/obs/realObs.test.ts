@@ -128,6 +128,10 @@ const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
   check('8 the scene of the failed source exists once (repairable with Build Selected)', mine === 1);
 
   check('12 no transition / switch / delete request sent by the builder', !log.some(r => FORBIDDEN.includes(r)), log.filter(r => FORBIDDEN.includes(r)).join(','));
+  { // picture quality: real GetVideoSettings feeds the read-only check (this OBS: 1920×1080 canvas and output, 60 fps)
+    const w0 = log.filter(l => !l.startsWith('Get')).length; await b.verify(); const st = b.state();
+    check('13 real OBS: quality check reads canvas, output and fps; a 1080p60 OBS has no canvas warning; no write', st.canvas?.w === 1920 && st.canvas?.ow === 1920 && st.canvas?.oh === 1080 && st.canvas?.fps === 60 && !st.quality.some(q => q.where === 'OBS video settings') && log.filter(l => !l.startsWith('Get')).length === w0, JSON.stringify(st.canvas));
+  }
   console.log(`\n${ok} passed, ${bad} failed`);
   process.exit(bad ? 1 : 0);
 })();

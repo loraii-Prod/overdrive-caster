@@ -100,6 +100,14 @@ export function ObsSetupPanel({ st, run }: { st: ControllerState; run: Run }) {
           <b>On-air risk:</b> {s!.controllerLeaks.map(l => `“${l.input}”`).join(', ')} load{s!.controllerLeaks.length === 1 ? 's' : ''} an Overdrive controller page as an OBS browser source. Controllers belong in Docks, never in a scene: remove {s!.controllerLeaks.length === 1 ? 'it' : 'them'} in OBS (Overdrive never deletes OBS sources).
         </div>
       )}
+      {(s?.quality?.length ?? 0) > 0 && (
+        <details className="flex-none border-b px-2.5 py-1 text-[12px]" style={{ borderColor: C.line, background: 'rgba(240,180,60,.10)', color: '#ffd89a' }} data-quality>
+          <summary className="cursor-pointer"><b>Picture quality:</b> {s!.quality.length} thing{s!.quality.length === 1 ? '' : 's'} make{s!.quality.length === 1 ? 's' : ''} OBS resize an Overdrive picture (soft text and logos). Overdrive only reports these; it changes nothing outside its own scenes.</summary>
+          <ul className="mt-1 space-y-0.5 pl-4">
+            {s!.quality.map((q, i) => <li key={i} data-quality-item><b>{q.where}</b>: {q.issue}. <span className="text-white/60">{q.fix}</span></li>)}
+          </ul>
+        </details>
+      )}
       {/* ---- per scene */}
       <div className="flex min-h-0 flex-1">
         <div className="min-h-0 flex-1 overflow-y-auto">

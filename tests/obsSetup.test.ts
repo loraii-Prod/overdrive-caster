@@ -1,6 +1,6 @@
 // OBS Scene Builder tests against a stateful OBS WebSocket v5 MOCK (not real OBS): npx tsx tests/obsSetup.test.ts
 import { createObsSetup, FORBIDDEN } from '../server/obsSetup';
-import { AUDIO_SCENE, GAME_CAPTURE, defaultObsSetup, discoverTargets, sanitizeObsSetup, targetUrl } from '../shared/obsSetup';
+import { AUDIO_SCENE, GAME_CAPTURE, defaultObsSetup, discoverTargets, sanitizeObsSetup, targetUrl, nativeSizeOf, itemScale, sourceQuality, canvasQuality } from '../shared/obsSetup';
 import { sanitizeGraphics } from '../shared/gfx';
 import { defaultShow } from '../shared/defaults';
 import { MockObs } from './mockObs';
@@ -74,7 +74,7 @@ const browserInputs = (m: MockObs) => [...m.inputs].filter(([, i]) => i.kind ===
   check('2 second build: nothing to do (build and repair)', typeof p2 !== 'string' && p2.ops.length === 0 && typeof p2r !== 'string' && p2r.ops.length === 0, typeof p2r === 'string' ? p2r : p2r.ops.map(o => o.detail).join(' | '));
   await A.build('build', 'all');
   check('2 running again creates no duplicate scene or source', A.obs.snapshot() === snap1);
-  check('verify: all correct after build', JSON.stringify(await A.b.verify()) === JSON.stringify({ ok: all.length + 1, bad: 0, leaks: 0 }));
+  check('verify: all correct after build', JSON.stringify(await A.b.verify()) === JSON.stringify({ ok: all.length + 1, bad: 0, leaks: 0, quality: 0 }));
 
   // ---------------------------------------------------------------- 10. mapping + tally
   const cd = all.find(t => t.id === 'g:caster-desk')!;
@@ -201,6 +201,28 @@ const browserInputs = (m: MockObs) => [...m.inputs].filter(([, i]) => i.kind ===
   A.obs.addInput(veto.scene, 'Oops controller', 'browser_source', { url: 'http://localhost:8787/producer/scene/s:veto', width: 1920, height: 1480 });
   const lv = await A.b.verify();
   check('verify flags a controller page put into a broadcast scene (and never removes it)', typeof lv !== 'string' && lv.leaks === 1 && A.b.state().controllerLeaks[0].input === 'Oops controller' && A.obs.inputs.has('Oops controller'));
+
+
+  // ---------------------------------------------------------------- picture quality (read-only)
+  check('quality: picture routes are native 1920×1080, ?controls 1920×1480, audio/music/control pages are not pictures',
+    nativeSizeOf('/g/caster-desk')?.w === 1920 && nativeSizeOf('/output/screen/brb')?.h === 1080 && nativeSizeOf('/output/casters?controls&token=x')?.h === 1480
+    && nativeSizeOf('/output/audio/1') === null && nativeSizeOf('/output/music') === null && nativeSizeOf('/producer/scene/g:x') === null && nativeSizeOf(null) === null);
+  check('quality: item scale from scale and from bounds', itemScale({ scaleX: 1, scaleY: 1 }, 1920, 1080).x === 1 && itemScale({ boundsType: 'OBS_BOUNDS_SCALE_INNER', boundsWidth: 1280, boundsHeight: 720 }, 1920, 1080).x === 2 / 3 && itemScale({ scaleX: 1.5, scaleY: 1.5 }, 1280, 720).y === 1.5);
+  check('quality: a 1:1 1920×1080 source in a 1920×1080 canvas has no findings', A.b.state().quality.length === 0, JSON.stringify(A.b.state().quality));
+  check('quality: mis-sized source = double scaling', sourceQuality('X', '/g/caster-desk', { width: 1280, height: 720 }, [{ scene: 'S', transform: { scaleX: 1.5, scaleY: 1.5 } }]).length === 2
+    && /67%/.test(sourceQuality('X', '/g/caster-desk', { width: 1280, height: 720 }, [])[0].issue) && /letterboxed/.test(sourceQuality('X', '/g/x', {}, [])[0].issue));
+  check('quality: canvas + scaled output reported', canvasQuality({ w: 1920, h: 1080, ow: 1280, oh: 720 }).length === 1 && canvasQuality({ w: 1280, h: 720 }).length === 1 && canvasQuality({ w: 1920, h: 1080, ow: 1920, oh: 1080 }).length === 0);
+  {
+    const writes0 = A.obs.log.filter(l => !l.req.startsWith('Get')).length;
+    A.obs.addInput('Scene', 'Old caster overlay', 'browser_source', { url: 'http://localhost:8787/output/casters', width: 1280, height: 720 });
+    const sc = A.obs.scenes.get('Scene')!; const it = sc.items.find(i => i.source === 'Old caster overlay')!; it.transform = { ...it.transform, scaleX: 1.5, scaleY: 1.5 };
+    A.obs.video = { ...A.obs.video, outputWidth: 1280, outputHeight: 720 };
+    const writes1 = A.obs.log.filter(l => !l.req.startsWith('Get')).length;
+    const v = await A.b.verify();
+    const q = A.b.state().quality;
+    check('verify reports the hand-made 1280×720 Overdrive source (size + 150% scale) and the 720p output', typeof v !== 'string' && v.quality === 3 && q.some(x => x.where === 'Old caster overlay' && /1280×720/.test(x.issue)) && q.some(x => /150%/.test(x.issue)) && q.some(x => /1280×720: the stream/.test(x.issue)), JSON.stringify(q.map(x => x.issue)));
+    check('quality check is read-only (no OBS write while verifying)', A.obs.log.filter(l => !l.req.startsWith('Get')).length === writes1 && writes1 >= writes0 && A.b.state().canvas?.ow === 1280);
+  }
 
   console.log(`\n${ok} passed, ${bad} failed`);
   process.exit(bad ? 1 : 0);

@@ -58,6 +58,8 @@ http.createServer((req, res) => {
   if (u.pathname === '/preview') { obs.studioMode = true; obs.preview = u.searchParams.get('scene') ?? obs.preview; emit('StudioModeStateChanged', { studioModeEnabled: true }); emit('CurrentPreviewSceneChanged', { sceneName: obs.preview }); return j({ ok: true }); }
   if (u.pathname === '/add-browser') { obs.addInput(u.searchParams.get('scene')!, u.searchParams.get('name')!, 'browser_source', { url: u.searchParams.get('url'), width: 1920, height: 1480 }); return j({ ok: true }); }
   if (u.pathname === '/break-url') { const i = obs.inputs.get(u.searchParams.get('input') ?? ''); if (i) i.settings.url = 'http://wrong:1/nothing'; return j({ ok: !!i }); }
+  if (u.pathname === '/add-picture') { const q = u.searchParams; obs.addInput(q.get('scene')!, q.get('name')!, 'browser_source', { url: q.get('url')!, width: Number(q.get('w')), height: Number(q.get('h')) }); const it = obs.scenes.get(q.get('scene')!)!.items.at(-1)!; const k = Number(q.get('scale') || 1); it.transform = { ...it.transform, scaleX: k, scaleY: k }; return j({ ok: true }); }
+  if (u.pathname === '/video') { const q = u.searchParams; obs.video = { ...obs.video, ...(q.get('ow') ? { outputWidth: Number(q.get('ow')), outputHeight: Number(q.get('oh')) } : {}), ...(q.get('bw') ? { baseWidth: Number(q.get('bw')), baseHeight: Number(q.get('bh')) } : {}) }; return j(obs.video); }
   if (u.pathname === '/add-manual') { obs.addInput(u.searchParams.get('scene')!, u.searchParams.get('name')!, 'image_source', { file: 'logo.png' }); return j({ ok: true }); }
   if (u.pathname === '/drop') { for (const s of socks) s.terminate(); return j({ ok: true }); }
   res.statusCode = 404; res.end();

@@ -113,7 +113,8 @@ export interface ObsSetupState {
   baseUrl: string;
   baseReason: string;
   version?: { obs: string; ws: string; missing: string[] };
-  canvas?: { w: number; h: number };
+  /** OBS base canvas, plus the output (scaled) resolution and frame rate when OBS reports them. */
+  canvas?: { w: number; h: number; ow?: number; oh?: number; fps?: number };
   targets: TargetReport[];
   plan: ObsPlan | null;
   busy: string | null;
@@ -123,6 +124,58 @@ export interface ObsSetupState {
   map: Record<string, ObsMapEntry>;
   /** OBS browser sources that load an Overdrive CONTROL page (must never be in a broadcast scene). */
   controllerLeaks: { input: string; url: string }[];
+  /** Picture-quality findings (read-only): anything that makes OBS resample an Overdrive picture. */
+  quality: QualityIssue[];
+}
+
+export interface QualityIssue { where: string; issue: string; fix: string }
+
+/**
+ * Native OBS browser-source size of an Overdrive page: every picture output is drawn 1:1 on a 1920×1080 canvas
+ * (`?controls` pages are 1920×1480: picture + controls). null = not a picture (audio, music, control pages).
+ */
+export function nativeSizeOf(route: string | null): { w: number; h: number } | null {
+  if (!route) return null;
+  const [path, q = ''] = route.split('?');
+  if (!/^\/(output|g)\//.test(path) || /^\/output\/(audio|music)(\/|$)/.test(path)) return null;
+  return new URLSearchParams(q).has('controls') ? { w: 1920, h: 1480 } : { w: 1920, h: 1080 };
+}
+
+/** How much OBS resizes a scene item when drawing it (1 = pixel for pixel). */
+export function itemScale(tr: any, srcW: number, srcH: number): { x: number; y: number } {
+  const sw = Number(tr?.sourceWidth) || srcW, sh = Number(tr?.sourceHeight) || srcH;
+  if (tr?.boundsType && tr.boundsType !== 'OBS_BOUNDS_NONE') {
+    const bx = (Number(tr.boundsWidth) || sw) / sw, by = (Number(tr.boundsHeight) || sh) / sh;
+    if (tr.boundsType === 'OBS_BOUNDS_STRETCH') return { x: bx, y: by };
+    const k = tr.boundsType === 'OBS_BOUNDS_SCALE_OUTER' ? Math.max(bx, by) : tr.boundsType === 'OBS_BOUNDS_MAX_ONLY' ? Math.min(1, bx, by) : Math.min(bx, by);
+    return { x: k, y: k };
+  }
+  return { x: Number(tr?.scaleX) || 1, y: Number(tr?.scaleY) || 1 };
+}
+
+/** Quality findings for one Overdrive browser source and the scene items that show it. */
+export function sourceQuality(input: string, route: string, settings: any, items: { scene: string; transform: any }[]): QualityIssue[] {
+  const n = nativeSizeOf(route);
+  if (!n) return [];
+  const out: QualityIssue[] = [];
+  const w = Number(settings?.width) || 800, h = Number(settings?.height) || 600;
+  if (w !== n.w || h !== n.h) {
+    const k = Math.min(w / n.w, h / n.h);
+    out.push({ where: input, issue: `browser source is ${w}×${h}: Overdrive draws its ${n.w}×${n.h} picture at ${Math.round(k * 100)}%${w / h !== n.w / n.h ? ' (letterboxed)' : ''}, then OBS resizes it again`, fix: `Set the source to ${n.w}×${n.h} (Properties → Width/Height), or Repair it from this page if Overdrive built it.` });
+  }
+  for (const it of items) {
+    const s = itemScale(it.transform, w, h);
+    if (Math.abs(s.x - 1) > 0.005 || Math.abs(s.y - 1) > 0.005) out.push({ where: `${input} in “${it.scene}”`, issue: `drawn at ${s.x === s.y ? `${Math.round(s.x * 1000) / 10}%` : `${Math.round(s.x * 1000) / 10}% × ${Math.round(s.y * 1000) / 10}%`} of its size, so OBS resamples every pixel`, fix: 'Right-click the source → Transform → Reset Transform (it then fills a 1920×1080 canvas 1:1).' });
+  }
+  return out;
+}
+
+/** Quality findings for the OBS video settings. */
+export function canvasQuality(v: { w: number; h: number; ow?: number; oh?: number; fps?: number }): QualityIssue[] {
+  const out: QualityIssue[] = [];
+  if (v.w !== 1920 || v.h !== 1080) out.push({ where: 'OBS video settings', issue: `base canvas is ${v.w}×${v.h}: every 1920×1080 Overdrive source has to be resized to fit it`, fix: 'Settings → Video → Base (Canvas) Resolution: 1920×1080.' });
+  if (v.ow && v.oh && (v.ow < v.w || v.oh < v.h)) out.push({ where: 'OBS video settings', issue: `output is scaled down to ${v.ow}×${v.oh}: the stream and recordings are not 1080p`, fix: 'Settings → Video → Output (Scaled) Resolution: 1920×1080 (same as the canvas), if your upload allows it.' });
+  return out;
 }
 
 export const AUDIO_SCENE = 'Overdrive · Caster audio';

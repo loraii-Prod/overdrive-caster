@@ -14,7 +14,7 @@
  */
 import crypto from 'node:crypto';
 import {
-  AUDIO_SCENE, GAME_CAPTURE, discoverTargets, routeOf, targetUrl,
+  AUDIO_SCENE, GAME_CAPTURE, discoverTargets, routeOf, targetUrl, nativeSizeOf, sourceQuality, canvasQuality,
   type ObsMapEntry, type ObsPlan, type ObsSetupOptions, type ObsSetupState, type ObsSetupStore, type ObsTarget, type OpKind, type PlanOp, type TargetReport, type TargetStatus,
 } from '../shared/obsSetup';
 import type { GfxInstance } from '../shared/gfx';
@@ -60,12 +60,13 @@ class Snapshot {
   private settings = new Map<string, any>();
   program = '';
   preview = '';
-  canvas = { w: 1920, h: 1080 };
+  canvas: { w: number; h: number; ow?: number; oh?: number; fps?: number } = { w: 1920, h: 1080 };
   inputKinds: Set<string> | null = null;
   constructor(private call: ObsCall) {}
   async load() {
     const v = await this.call('GetVideoSettings');
-    this.canvas = { w: Number(v.baseWidth) || 1920, h: Number(v.baseHeight) || 1080 };
+    const fps = Number(v.fpsNumerator) / (Number(v.fpsDenominator) || 1);
+    this.canvas = { w: Number(v.baseWidth) || 1920, h: Number(v.baseHeight) || 1080, ...(Number(v.outputWidth) ? { ow: Number(v.outputWidth), oh: Number(v.outputHeight) } : {}), ...(fps > 0 ? { fps: Math.round(fps * 100) / 100 } : {}) };
     const sl = await this.call('GetSceneList');
     this.program = String(sl.currentProgramSceneName ?? '');
     this.preview = String(sl.currentPreviewSceneName ?? '');
@@ -100,6 +101,7 @@ export function createObsSetup(d: ObsSetupDeps) {
   let canvas: ObsSetupState['canvas'];
   let lastRun: ObsSetupState['lastRun'] = null;
   let leaks: ObsSetupState['controllerLeaks'] = [];
+  let quality: ObsSetupState['quality'] = [];
 
   const opts = (): ObsSetupOptions => d.store().options;
   const targets = () => discoverTargets(d.graphics(), d.obsScenes(), opts());
@@ -369,9 +371,23 @@ export function createObsSetup(d: ObsSetupDeps) {
     scannedAt = Date.now();
     // a controller page inside a broadcast source would put the control UI on air: report it (never auto-removed)
     leaks = [];
+    const pictures: { name: string; route: string; st: any }[] = [];
     for (const [name, inp] of s.inputs) {
       if (inp.kind !== 'browser_source') continue;
-      try { const st = await s.settingsOf(name); const r = typeof st.url === 'string' ? routeOf(st.url) : null; if (isControllerRoute(r)) leaks.push({ input: name, url: String(st.url) }); } catch {}
+      try {
+        const st = await s.settingsOf(name); const r = typeof st.url === 'string' ? routeOf(st.url) : null;
+        if (isControllerRoute(r)) leaks.push({ input: name, url: String(st.url) });
+        else if (nativeSizeOf(r)) pictures.push({ name, route: r!, st });
+      } catch {}
+    }
+    // picture quality (read-only): OBS canvas/output, and every Overdrive picture source wherever it is used
+    quality = canvasQuality(s.canvas);
+    if (pictures.length) {
+      const uses = new Map<string, { scene: string; transform: any }[]>();
+      for (const scene of s.scenes.keys()) {
+        try { for (const it of await s.itemsOf(scene)) if (pictures.some(p => p.name === it.sourceName)) { const l = uses.get(it.sourceName) ?? []; l.push({ scene, transform: it.sceneItemTransform }); uses.set(it.sourceName, l); } } catch {}
+      }
+      for (const p of pictures) quality.push(...sourceQuality(p.name, p.route, p.st, uses.get(p.name) ?? []));
     }
     // orphans: mapped outputs that no longer exist (never deleted from OBS)
     for (const [k, e] of Object.entries(d.store().map)) if (k !== 'support:audio' && !all.some(t => t.id === k)) reports.push({ id: k, name: `${k} (removed from Overdrive)`, kind: k.startsWith('g:') ? 'gfx' : 'source', scene: e.scene, input: e.input, url: e.url, status: 'unknown', issues: ['This output no longer exists in Overdrive. Its OBS scene is kept: delete it in OBS if you no longer need it.'], unmanaged: [], onAir: e.scene === s.program, inAll: false });
@@ -414,7 +430,7 @@ export function createObsSetup(d: ObsSetupDeps) {
   return {
     state(): ObsSetupState {
       const b = base();
-      return { options: opts(), baseUrl: b.url, baseReason: b.reason, version, canvas, targets: reports, plan, busy, scannedAt, lastRun, results: d.store().results, map: d.store().map, controllerLeaks: leaks };
+      return { options: opts(), baseUrl: b.url, baseReason: b.reason, version, canvas, targets: reports, plan, busy, scannedAt, lastRun, results: d.store().results, map: d.store().map, controllerLeaks: leaks, quality };
     },
     targets,
     async scan(): Promise<string | null> {
@@ -471,8 +487,8 @@ export function createObsSetup(d: ObsSetupDeps) {
         return lastRun;
       });
     },
-    async verify(): Promise<{ ok: number; bad: number; leaks: number } | string> {
-      return guarded('verify', async c => { const r = await scanWith(c); const rel = r.filter(x => x.inAll); return { ok: rel.filter(x => x.status === 'ok').length, bad: rel.filter(x => x.status !== 'ok').length, leaks: leaks.length }; });
+    async verify(): Promise<{ ok: number; bad: number; leaks: number; quality: number } | string> {
+      return guarded('verify', async c => { const r = await scanWith(c); const rel = r.filter(x => x.inAll); return { ok: rel.filter(x => x.status === 'ok').length, bad: rel.filter(x => x.status !== 'ok').length, leaks: leaks.length, quality: quality.length }; });
     },
     setOptions(o: Partial<ObsSetupOptions>) {
       const cur = d.store().options;

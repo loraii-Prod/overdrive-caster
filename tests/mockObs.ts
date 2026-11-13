@@ -23,6 +23,7 @@ export class MockObs {
   failOn: ((req: string, data: any) => string | null) | null = null;
   /** Disconnect after this many more requests. */
   dropAfter: number | null = null;
+  video = { baseWidth: 1920, baseHeight: 1080, outputWidth: 1920, outputHeight: 1080, fpsNumerator: 60, fpsDenominator: 1 };
   kinds = ['browser_source', 'game_capture', 'window_capture', 'monitor_capture', 'dshow_input', 'wasapi_input_capture', 'ffmpeg_source', 'image_source'];
 
   constructor() { this.scenes.set('Scene', { uuid: uuid(), items: [], nextId: 1 }); }
@@ -40,7 +41,7 @@ export class MockObs {
     if (f) this.err(702, f);
     switch (req) {
       case 'GetVersion': return { obsVersion: '31.0.0 (mock)', obsWebSocketVersion: '5.5.0 (mock)', rpcVersion: 1, availableRequests: ['GetVersion', 'GetVideoSettings', 'GetSceneList', 'GetInputList', 'GetInputKindList', 'GetSceneItemList', 'GetInputSettings', 'CreateScene', 'CreateInput', 'SetInputSettings', 'CreateSceneItem', 'SetSceneItemTransform', 'SetSceneItemEnabled', 'SetSceneItemIndex', 'SetCurrentProgramScene'] };
-      case 'GetVideoSettings': return { baseWidth: 1920, baseHeight: 1080, outputWidth: 1920, outputHeight: 1080, fpsNumerator: 60, fpsDenominator: 1 };
+      case 'GetVideoSettings': return { ...this.video };
       case 'GetSceneList': return { currentProgramSceneName: this.program, currentPreviewSceneName: this.studioMode ? this.preview : null,
         scenes: [...this.scenes].map(([n, s], i) => ({ sceneName: n, sceneUuid: s.uuid, sceneIndex: this.scenes.size - 1 - i })).reverse() };
       case 'GetInputList': return { inputs: [...this.inputs].map(([n, i]) => ({ inputName: n, inputUuid: i.uuid, inputKind: i.kind, unversionedInputKind: i.kind })) };

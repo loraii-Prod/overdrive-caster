@@ -1098,7 +1098,7 @@ export function createHub(server: Server) {
     obsSetup: async cmd => {
       switch (cmd.action) {
         case 'scan': { const e = await obsSetup.scan(); return e ? { error: e } : { note: 'OBS scanned' }; }
-        case 'verify': { const r = await obsSetup.verify(); return typeof r === 'string' ? { error: r } : { note: `${r.bad ? `${r.ok} scene${r.ok === 1 ? '' : 's'} correct, ${r.bad} need attention` : `All ${r.ok} scenes are correct`}${r.leaks ? ` · ⚠ ${r.leaks} OBS source${r.leaks === 1 ? '' : 's'} show an Overdrive controller page` : ''}` }; }
+        case 'verify': { const r = await obsSetup.verify(); return typeof r === 'string' ? { error: r } : { note: `${r.bad ? `${r.ok} scene${r.ok === 1 ? '' : 's'} correct, ${r.bad} need attention` : `All ${r.ok} scenes are correct`}${r.leaks ? ` · ⚠ ${r.leaks} OBS source${r.leaks === 1 ? '' : 's'} show an Overdrive controller page` : ''}${r.quality ? ` · ${r.quality} picture-quality warning${r.quality === 1 ? '' : 's'}` : ''}` }; }
         case 'preview': {
           const ids = cmd.targets === 'all' ? 'all' as const : Array.isArray(cmd.targets) ? cmd.targets.map(String).slice(0, 200) : [];
           const r = await obsSetup.preview(cmd.mode === 'repair' ? 'repair' : 'build', ids);
