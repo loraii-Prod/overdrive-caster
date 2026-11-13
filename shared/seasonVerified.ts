@@ -15,8 +15,5 @@ export const SEASON_VERIFIED: Record<string, Partial<SeasonLine>> = {
   "rnboi": {
     "split1": "Div 2 · 3rd in the league (7–2)",
     "split2": "Div 2 · 6th in the league (3–5)"
-  },
-  "All Gamers Global": {
-    "split2": "Div 1 · 7th in the league (0–5)"
   }
 };

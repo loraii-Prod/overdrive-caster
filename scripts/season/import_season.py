@@ -57,25 +57,45 @@ unresolved = Counter()
 link_log = {}
 # Split 1 entries whose names no team record carries (not even as a previous name). They get their own stable ids;
 # a successor is only *suggested* (roster overlap) and must be confirmed by a human.
-PROVISIONAL = {'fut': ('S1_FUT', 'FUT', 'TEAM_0004', 'Nayko (Split 1 FUT roster) plays for Weibo x FUT'),
-               'navi': ('S1_NAVI', 'NAVI', 'TEAM_0006', 'mime (Split 1 Navi roster) plays for NAVI x Joel')}
-for k, (pid, nm, succ, why) in PROVISIONAL.items():
+# the site sheet's "logos" tab: dated (team_id, name, official SVG) entries = a name history per team_id
+registry = []
+for r in csv_rows('logos.csv'):
+    tid = r['team_id'].strip()
+    if not tid: continue
+    f = r['logo_url_git'].strip()
+    mdy = r['timestamp'].split('/')  # the logos tab writes m/d/yyyy
+    e = {'date': f'{mdy[2]}-{int(mdy[0]):02d}-{int(mdy[1]):02d}' if len(mdy) == 3 else None,
+         'name': r['team_name'].strip(), 'svg': f.rsplit('/', 1)[-1] if f else None, 'url': f or None}
+    registry.append({'team': tid, **e})
+    if tid in teams: teams[tid].setdefault('logoRegistry', []).append(e)
+    else: note('Unmatched logos', f"logos tab: {tid} “{e['name']}” has no team record")
+reg_names = defaultdict(set)
+for e in registry: reg_names[key(e['name'])].add(e['team'])
+PROVISIONAL = {'fut': ('S1_FUT', 'FUT', [('logos tab', 'TEAM_0005', 'named “FUT Esports” on 2026-04-03 (FUT_Esport.svg); later GenG x Legu → Team Nyxbar'),
+                                          ('roster overlap', 'TEAM_0004', 'Nayko (Split 1 FUT) now plays for Weibo x FUT')]),
+               'navi': ('S1_NAVI', 'NAVI', [('logos tab', 'TEAM_0006', 'named “NAVI” on 2026-04-03 (Navi.svg); later NAVI x Nemesis → Navi x Joel'),
+                                           ('roster overlap', 'TEAM_0006', 'mime (Split 1 Navi) now plays for NAVI x Joel')])}
+for k, (pid, nm, ev) in PROVISIONAL.items():
     teams[pid] = {'id': pid, 'name': nm, 'tag': None, 'status': 'split1-only', 'previousNames': [], 'roster': [], 'notes': None, 'logo': None, 'aliases': [],
-                  'suggestedSuccessor': {'team': succ, 'evidence': why, 'confirmed': False}}
+                  'possibleSameTeam': [{'team': t, 'evidence': f'{src}: {why}'} for src, t, why in ev], 'confirmed': False}
     by_key[k] = pid
-    note('Needs your decision', f'Split 1 “{nm}” has no team record in the site sheet: stored as {pid}. Suggested successor {succ} ({why}) — not linked until you confirm.')
+    agree = len({t for _, t, _ in ev}) == 1
+    note('Needs your decision', f"Split 1 “{nm}” is stored as {pid}, not linked to a current team. Evidence: " + '; '.join(f'{t} ({src}: {why})' for src, t, why in ev) + ('. Both point to the same team.' if agree else '. The two pieces of evidence point to DIFFERENT teams.'))
 id_evidence = {}  # name -> team_id, from rows of source B that carry both
 def resolve(name, ctx):
     """Team id for a name as written in a source, or None (kept as written, reported)."""
     n = name.strip()
     if not n: return None
     k = key(n)
-    if k in id_evidence:
-        return id_evidence[k]
+    if k in id_evidence and str(ctx).startswith('od26-s2'):
+        return id_evidence[k]  # Split 2 rows of the site sheet carry this name with an explicit team_id
     if k in by_key:
         tid = by_key[k]
         if prev_index.get(k) and tid not in prev_index[k]:
-            link_log.setdefault(n, f"“{n}” → {tid} {teams[tid]['name']} (current name) — but {', '.join(prev_index[k])} also lists “{n}” as a previous name: check which one played {ctx}")
+            amb = [tid] + [x for x in prev_index[k] if x != tid]
+            unresolved[n] += 1
+            note('Needs your decision', f"“{n}” (Split 1 / spring events): ambiguous between {' and '.join(f'{x} ({teams[x]['name']}, {teams[x]['status']})' for x in amb)} — left unlinked, name kept as written")
+            return None
         elif n != teams[tid]['name']:
             link_log.setdefault(n, f"“{n}” → {tid} {teams[tid]['name']} (same name, different capitalisation)")
         return tid
@@ -256,22 +276,26 @@ major_list = re.findall(r"\{ name: '([^']+)', how: '[^']*', logo: '([^']+)' \}",
 # display names used by Overdrive's Major list → team ids, with the evidence in the repo (shared/season.ts) or an exact name
 MAJOR_ALIAS = {'FUT Esports': ('TEAM_0004', 'shared/season.ts: Split 2 "Runner-up (Weibo x FUT)"'), 'Natus Vincere': ('TEAM_0006', 'shared/season.ts: Split 2 "Div 2 · Champions" = NAVI x Joel in the site standings'),
                'All Gamers Global': ('TEAM_0002', 'shared/season.ts: Split 1 "Div 1 · 3rd (8–1)" = All Gamers in the site standings')}
-logo_map = {}
+logo_map, major_links = {}, {}
 for disp, logo in major_list:
-    tid = by_key.get(key(disp)) or MAJOR_ALIAS.get(disp, (None,))[0]
+    exact = by_key.get(key(disp)) if not str(by_key.get(key(disp), '')).startswith('S1_') else None
+    tid = exact or MAJOR_ALIAS.get(disp, (None,))[0]
     f = os.path.join(LOGO_DIR, f'{logo}.png')
     if not tid: note('Unmatched logos', f'Major team “{disp}” ({logo}.png) has no team record'); continue
-    teams[tid]['logo'] = f'/brand/overdrive/teams/{logo}.png' if os.path.exists(f) else None
-    if disp != teams[tid]['name']: teams[tid]['aliases'].append(disp)
-    logo_map[disp] = tid
-    if disp in MAJOR_ALIAS: link_log.setdefault(disp, f"Major list name “{disp}” → {tid} {teams[tid]['name']} ({MAJOR_ALIAS[disp][1]})")
+    confirmed = bool(exact)
+    major_links[disp] = {'team': tid, 'confirmed': confirmed, 'logoFile': f'/brand/overdrive/teams/{logo}.png' if os.path.exists(f) else None,
+                         'evidence': 'same name' if confirmed else MAJOR_ALIAS[disp][1]}
+    if confirmed:
+        teams[tid]['logo'] = major_links[disp]['logoFile']; logo_map[disp] = tid
+    else:
+        note('Needs your decision', f"Major list name “{disp}” is not a team name in the sheets. Likely {tid} {teams[tid]['name']} ({MAJOR_ALIAS[disp][1]}) — left unconfirmed: no season data or logo is derived through it")
 digest = defaultdict(list)
 for f in sorted(os.listdir(LOGO_DIR)):
     if f.endswith('.png'): digest[hashlib.md5(open(os.path.join(LOGO_DIR, f), 'rb').read()).hexdigest()].append(f)
 for fs in digest.values():
     if len(fs) > 1: note('Unmatched logos', f"Identical image files: {', '.join(fs)} (the OverDrive mark) — COOK and FUT Esports show the OverDrive logo, not their own")
-for t in teams.values():
-    if t['logo'] and any(t['logo'].endswith(x) for x in ('cook.png', 'weiboxfut.png')): t['logoIsPlaceholder'] = True
+for disp, l in major_links.items():
+    if l['logoFile'] and any(l['logoFile'].endswith(x) for x in ('cook.png', 'weiboxfut.png')): l['logoIsPlaceholder'] = True
 unused = sorted(set(f[:-4] for f in os.listdir(LOGO_DIR) if f.endswith('.png')) - {l for _, l in major_list})
 note('Unmatched logos', f"Logo files not linked to any team by the data or the code: {', '.join(unused)} (left unlinked: no source names a file)")
 
@@ -286,7 +310,7 @@ data = {
     'matches': matches, 'standings': standings, 'split1WeeklyStandings': weekly, 'split1Rosters': s1_rosters, 'continentalPlacements': placements,
     'overpoints': overpoints, 'split1PlayerTimes': player_times, 'split1TrackRecords': track_records,
     'split1Broadcasts': broadcasts, 'split1Viewership': viewership, 'articles': articles, 'socials': socials,
-    'unresolvedNames': sorted(unresolved), 'majorDisplayNames': logo_map,
+    'unresolvedNames': sorted(unresolved), 'majorTeams': major_links, 'logoRegistry': registry,
 }
 json.dump(data, open(OUT, 'w', encoding='utf-8'), ensure_ascii=False, separators=(',', ':'))
 
@@ -316,11 +340,9 @@ L = ['# OverDrive 2026 dataset: import report', '', 'Built by `scripts/season/im
      '', '## Names not linked to a team record (kept exactly as written)', '', f'{len(unresolved)} names, {sum(unresolved.values())} occurrences. No team record has this name or lists it as a previous name. BYE is a bracket bye, not a team.', '',
      ', '.join(f'{n} ({c})' for n, c in sorted(unresolved.items(), key=lambda x: (-x[1], x[0]))), '',
      '## Missing fields', ''] + [f'- {k}: {v}' for k, v in sorted(missing.items())] + ['']
-if any(m['tournament'].startswith('od26-s1') and 'Rex Regum Qeon' in (m['a']['name'], m['b']['name']) for m in matches):
-    note('Needs your decision', 'Split 1 Promotion “Rex Regum Qeon” (PRM03 vs Loading) is linked to TEAM_0023 BOMBO because the site sheet gives that name team_id TEAM_0023 on its Split 2 rows; TEAM_0073 is also named “Rex Regum Qeon” (retired, previously F11). Confirm.')
 issues['Corrections'].append('“Amercias” (fall Open Qualifier / Continental event names in the site sheet) was normalised to “Americas” when the tab was exported on 13 Nov 2026.')
 for sec in ('Needs your decision', 'Conflicts', 'Duplicates', 'Corrections', 'Unmatched logos', 'Unsupported structures'):
-    L += [f'## {sec}', ''] + ([f'- {x}' for x in issues[sec]] or ['- none']) + ['']
+    L += [f'## {sec}', ''] + ([f'- {x}' for x in dict.fromkeys(issues[sec])] or ['- none']) + ['']
 open(REPORT, 'w', encoding='utf-8').write('\n'.join(L))
 print(f'{len(tournaments)} tournaments, {len(regions)} regions, {len(teams)} teams, {len(players)} players, {len(matches)} matches, {len(unresolved)} unresolved names')
 
@@ -349,14 +371,15 @@ def wildcard_line(tid):
                 out.append(f"{res} {f}–{a} {m[op]['name']}" if isinstance(f, int) else f"{res} ({f}) {m[op]['name']}")
     return ' · '.join(out) or None
 season_out, season_log = {}, []
+for disp, l in major_links.items():
+    if not l['confirmed']: season_log.append(f"{disp}: nothing applied — its link to {l['team']} is unconfirmed; curated lines in shared/season.ts are shown unchanged")
 for disp, tid in logo_map.items():
     cur = curated.get(disp, {})
     upd = {}
     for field, split in (('split1', 's1'), ('split2', 's2')):
         line, r = league_line(tid, split)
         if not line: continue
-        if split == 's1' and any(t.get('suggestedSuccessor', {}).get('team') == tid for t in teams.values()):
-            season_log.append(f"{disp} · {field}: left as curated (“{cur.get(field, '')}”) — which Split 1 team is its predecessor is not confirmed (see Needs your decision; the sheet's previous-name column gives {r['name']} {ORD(r['rank'])} ({r['w']}–{r['l']}))"); continue
+
         c = cur.get(field, '')
         if not c:
             upd[field] = line; season_log.append(f"{disp} · {field}: empty → “{line}” (verified standings{'' if r['name'] == teams[tid]['name'] else ', listed there as ' + r['name']})")

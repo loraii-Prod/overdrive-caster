@@ -18,7 +18,7 @@ check('standings / placements / Overpoints rows all imported', d.standings.lengt
 check('match ids are unique and stable (source code or content hash)', new Set(M.map(m => m.id)).size === M.length);
 check('every match belongs to a known tournament', M.every(m => d.tournaments.some((t: any) => t.id === m.tournament)));
 check('every team reference points at a team record', [...M.flatMap(m => [m.a.team, m.b.team]), ...d.standings.map((r: any) => r.team), ...d.overpoints.map((r: any) => r.team)].every(id => id === null || T.has(id)));
-check('only "BYE" is left without a team record', d.unresolvedNames.length === 1 && d.unresolvedNames[0] === 'BYE', d.unresolvedNames.join(','));
+check('only "BYE" and the ambiguous "Rex Regum Qeon" are left without a team record', JSON.stringify(d.unresolvedNames) === '["BYE","Rex Regum Qeon"]', d.unresolvedNames.join(','));
 check('3 regions: Oceasia, Americas, EMEA', JSON.stringify([...new Set(d.tournaments.map((t: any) => t.region).filter(Boolean))].sort()) === '["Americas","EMEA","Oceasia"]');
 check('the Major has dates and no invented matches', M.filter(m => m.tournament === 'od26-major').length === 0 && d.tournaments.find((t: any) => t.id === 'od26-major').dates.length === 2);
 // league tables recomputed from the match records = the sheet's standings
@@ -38,12 +38,19 @@ for (const tid of ['od26-s1-div1', 'od26-s1-div2', 'od26-s2-div1', 'od26-s2-div2
 check('Split 1 match records keep track scores (except the 3 the sheet marks "missing") and admins', M.filter(m => m.tournament.startsWith('od26-s1-div') && m.code).every(m => Array.isArray(m.tracks) || m.trackData === 'missing') && M.filter(m => m.trackData === 'missing').length === 3 && M.some(m => m.admin));
 // logos
 const used = MAJOR_TEAMS.map(t => t.name);
-check('every Major team has a team record and an existing logo file', used.every(n => d.majorDisplayNames[n] && T.get(d.majorDisplayNames[n]).logo && fs.existsSync('public' + T.get(d.majorDisplayNames[n]).logo)));
-check('COOK / FUT logos flagged as the OverDrive placeholder', T.get(d.majorDisplayNames['COOK']).logoIsPlaceholder === true && T.get(d.majorDisplayNames['FUT Esports']).logoIsPlaceholder === true);
+const MJ = d.majorTeams as Record<string, any>;
+check('every Major team listed with its logo file and a team candidate', used.every(n => MJ[n] && T.has(MJ[n].team) && fs.existsSync('public' + MJ[n].logoFile)));
+check('Major names that are not sheet team names stay unconfirmed (FUT Esports, Natus Vincere, All Gamers Global)', ['FUT Esports', 'Natus Vincere', 'All Gamers Global'].every(n => MJ[n].confirmed === false) && ['BIG', 'COOK', 'Airwalkers', 'Ragnarok', 'rnboi'].every(n => MJ[n].confirmed === true));
+check('unconfirmed links derive nothing: no logo on the team record, no season line', ['FUT Esports', 'Natus Vincere', 'All Gamers Global'].every(n => !T.get(MJ[n].team).logo && !SEASON_VERIFIED[n]));
+check('COOK / FUT logo files flagged as the OverDrive placeholder', MJ['COOK'].logoIsPlaceholder === true && MJ['FUT Esports'].logoIsPlaceholder === true && !MJ['BIG'].logoIsPlaceholder);
+check('logos tab imported as a dated registry (team_id, name, official SVG)', d.logoRegistry.length === lines('logos.csv') - 1 && d.logoRegistry.some((e: any) => e.team === 'TEAM_0005' && e.name === 'FUT Esports' && e.svg === 'FUT_Esport.svg' && e.date === '2026-04-03'));
+check('Split 1 FUT / NAVI kept as their own records with both pieces of evidence, unconfirmed', ['S1_FUT', 'S1_NAVI'].every(id => T.get(id).confirmed === false && T.get(id).possibleSameTeam.length === 2));
+check('ambiguous Split 1 "Rex Regum Qeon" left unlinked (TEAM_0023 vs TEAM_0073)', M.filter(m => m.tournament.startsWith('od26-s1') && [m.a.name, m.b.name].includes('Rex Regum Qeon')).every(m => (m.a.name === 'Rex Regum Qeon' ? m.a.team : m.b.team) === null) && M.filter(m => m.tournament === 'od26-s2-div2' && [m.a.name, m.b.name].includes('Rex Regum Qeon')).every(m => (m.a.name === 'Rex Regum Qeon' ? m.a.team : m.b.team) === 'TEAM_0023'));
+check('duplicate retired records kept as in the source (Loading, Shark)', ['TEAM_0016', 'TEAM_0098', 'TEAM_0070', 'TEAM_0101'].every(id => T.has(id)));
 // season lines
 check('seasonOf keeps curated lines and only adds verified fills/corrections', used.every(n => { const s = seasonOf(n)!; const c = SEASON[n], v = SEASON_VERIFIED[n] ?? {}; return (['split1', 'split2', 'wildcards', 'road'] as const).every(k => s[k] === (v[k] ?? c[k])); }));
 check('COOK Split 1 corrected to the verified 6th (4–5)', seasonOf('COOK')!.split1 === 'Div 1 · 6th in the league (4–5)');
-check('unconfirmed Split 1 predecessors are not touched (FUT Esports, Natus Vincere)', !SEASON_VERIFIED['FUT Esports']?.split1 && !SEASON_VERIFIED['Natus Vincere']?.split1);
+
 check('offline: the dataset is a static file of the build (no Google Sheets / Render URL needed at runtime)', !/docs\.google\.com\/spreadsheets\/d\/[^"]*gviz/.test(JSON.stringify(d)) && fs.existsSync('public/season/overdrive-2026.json'));
 console.log(`\n${ok} passed, ${bad} failed`);
 process.exit(bad ? 1 : 0);

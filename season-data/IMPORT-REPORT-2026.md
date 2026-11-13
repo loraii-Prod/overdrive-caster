@@ -84,19 +84,23 @@ Built by `scripts/season/import_season.py` into `public/season/overdrive-2026.js
 
 ## Name links made (evidence)
 
-- Major list name “All Gamers Global” → TEAM_0002 All Gamers (shared/season.ts: Split 1 "Div 1 · 3rd (8–1)" = All Gamers in the site standings)
-- Major list name “FUT Esports” → TEAM_0004 Weibo x FUT (shared/season.ts: Split 2 "Runner-up (Weibo x FUT)")
-- Major list name “Natus Vincere” → TEAM_0006 NAVI x Joel (shared/season.ts: Split 2 "Div 2 · Champions" = NAVI x Joel in the site standings)
+- “ALL GAMERS” → TEAM_0002 All Gamers (same name, different capitalisation)
 - “Aurora x SKUF” → TEAM_0022 Onyx (the sheet lists “Aurora x SKUF” as its previous name)
 - “EVOLUPEGG” → TEAM_0018 EvolupeGG (same name, different capitalisation)
 - “Eline Express” → TEAM_0048 eLine Express (same name, different capitalisation)
 - “F11” → TEAM_0073 Rex Regum Qeon (the sheet lists “F11” as its previous name)
 - “GENG X WEIBO” → TEAM_0004 Weibo x FUT (the sheet lists “GENG X WEIBO” as its previous name)
 - “GenG x Weibo” → TEAM_0004 Weibo x FUT (the sheet lists “GenG x Weibo” as its previous name)
+- “HALCYON” → TEAM_0019 Halcyon (same name, different capitalisation)
+- “LOADING” → TEAM_0016 Loading (same name, different capitalisation)
 - “Navi” → S1_NAVI NAVI (same name, different capitalisation)
 - “ORGLESS” → TEAM_0009 Airwalkers (the sheet lists “ORGLESS” as its previous name)
 - “Orgless” → TEAM_0009 Airwalkers (the sheet lists “Orgless” as its previous name)
+- “Pacb” → TEAM_0003 PACB (same name, different capitalisation)
+- “Piwo” → TEAM_0020 PIWO (same name, different capitalisation)
+- “RAGNAROK” → TEAM_0014 Ragnarok (same name, different capitalisation)
 - “Rex Regum Qeon” → TEAM_0023 BOMBO (the site sheet's own team_id on Split 2 rows; the record named “Rex Regum Qeon” is TEAM_0073)
+- “SHIFT” → TEAM_0011 ONIC x Josh (the sheet lists “SHIFT” as its previous name)
 - “TEAM HERETICS” → TEAM_0015 Grassboyz (the sheet lists “TEAM HERETICS” as its previous name)
 - “TEMPOBROS” → TEAM_0012 rnboi (the sheet lists “TEMPOBROS” as its previous name)
 - “TMWA Casual” → TEAM_0070 Shark (the sheet lists “TMWA Casual” as its previous name)
@@ -104,12 +108,14 @@ Built by `scripts/season/import_season.py` into `public/season/overdrive-2026.js
 - “Team Heretics” → TEAM_0015 Grassboyz (the sheet lists “Team Heretics” as its previous name)
 - “TempoBros” → TEAM_0012 rnboi (the sheet lists “TempoBros” as its previous name)
 - “VA BENE” → TEAM_0017 Va Bene (same name, different capitalisation)
+- “VP X NEON” → TEAM_0010 VP x Neon (same name, different capitalisation)
+- “VP X Neon” → TEAM_0010 VP x Neon (same name, different capitalisation)
 
 ## Names not linked to a team record (kept exactly as written)
 
-1 names, 12 occurrences. No team record has this name or lists it as a previous name. BYE is a bracket bye, not a team.
+2 names, 23 occurrences. No team record has this name or lists it as a previous name. BYE is a bracket bye, not a team.
 
-BYE (12)
+BYE (12), Rex Regum Qeon (11)
 
 ## Missing fields
 
@@ -123,9 +129,12 @@ BYE (12)
 
 ## Needs your decision
 
-- Split 1 “FUT” has no team record in the site sheet: stored as S1_FUT. Suggested successor TEAM_0004 (Nayko (Split 1 FUT roster) plays for Weibo x FUT) — not linked until you confirm.
-- Split 1 “NAVI” has no team record in the site sheet: stored as S1_NAVI. Suggested successor TEAM_0006 (mime (Split 1 Navi roster) plays for NAVI x Joel) — not linked until you confirm.
-- Split 1 Promotion “Rex Regum Qeon” (PRM03 vs Loading) is linked to TEAM_0023 BOMBO because the site sheet gives that name team_id TEAM_0023 on its Split 2 rows; TEAM_0073 is also named “Rex Regum Qeon” (retired, previously F11). Confirm.
+- Split 1 “FUT” is stored as S1_FUT, not linked to a current team. Evidence: TEAM_0005 (logos tab: named “FUT Esports” on 2026-04-03 (FUT_Esport.svg); later GenG x Legu → Team Nyxbar); TEAM_0004 (roster overlap: Nayko (Split 1 FUT) now plays for Weibo x FUT). The two pieces of evidence point to DIFFERENT teams.
+- Split 1 “NAVI” is stored as S1_NAVI, not linked to a current team. Evidence: TEAM_0006 (logos tab: named “NAVI” on 2026-04-03 (Navi.svg); later NAVI x Nemesis → Navi x Joel); TEAM_0006 (roster overlap: mime (Split 1 Navi) now plays for NAVI x Joel). Both point to the same team.
+- “Rex Regum Qeon” (Split 1 / spring events): ambiguous between TEAM_0073 (Rex Regum Qeon, retired) and TEAM_0023 (BOMBO, active) — left unlinked, name kept as written
+- Major list name “FUT Esports” is not a team name in the sheets. Likely TEAM_0004 Weibo x FUT (shared/season.ts: Split 2 "Runner-up (Weibo x FUT)") — left unconfirmed: no season data or logo is derived through it
+- Major list name “Natus Vincere” is not a team name in the sheets. Likely TEAM_0006 NAVI x Joel (shared/season.ts: Split 2 "Div 2 · Champions" = NAVI x Joel in the site standings) — left unconfirmed: no season data or logo is derived through it
+- Major list name “All Gamers Global” is not a team name in the sheets. Likely TEAM_0002 All Gamers (shared/season.ts: Split 1 "Div 1 · 3rd (8–1)" = All Gamers in the site standings) — left unconfirmed: no season data or logo is derived through it
 
 ## Conflicts
 
@@ -151,21 +160,19 @@ BYE (12)
 
 ## Season lines applied to the graphics (analyst desk “Head to head”, match intro roads)
 
-- FUT Esports · split1: left as curated (“Div 1 · 8th in the league (2–7)”) — which Split 1 team is its predecessor is not confirmed (see Needs your decision; the sheet's previous-name column gives GenG x Weibo 5th (5–4))
+- FUT Esports: nothing applied — its link to TEAM_0004 is unconfirmed; curated lines in shared/season.ts are shown unchanged
+- Natus Vincere: nothing applied — its link to TEAM_0006 is unconfirmed; curated lines in shared/season.ts are shown unchanged
+- All Gamers Global: nothing applied — its link to TEAM_0002 is unconfirmed; curated lines in shared/season.ts are shown unchanged
 - Airwalkers · split1: empty → “Div 1 · 7th in the league (3–6)” (verified standings, listed there as Orgless)
 - COOK · split1: “Div 1 · 5th in the league (4–4)” contradicts the verified standings → “Div 1 · 6th in the league (4–5)”
 - Ragnarok · split2: empty → “Div 1 · 10th in the league (0–5)” (verified standings)
 - rnboi · split1: empty → “Div 2 · 3rd in the league (7–2)” (verified standings, listed there as TempoBros)
 - rnboi · split2: empty → “Div 2 · 6th in the league (3–5)” (verified standings)
-- All Gamers Global · split2: empty → “Div 1 · 7th in the league (0–5)” (verified standings)
 
 ## Player showcase (shared/major.ts) vs verified rosters — not changed, for your review
 
 - BIG: showcase matches the verified roster
-- FUT Esports: showcase matches the verified roster
 - Airwalkers: showcase matches the verified roster
 - COOK: showcase matches the verified roster
 - Ragnarok: showcase matches the verified roster (roster also lists Evon, no profile)
-- Natus Vincere: showcase matches the verified roster
 - rnboi: showcase profiles Nabla, Walegen · verified roster (rnboi) Azion, NablaTM, Walegen
-- All Gamers Global: showcase matches the verified roster (roster also lists Alfadream, Otaaaq, no profile)

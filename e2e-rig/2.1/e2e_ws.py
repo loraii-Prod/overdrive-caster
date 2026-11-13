@@ -34,7 +34,11 @@ async def main():
         check("Inspector edit makes a draft (server)", gd()["draft"] and gd()["draft"]["panel"]=="h2h" and gd()["config"]["panel"]=="cams")
         check("operator B sees the DRAFT badge instantly", await Bc.locator("[data-gfx-row='analyst-desk'] >> text=DRAFT").count()==1)
         check("source still shows the published panel", await S.evaluate("document.querySelector('[data-desk-mode]')?.getAttribute('data-desk-mode')")=="cams")
-        await A.click("[data-view-toggle] >> text=Live"); await A.wait_for_timeout(300)
+        await A.click("[data-view-toggle] >> text=Live")
+        # The Draft panel leaves with its own exit animation (~320-350 ms, approved behaviour): wait for it to
+        # finish instead of sampling at a fixed 300 ms (that race made this check fail about half the time).
+        try: await A.wait_for_function("!document.querySelector('[data-preview] [data-desk-panel]')", timeout=2000)
+        except Exception: pass
         live_has_panel=await A.evaluate("!!document.querySelector('[data-preview] [data-desk-panel]')")
         await A.click("[data-view-toggle] >> text=Draft"); await A.wait_for_timeout(700)
         draft_has_panel=await A.evaluate("document.querySelector('[data-preview] [data-desk-panel]')?.getAttribute('data-desk-panel')")
