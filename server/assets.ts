@@ -39,8 +39,16 @@ export interface AssetRec {
   w?: number; h?: number; alpha?: boolean;
   created: number;
   status: 'approved' | 'draft';
-  /** false = waiting to be copied to storage (retried). */
+  /**
+   * Durability: 'stored' = the copy in the bucket exists and was verified; 'pending' = only on this server's disk,
+   * copy being retried; 'failed' = automatic retries exhausted (manual retry, still retried every 30 min); 'lost' =
+   * never reached storage and this disk no longer has it (a deploy wiped it): must be uploaded again;
+   * 'local' = storage is not configured on this server (lost on the next Render deploy).
+   */
+  state: 'stored' | 'pending' | 'failed' | 'lost' | 'local';
+  /** Back-compat (= state === 'stored'). */
   stored: boolean;
+  attempts?: number; nextTry?: number; lastError?: string;
 }
 export interface AssetReport {
   at: number;
@@ -59,7 +67,9 @@ export function sanitizeAssets(v: any): AssetsStore {
   d.list = v.list.filter((x: any) => x && typeof x.path === 'string' && /^\/(uploads|media|music)\//.test(x.path) && ROLES.includes(x.role)).slice(0, 5000).map((x: any) => ({
     id: String(x.id).slice(0, 40), role: x.role, ref: typeof x.ref === 'string' ? x.ref.slice(0, 60) : null, path: x.path.slice(0, 300), key: typeof x.key === 'string' ? x.key.slice(0, 200) : '',
     sha256: String(x.sha256 ?? '').slice(0, 64), size: Number(x.size) || 0, mime: String(x.mime ?? '').slice(0, 60),
-    ...(Number(x.w) ? { w: Number(x.w), h: Number(x.h), alpha: x.alpha === true } : {}), created: Number(x.created) || Date.now(), status: x.status === 'draft' ? 'draft' : 'approved', stored: x.stored === true,
+    ...(Number(x.w) ? { w: Number(x.w), h: Number(x.h), alpha: x.alpha === true } : {}), created: Number(x.created) || Date.now(), status: x.status === 'draft' ? 'draft' : 'approved',
+    state: ['stored', 'pending', 'failed', 'lost', 'local'].includes(x.state) ? x.state : x.stored === true ? 'stored' : 'pending', stored: x.state ? x.state === 'stored' : x.stored === true,
+    attempts: Number(x.attempts) || 0, nextTry: Number(x.nextTry) || 0, lastError: typeof x.lastError === 'string' ? x.lastError.slice(0, 160) : undefined,
   }));
   d.report = v.report && typeof v.report === 'object' ? v.report : null;
   return d;
@@ -83,14 +93,33 @@ const byPath = () => new Map(db.assets.list.map(a => [a.path, a]));
 const sha = (b: Buffer) => crypto.createHash('sha256').update(b).digest('hex');
 export const storageOn = () => !!s3;
 
+/** Storage health as seen by uploads and reads (for the status banners). */
+export const storageHealth = { ok: true, lastOk: 0, lastError: '' as string, lastErrorAt: 0 };
+const setState = (rec: AssetRec, st: AssetRec['state']) => { rec.state = st; rec.stored = st === 'stored'; };
+const MAX_AUTO = 8;
+const backoff = (n: number) => Math.min(15_000 * 2 ** Math.max(0, n - 1), 10 * 60_000);
+
+/**
+ * Copy to storage and verify it is there (HEAD: right size) before calling it stored. Never throws: a failure leaves
+ * the asset 'pending' with the next retry time; after MAX_AUTO attempts it becomes 'failed'.
+ */
 async function store(rec: AssetRec, b: Buffer) {
-  if (!s3) return;
+  if (!s3) { setState(rec, 'local'); return; }
+  rec.key = `assets/${rec.role === 'video' || rec.role === 'image' ? rec.role : rec.role}/${rec.sha256}.${rec.path.split('.').pop()?.toLowerCase().replace(/[^a-z0-9]/g, '') || 'bin'}`;
+  rec.attempts = (rec.attempts ?? 0) + 1;
   try {
-    rec.key = `assets/${rec.role}/${rec.sha256}.${rec.path.split('.').pop()?.toLowerCase().replace(/[^a-z0-9]/g, '') || 'bin'}`;
-    const exists = await s3.head(rec.key).catch(() => null);
-    if (!exists) await s3.put(rec.key, b, rec.mime, { path: encodeURIComponent(rec.path).slice(0, 500) });
-    rec.stored = true;
-  } catch (e: any) { rec.stored = false; console.error('[assets] storage upload failed (retrying):', rec.path, e.message); }
+    let head = await s3.head(rec.key);
+    if (!head) { await s3.put(rec.key, b, rec.mime, { path: encodeURIComponent(rec.path).slice(0, 500) }); head = await s3.head(rec.key); }
+    if (!head || head.size !== b.length) throw new Error(`verification failed (${head ? head.size : 'missing'} bytes in storage)`);
+    setState(rec, 'stored'); rec.lastError = undefined; rec.nextTry = 0;
+    storageHealth.ok = true; storageHealth.lastOk = Date.now();
+  } catch (e: any) {
+    rec.lastError = String(e?.message ?? e).slice(0, 160);
+    setState(rec, rec.attempts >= MAX_AUTO ? 'failed' : 'pending');
+    rec.nextTry = Date.now() + (rec.state === 'failed' ? 30 * 60_000 : backoff(rec.attempts));
+    storageHealth.ok = false; storageHealth.lastError = rec.lastError; storageHealth.lastErrorAt = Date.now();
+    console.error(`[assets] storage copy failed (${rec.state}, attempt ${rec.attempts}):`, rec.path, rec.lastError);
+  }
 }
 
 /**
@@ -101,8 +130,10 @@ export async function register(pathname: string, b: Buffer, role: AssetRole, ref
   const t = sniff(b), info = t?.kind === 'image' ? imageInfo(b, t.mime) : null;
   const prev = db.assets.list.find(a => a.path === pathname);
   const rec: AssetRec = { id: prev?.id ?? crypto.randomBytes(6).toString('base64url'), role: prev?.role ?? role, ref: ref ?? prev?.ref ?? null, path: pathname, key: '', sha256: sha(b), size: b.length,
-    mime: t?.mime ?? 'application/octet-stream', ...(info ? info : {}), created: Date.now(), status, stored: !s3 };
+    mime: t?.mime ?? 'application/octet-stream', ...(info ? info : {}), created: Date.now(), status, state: 'pending', stored: false, attempts: 0 };
+  // One quick second try for a blip; after that the copy is retried in the background with backoff.
   await store(rec, b);
+  if (rec.state === 'pending') { rec.attempts = 1; await new Promise(r => setTimeout(r, 800)); await store(rec, b); }
   db.assets.list = [...db.assets.list.filter(a => a.path !== pathname), rec];
   save();
   return rec;
@@ -123,14 +154,31 @@ export function tag(pathname: string, role: AssetRole, ref: string | null) {
 /** Registered addresses under a prefix (listing media / music after a deploy wiped the disk). */
 export const registered = (prefix: string) => db.assets.list.filter(a => a.path.startsWith(prefix));
 
-// Retry copies that failed (storage was down).
-setInterval(async () => {
-  if (!s3) return;
-  for (const rec of db.assets.list.filter(a => !a.stored).slice(0, 5)) {
+/** Background retry of copies that have not reached storage. An asset whose local file is gone can never be copied. */
+export async function retryPending(force = false): Promise<{ tried: number; stored: number }> {
+  let tried = 0, ok = 0;
+  if (!s3) return { tried, stored: ok };
+  for (const rec of db.assets.list.filter(a => a.state === 'pending' || a.state === 'failed')) {
+    if (!force && (rec.nextTry ?? 0) > Date.now()) continue;
     const f = localOf(rec.path);
-    if (f && fs.existsSync(f)) { await store(rec, fs.readFileSync(f)); save(); }
+    if (!f || !fs.existsSync(f)) { setState(rec, 'lost'); rec.lastError = 'The file was only on this server and is gone (deploy/restart): upload it again'; continue; }
+    const b = fs.readFileSync(f);
+    if (sha(b) !== rec.sha256) { setState(rec, 'lost'); rec.lastError = 'The local file changed: upload it again'; continue; }
+    if (force) rec.attempts = 0;
+    tried++; await store(rec, b); if (rec.state === 'stored') ok++;
+    if (tried >= 10) break;
   }
-}, 30_000).unref();
+  if (tried) save();
+  return { tried, stored: ok };
+}
+setInterval(() => { retryPending().catch(() => {}); }, 15_000).unref();
+
+/** Counts for the status banners (Producer, Controller, Admin, Studio). */
+export function durability() {
+  const c = { stored: 0, pending: 0, failed: 0, lost: 0, local: 0 };
+  for (const a of db.assets.list) c[a.state]++;
+  return { storage: s3 ? 'r2' : 'local', ...c, health: storageHealth, attention: db.assets.list.filter(a => a.state !== 'stored' && a.state !== 'local').slice(0, 20).map(a => ({ path: a.path, role: a.role, ref: a.ref, state: a.state, lastError: a.lastError, nextTry: a.nextTry })) };
+}
 
 // ---------------------------------------------------------------- delivery
 
@@ -145,22 +193,49 @@ export function fromStorage(prefix: '/uploads' | '/media' | '/music') {
     const p = prefix + req.path;
     const rec = byPath().get(p) ?? byPath().get(prefix + encodeURI(decodeURIComponent(req.path)));
     if (!rec || (rec.status === 'draft' && !isAdmin(req))) return res.status(404).end();
-    if (!s3 || !rec.key || !rec.stored) return res.status(404).end();
+    if (!s3 || !rec.key || rec.state !== 'stored') return res.status(404).end();
+    const f = localOf(rec.path);
     try {
       if (rec.mime.startsWith('image/')) {
         const b = await s3.getBuffer(rec.key);
         if (!b || sha(b) !== rec.sha256) return res.status(502).end();
-        const f = localOf(rec.path);
         if (f) { fs.mkdirSync(path.dirname(f), { recursive: true }); fs.writeFileSync(f + '.tmp', b); fs.renameSync(f + '.tmp', f); }
         res.setHeader('Content-Type', rec.mime);
         res.setHeader('Cache-Control', prefix === '/uploads' ? 'public, max-age=31536000, immutable' : 'public, max-age=3600');
         if (rec.mime === 'image/svg+xml') res.setHeader('Content-Security-Policy', "default-src 'none'; img-src 'self' data:; style-src 'unsafe-inline'; sandbox");
+        storageHealth.ok = true; storageHealth.lastOk = Date.now();
         return res.end(req.method === 'HEAD' ? undefined : b);
       }
-      res.setHeader('Cache-Control', 'no-store');
-      res.redirect(302, await s3.presign(rec.key, 3600));
-    } catch (e: any) { console.error('[assets] storage read failed:', rec.path, e.message); res.status(503).end(); }
+      // Video / audio: streamed by this server with byte ranges (seek, loop, resume), never an expiring link, so a
+      // looping OBS media source works for hours. The whole file is cached to disk in the background; from then on
+      // express.static serves it (and it keeps playing if storage goes away).
+      if (f) cacheInBackground(rec, f);
+      const range = typeof req.headers.range === 'string' && /^bytes=\d*-\d*$/.test(req.headers.range) ? req.headers.range : undefined;
+      const r = await s3.get(rec.key, range);
+      if (!r) return res.status(404).end();
+      res.status(r.status === 206 ? 206 : 200);
+      for (const h of ['content-length', 'content-range', 'accept-ranges', 'etag', 'last-modified']) { const v = r.headers.get(h); if (v) res.setHeader(h, v); }
+      res.setHeader('Content-Type', rec.mime); res.setHeader('Accept-Ranges', 'bytes'); res.setHeader('Cache-Control', 'public, max-age=3600');
+      res.setHeader('Content-Security-Policy', "default-src 'none'; sandbox");
+      storageHealth.ok = true; storageHealth.lastOk = Date.now();
+      if (req.method === 'HEAD' || !r.body) { res.end(); return; }
+      const { Readable } = await import('node:stream');
+      Readable.fromWeb(r.body as any).on('error', () => res.destroy()).pipe(res);
+    } catch (e: any) {
+      storageHealth.ok = false; storageHealth.lastError = String(e.message); storageHealth.lastErrorAt = Date.now();
+      console.error('[assets] storage read failed:', rec.path, e.message); res.status(503).end();
+    }
   };
+}
+const caching = new Set<string>();
+function cacheInBackground(rec: AssetRec, f: string) {
+  if (caching.has(rec.path) || fs.existsSync(f)) return;
+  caching.add(rec.path);
+  (async () => {
+    const b = await s3!.getBuffer(rec.key);
+    if (!b || sha(b) !== rec.sha256) throw new Error('checksum mismatch');
+    fs.mkdirSync(path.dirname(f), { recursive: true }); fs.writeFileSync(f + '.tmp', b); fs.renameSync(f + '.tmp', f);
+  })().catch(e => console.error('[assets] cache fill failed:', rec.path, e.message)).finally(() => caching.delete(rec.path));
 }
 
 /** Image metadata graphics use for framing (no keys, no drafts). */
@@ -202,20 +277,27 @@ function references(): { where: string; url: string }[] {
  */
 export async function migrate(): Promise<AssetReport> {
   const rep: AssetReport = { at: Date.now(), storage: s3 ? 'r2' : 'local', scanned: 0, registered: 0, uploaded: 0, already: 0, failed: [], references: [], unmatched: [] };
+  // Uploads that never reached storage and whose file this disk no longer has (wiped by a deploy) are lost:
+  // say so at once instead of waiting for the next retry.
+  for (const rec of db.assets.list) {
+    if (rec.state !== 'pending' && rec.state !== 'failed') continue;
+    const f = localOf(rec.path);
+    if (!f || !fs.existsSync(f)) { setState(rec, 'lost'); rec.lastError = 'The file was only on this server and is gone (deploy/restart): upload it again'; }
+  }
   const have = byPath();
   for (const [dir, abs] of Object.entries(LOCAL)) {
     for (const rel of walk(abs)) {
       rep.scanned++;
       const pub = `/${dir}/${rel.split(path.sep).map(encodeURIComponent).join('/')}`;
       const prev = have.get(pub);
-      if (prev?.stored) { rep.already++; continue; }
+      if (prev?.state === 'stored') { rep.already++; continue; }
       try {
         const b = fs.readFileSync(path.join(abs, rel));
         const t = sniff(b);
         if (!t) { rep.failed.push({ path: pub, error: 'unknown file type, not registered' }); continue; }
         const role: AssetRole = dir === 'music' ? 'music' : dir === 'media' ? 'media' : t.kind === 'video' ? 'video' : 'image';
         const rec = await register(pub, b, prev?.role ?? role, prev?.ref ?? (dir === 'music' ? rel.split(path.sep)[0] : null));
-        rep.registered++; if (s3 && rec.stored) rep.uploaded++; if (s3 && !rec.stored) rep.failed.push({ path: pub, error: 'storage upload failed (will retry)' });
+        rep.registered++; if (rec.state === 'stored') rep.uploaded++; if (s3 && rec.state !== 'stored') rep.failed.push({ path: pub, error: `not in storage yet (${rec.state}): ${rec.lastError ?? ''}` });
       } catch (e: any) { rep.failed.push({ path: pub, error: String(e.message) }); }
     }
   }
@@ -267,6 +349,14 @@ export function assetsApi() {
   r.post('/api/assets/migrate', async (req, res) => {
     if (!isAdmin(req)) return res.status(401).json({ error: 'sign in' });
     res.json({ ok: true, report: await migrate() });
+  });
+  r.get('/api/assets/health', (req, res) => {
+    if (!isAdmin(req)) return res.status(401).json({ error: 'sign in' });
+    res.setHeader('Cache-Control', 'no-store'); res.json(durability());
+  });
+  r.post('/api/assets/retry', async (req, res) => {
+    if (!isAdmin(req)) return res.status(401).json({ error: 'sign in' });
+    const out = await retryPending(true); res.json({ ok: true, ...out, ...durability() });
   });
   r.post('/api/assets/status', express.json(), (req, res) => {
     if (!isAdmin(req)) return res.status(401).json({ error: 'sign in' });

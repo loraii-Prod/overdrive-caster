@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { StorageBanner, uploadWarning } from '../../components/StorageBanner';
 import { Logo } from '../../components/Brand';
 import { ScaledCanvas } from '../../components/Stage';
 import { BracketView, MatchesBoard } from '../../components/show/Bracket';
@@ -12,6 +13,7 @@ export async function uploadImage(file: File): Promise<string> {
   const r = await fetch('/api/upload', { method: 'POST', headers: { 'Content-Type': file.type }, body: file });
   const j = await r.json().catch(() => ({}));
   if (!r.ok) throw new Error(j.error ?? 'Upload failed');
+  if (uploadWarning(j)) console.warn(uploadWarning(j)); // the storage banner shows it on screen
   return j.url;
 }
 
@@ -47,6 +49,7 @@ export function Admin({ role, onLogout }: { role: 'producer' | 'admin'; onLogout
 
   return (
     <ThemeProvider theme={live?.show.theme ?? 'bnl'} brand={live?.show.brand ?? null}>
+      <StorageBanner />
     <div className="min-h-screen bg-[#101010] text-white" data-theme-ui={live?.show.theme ?? 'bnl'}>
       <header className="sticky top-0 z-20 flex h-16 items-center gap-5 border-b border-white/[0.07] bg-[#101010]/95 px-6 backdrop-blur">
         <Logo height={36} />

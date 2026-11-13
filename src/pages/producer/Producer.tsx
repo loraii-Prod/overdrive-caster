@@ -10,6 +10,7 @@
  *     STUDIO         Library · Studio tabs (packages, instances & OBS, talent, bindings, modules, assets, show) · Publish …
  * Selecting anything only changes this workspace: it never airs, never switches OBS, never animates.
  */
+import { StorageBanner } from '../../components/StorageBanner';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import type { CasterId, ControllerState, ScreenId } from '../../../shared/types';
 import { applyDraft, draftLabel, type EngineState, type ProducerCmd } from '../../../shared/engine';
@@ -222,6 +223,7 @@ export function Producer({ onLogout, dock }: { onLogout: () => void; dock?: stri
 
   return (
     <div className="fixed inset-0 overflow-hidden" style={{ background: '#000' }}>
+      {!dock && <StorageBanner />}
       <div data-console-canvas className="absolute origin-top-left overflow-hidden font-['Inter'] text-white antialiased" style={{ width: W, height: H, left: fit.x, top: fit.y, transform: `scale(${fit.s})`, background: C.bg }}>
         {/* ===== 1920×1080: the selected graphic, exactly as its source renders it (nothing painted over it) ===== */}
         <div className="absolute left-0 top-0 overflow-hidden" style={{ width: 1920, height: 1080, background: 'repeating-conic-gradient(#151517 0% 25%, #101012 0% 50%) 50% / 40px 40px' }} data-preview={gInst ? `g:${gInst.id}` : src.id} data-preview-view={view}>

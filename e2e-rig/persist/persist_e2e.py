@@ -3,7 +3,7 @@ storage bucket, snapshots restore, validation, private delivery, outages. Uses t
 S3-compatible stand-in for R2 (s3rver, e2e-rig/persist/s3mock.mjs). Not real Cloudflare R2.
     python3 e2e-rig/persist/persist_e2e.py
 """
-import io, json, os, shutil, signal, struct, subprocess, sys, time, urllib.error, urllib.request, zlib
+import io, json, os, urllib.parse, shutil, signal, struct, subprocess, sys, time, urllib.error, urllib.request, zlib
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 B = 'http://localhost:8787'; D = '/tmp/oddata-persist'; S3DIR = '/tmp/s3mock-persist'
 DB = 'postgres://vote@127.0.0.1:5433/odstate'
@@ -123,11 +123,12 @@ def main():
     h = Http(); h.login()
     items = json.loads(h.req('GET', '/api/media')[1])['items']
     check('deploy: media library still lists the reel', any(i['url'] == media_url for i in items), items)
+    c, b, hd = anon.req('GET', media_url, None, {'Range': 'bytes=100-199'})
+    check('deploy: video streamed by the server with byte ranges (no expiring link, bucket private)', c == 206 and b == mp4[100:200] and 'location' not in {k.lower() for k in hd} and {k.lower(): v for k, v in hd.items()}.get('content-range', '').startswith('bytes 100-199/'), (c, len(b), hd))
     c, b, hd = anon.req('GET', media_url)
-    loc = hd.get('Location', '')
-    check('deploy: video answered with a short-lived signed storage address (bucket stays private)', c == 302 and 'X-Amz-Signature' in loc and 'X-Amz-Expires=3600' in loc, (c, loc[:80]))
-    got = urllib.request.urlopen(loc).read() if loc else b''
-    check('…which streams the exact uploaded bytes', got == mp4)
+    check('…full file = the exact uploaded bytes', c == 200 and b == mp4, (c, len(b)))
+    time.sleep(1.5)
+    check('…and cached to disk in the background (keeps playing if storage goes away)', os.path.exists(f"{D}/media/{urllib.parse.unquote(media_url.split('/')[-1])}"))
     secs = json.loads(urllib.request.urlopen(B + '/api/music').read())['sections']
     check('deploy: music section still lists the bed', any('Desk bed' in t['name'] for t in secs['analysis']), secs['analysis'])
     check('unknown asset address: 404, nothing proxied', anon.req('GET', '/uploads/does-not-exist.png')[0] == 404)
@@ -171,10 +172,28 @@ def main():
     h = Http(); h.login()
     c, b, _ = h.req('POST', '/api/upload?role=logo', png(256, 256), {'content-type': 'image/png'})
     j = json.loads(b) if c == 200 else {}
-    check('storage down: upload still works (kept locally, queued)', c == 200 and j.get('stored') is False, (c, b[:100]))
-    s3(True); time.sleep(33)
+    check('storage down: upload accepted but reported NOT durable (pending, with a warning)', c == 200 and j.get('durable') is False and j.get('state') == 'pending' and 'NOT yet in durable storage' in j.get('warning', ''), (c, b[:200]))
+    hl = json.loads(h.req('GET', '/api/assets/health')[1])
+    check('storage down: health shows it pending + the storage error (banner)', hl['pending'] >= 1 and hl['health']['ok'] is False, hl)
+    c, b, _ = h.req('POST', '/api/upload?role=logo', png(128, 128), {'content-type': 'image/png'})
+    lost_url = json.loads(b)['url']
+    s3(True); time.sleep(50)
     reg = json.loads(h.req('GET', '/api/assets')[1])
-    check('storage back: the queued upload is copied automatically', next(a for a in reg['assets'] if a['path'] == j.get('url'))['stored'] is True)
+    check('storage back: queued uploads copied automatically (backoff retry), now durable', all(next(a for a in reg['assets'] if a['path'] == u)['state'] == 'stored' for u in (j.get('url'), lost_url)))
+    # lost: storage down, upload, then a deploy before it could be stored
+    s3(False)
+    c, b, _ = h.req('POST', '/api/upload?role=logo', png(96, 96), {'content-type': 'image/png'})
+    gone = json.loads(b)['url']
+    stop(); shutil.rmtree(f'{D}/uploads'); start()
+    time.sleep(17)
+    h = Http(); h.login()
+    hl = json.loads(h.req('GET', '/api/assets/health')[1])
+    rec = next((a for a in hl['attention'] if a['path'] == gone), None)
+    check('deploy before storage came back: the upload is marked LOST (never shown as saved)', rec and rec['state'] == 'lost' and 'upload it again' in (rec.get('lastError') or ''), hl)
+    check('…and its address answers 404, not a broken image', Http().req('GET', gone)[0] == 404)
+    s3(True)
+    c, b, _ = h.req('POST', '/api/assets/retry')
+    check('manual retry: answered, lost stays lost (needs a new upload)', c == 200 and json.loads(b)['lost'] >= 1)
     stop(); start(STATE_DATABASE_URL='postgres://vote@127.0.0.1:5999/none')
     pr = json.loads(Http().req('GET', '/api/health')[1])
     h = Http(); h.login()
@@ -184,7 +203,8 @@ def main():
     stop(); s3(False)
     print(f'\n{ok} passed, {bad} failed'); sys.exit(1 if bad else 0)
 
-try: main()
-finally:
-    stop()
-    for k in list(procs): procs.pop(k).terminate()
+if __name__ == '__main__':
+    try: main()
+    finally:
+        stop()
+        for k in list(procs): procs.pop(k).terminate()

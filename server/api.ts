@@ -13,7 +13,15 @@ import type { ClientMsg } from '../shared/protocol';
 import type { LayoutMode, Scene, ScreenId } from '../shared/types';
 import { resolve, upcoming, results, champion, isTeam, type TournamentOp } from '../shared/tournament';
 import { isWcId } from '../shared/wildcard';
-import { fromStorage, register, registered, unregister, validate, type AssetRole } from './assets';
+import { fromStorage, register, registered, unregister, validate, type AssetRec, type AssetRole } from './assets';
+
+/** What an upload screen must tell the producer: saved durably, or only on this server for now. */
+const durableNote = (rec: AssetRec) => ({
+  stored: rec.state === 'stored', durable: rec.state === 'stored', state: rec.state,
+  ...(rec.state === 'stored' ? {} : { warning: rec.state === 'local'
+    ? 'Saved on this server only: durable storage is not configured, so this file is lost on the next deploy.'
+    : `Saved on this server only, NOT yet in durable storage (${rec.lastError ?? 'storage unavailable'}). Retrying automatically; it is lost if the server is redeployed before it is stored.` }),
+});
 
 interface Api { engine: (cmd: ProducerCmd, source?: 'manual' | 'auto') => Promise<{ ok: boolean; version: number; error?: string; note?: string }>; act: (m: ClientMsg) => void; tournamentOp: (op: TournamentOp) => void; spectate: (name: string, login: string) => void; state: () => unknown }
 
@@ -236,7 +244,7 @@ export function uploads() {
     fs.writeFileSync(path.join(dir, name), req.body);
     const ref = typeof req.query.ref === 'string' ? req.query.ref.slice(0, 60) : null;
     const rec = await register(`/uploads/${name}`, req.body, v.kind === 'video' ? 'video' : role, ref);
-    res.json({ url: `/uploads/${name}`, stored: rec.stored, w: rec.w, h: rec.h, alpha: rec.alpha });
+    res.json({ url: `/uploads/${name}`, ...durableNote(rec), w: rec.w, h: rec.h, alpha: rec.alpha });
   });
   r.use('/uploads', express.static(dir, {
     maxAge: '365d',
@@ -289,8 +297,8 @@ export function music() {
     const name = `${crypto.randomBytes(4).toString('base64url').replace(/[^A-Za-z0-9]/g, 'x').slice(0, 6).padEnd(6, 'x')}_${base}.${ext}`;
     ensure(rootOf()); // a new event's folders may not exist yet
     fs.writeFileSync(path.join(rootOf(), s, name), req.body);
-    await register(`${prefix()}/${s}/${encodeURIComponent(name)}`, req.body, 'music', s);
-    res.json({ sections: list() });
+    const rec = await register(`${prefix()}/${s}/${encodeURIComponent(name)}`, req.body, 'music', s);
+    res.json({ sections: list(), ...durableNote(rec) });
   });
   r.delete('/api/music/:section/:file', (req, res) => {
     if (!isAuthed(req)) return res.status(401).json({ error: 'not signed in' });
@@ -328,8 +336,8 @@ export function media() {
     if ('error' in v) return res.status(v.error.includes('up to') ? 413 : 400).json({ error: v.error });
     const name = `${crypto.randomBytes(4).toString('base64url').slice(0, 6)}_${raw}`;
     fs.writeFileSync(path.join(dir, name), req.body);
-    await register(`/media/${encodeURIComponent(name)}`, req.body, 'media');
-    res.json({ ok: true, items: list() });
+    const rec = await register(`/media/${encodeURIComponent(name)}`, req.body, 'media');
+    res.json({ ok: true, items: list(), ...durableNote(rec) });
   });
   r.delete('/api/media/:file', (req, res) => {
     if (!isAuthed(req)) return res.status(401).json({ error: 'sign in' });

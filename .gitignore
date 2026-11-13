@@ -3,3 +3,4 @@ dist
 data
 .env
 settings.bat
+__pycache__/

@@ -10,7 +10,7 @@ import type { WildcardState, WcOp } from '../../../shared/wildcard';
 import { Btn, PVW, WARN } from './modules';
 import { LABEL } from './ws';
 
-interface Asset { id: string; role: string; ref: string | null; path: string; size: number; mime: string; w?: number; h?: number; alpha?: boolean; status: string; stored: boolean; created: number }
+interface Asset { id: string; role: string; ref: string | null; path: string; size: number; mime: string; w?: number; h?: number; alpha?: boolean; status: string; stored: boolean; state?: string; lastError?: string; created: number }
 interface Report { at: number; storage: string; scanned: number; registered: number; uploaded: number; already: number; failed: { path: string; error: string }[]; references: { where: string; url: string; ok: boolean }[]; unmatched: { where: string; key: string; note: string }[] }
 
 const kb = (n: number) => (n > 1 << 20 ? `${(n / (1 << 20)).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`);
@@ -30,6 +30,7 @@ export function AssetLibrary({ wc, wcOp }: { wc: WildcardState; wcOp: (op: WcOp)
       const j = await r.json().catch(() => ({}));
       if (!r.ok || !j.url) throw new Error(j.error ?? `Upload failed (${r.status})`);
       wcOp({ k: 'photo', player: handle, url: j.url }); // the existing association (nickname key), linked to the id
+      if (j.durable === false) setErr(`${handle}: ${j.warning}`);
       await load();
     } catch (e: any) { setErr(`${handle}: ${e.message ?? e}`); } finally { setBusy(''); }
   };
@@ -54,7 +55,7 @@ export function AssetLibrary({ wc, wcOp }: { wc: WildcardState; wcOp: (op: WcOp)
                 </div>
                 <div className="font-bold">{p.handle} <span className="font-normal text-white/40">{p.team}</span></div>
                 <div className="font-mono text-[10.5px] text-white/45">{id}{isProvisional(id) ? ' · provisional' : ''}</div>
-                {a && <div className="text-[10.5px]" style={{ color: low ? WARN : 'rgba(255,255,255,.5)' }}>{a.w}×{a.h}{a.alpha ? ' · transparent' : ''} · {kb(a.size)}{a.stored ? '' : ' · not in storage yet'}{low ? ' · low resolution' : ''}</div>}
+                {a && <div className="text-[10.5px]" style={{ color: low ? WARN : 'rgba(255,255,255,.5)' }}>{a.w}×{a.h}{a.alpha ? ' · transparent' : ''} · {kb(a.size)}{a.state && a.state !== 'stored' ? ` · ${a.state === 'local' ? 'this server only' : a.state.toUpperCase()}` : ''}{low ? ' · low resolution' : ''}</div>}
                 <label className="mt-1 inline-block cursor-pointer rounded-[2px] border border-white/15 px-2 py-0.5 text-[11px] hover:border-white/40">{busy === p.handle ? 'Uploading…' : url ? 'Replace' : 'Upload'}
                   <input type="file" accept="image/png,image/webp,image/jpeg" className="hidden" onChange={e => upload(p.handle, e.target.files?.[0])} /></label>
               </div>
@@ -68,7 +69,7 @@ export function AssetLibrary({ wc, wcOp }: { wc: WildcardState; wcOp: (op: WcOp)
           {(d?.assets ?? []).slice().sort((x, y) => y.created - x.created).map(a => (
             <div key={a.path} className="flex gap-2 border-b border-white/[0.06] px-2 py-0.5 font-mono text-[11px]">
               <span className="w-[70px] text-white/60">{a.role}</span><span className="w-[90px] truncate">{a.ref ?? ''}</span><span className="flex-1 truncate">{a.path}</span>
-              <span className="w-[70px] text-right">{kb(a.size)}</span><span className="w-[70px]" style={{ color: a.stored ? PVW : WARN }}>{a.stored ? 'stored' : 'queued'}</span><span className="w-[60px]">{a.status}</span>
+              <span className="w-[70px] text-right">{kb(a.size)}</span><span className="w-[70px]" title={a.lastError} style={{ color: a.state === 'stored' ? PVW : WARN }}>{a.state ?? (a.stored ? 'stored' : 'pending')}</span><span className="w-[60px]">{a.status}</span>
             </div>
           ))}
         </div>

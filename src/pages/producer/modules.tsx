@@ -16,6 +16,7 @@ import { SEAT_LABELS, talentLabel, type Seat } from '../../../shared/talent';
 import { mediaName, type MediaState } from '../../../shared/media';
 import { sectionFor, DEFAULT_LEVELS } from '../../../shared/music';
 import { MvpModule, PickemsModule, QrModule } from './audienceModules';
+import { uploadWarning } from '../../components/StorageBanner';
 
 export const PGM = '#e5484d', PVW = '#2fbf71', WARN = '#f5a524';
 export type Ack = { ok: boolean; error?: string; note?: string; version: number };
@@ -256,7 +257,7 @@ function MediaModule({ x }: { x: Ctx }) {
   const upload = async (f: File) => {
     setErr('');
     const r = await fetch('/api/media', { method: 'POST', headers: { 'X-Filename': encodeURIComponent(f.name) }, body: f });
-    if (!r.ok) setErr((await r.json().catch(() => ({}))).error ?? `Upload failed (${r.status})`); else setLib((await r.json()).items);
+    if (!r.ok) setErr((await r.json().catch(() => ({}))).error ?? `Upload failed (${r.status})`); else { const j = await r.json(); setLib(j.items); setErr(uploadWarning(j)); }
   };
   const pos = m && m.status === 'playing' && m.startedAt ? (x.now - m.startedAt) / 1000 : m ? m.pausedMs / 1000 : 0;
   const fmt = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;

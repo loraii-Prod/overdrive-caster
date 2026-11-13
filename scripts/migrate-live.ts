@@ -56,7 +56,7 @@ for (const [url, r] of refs) {
     const role = r.role === 'image' && t.kind === 'video' ? 'video' : r.role, key = `assets/${role}/${h}.${ext}`;
     const info = t.kind === 'image' ? imageInfo(b, t.mime) : null;
     if (!dry) { if (!(await s3!.head(key))) await s3!.put(key, b, t.mime, { path: encodeURIComponent(url).slice(0, 500) }); }
-    assets.push({ id: crypto.randomBytes(6).toString('base64url'), role, ref: r.ref, path: url, key, sha256: h, size: b.length, mime: t.mime, ...(info ?? {}), created: Date.now(), status: 'approved', stored: !dry });
+    assets.push({ id: crypto.randomBytes(6).toString('base64url'), role, ref: r.ref, path: url, key, sha256: h, size: b.length, mime: t.mime, ...(info ?? {}), created: Date.now(), status: 'approved', state: dry ? 'pending' : 'stored', stored: !dry });
     lines.push(`| ${r.where} | \`${url}\` | ${role}${r.ref ? ` → ${r.ref}` : ''} | ${(b.length / 1024).toFixed(0)} KB${info ? ` · ${info.w}×${info.h}${info.alpha ? ' · transparent' : ''}` : ''} |`);
   } catch (e: any) { failed.push(`${url} (${r.where}): ${e.message}`); }
 }

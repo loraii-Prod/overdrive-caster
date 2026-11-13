@@ -86,7 +86,7 @@ async def main():
         br = await p.chromium.launch(executable_path='/usr/bin/google-chrome', args=['--autoplay-policy=no-user-gesture-required'])
         prod = await br.new_page(); await prod.request.post(B + '/api/login', data={'password': 'testpw'}); await prod.goto(B + '/api/session')
         g = await upload(prod, '/tmp/portraits/cutout.png', 'image/png'); m = await upload(prod, '/tmp/portraits/framed.jpg', 'image/jpeg')
-        check('test portraits uploaded to storage (transparent cut-out + rectangular photo)', g.get('stored') and g.get('alpha') and m.get('stored') and not m.get('alpha'), (g, m))
+        check('test portraits uploaded to storage (transparent cut-out + rectangular photo)', g.get('durable') and g.get('alpha') and m.get('durable') and not m.get('alpha'), (g, m))
         wcop({'k': 'photo', 'player': 'GranaDy', 'url': g['url']}); wcop({'k': 'photo', 'player': 'Massa', 'url': m['url']})
         await asyncio.sleep(3)
         err = await ws_op(prod, {'k': 'mvp-prepare', 'match': 'R1_UB1', 'players': ['Massa', 'GranaDy', 'Heav', 'Nayko']})

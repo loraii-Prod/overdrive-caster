@@ -1,4 +1,5 @@
 import { playerIdOf } from '../../../shared/playerIds';
+import { uploadWarning } from '../../components/StorageBanner';
 import { useEffect, useState, type ReactNode } from 'react';
 import type { ClientMsg, QuickOp } from '../../../shared/protocol';
 import type { Caster, Show } from '../../../shared/types';
@@ -309,6 +310,7 @@ function MapsCard({ s, op }: { s: WildcardState; op: (o: WcOp) => void }) {
       const j = await r.json().catch(() => ({}));
       if (!r.ok || !j.url) throw new Error(j.error ?? `Upload failed (${r.status})`);
       op({ k: 'map-photo', id, url: j.url });
+      if (uploadWarning(j)) setErr(`${id}: ${uploadWarning(j)}`);
     } catch (e: any) { setErr(`${id}: ${e.message ?? e}`); }
     finally { setBusy(null); }
   };
@@ -350,6 +352,7 @@ function ShowcaseCard({ s, op, now }: { s: WildcardState; op: (o: WcOp) => void;
       const j = await r.json().catch(() => ({}));
       if (!r.ok || !j.url) throw new Error(j.error ?? `Upload failed (${r.status})`);
       op({ k: 'photo', player: handle, url: j.url });
+      if (uploadWarning(j)) setErr(`${handle}: ${uploadWarning(j)}`);
     } catch (e: any) { setErr(`${handle}: ${e.message ?? e}`); }
     finally { setBusy(null); }
   };

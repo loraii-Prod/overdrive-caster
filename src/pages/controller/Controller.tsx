@@ -1,4 +1,5 @@
 import type { TransitionKind } from '../../../shared/engine';
+import { StorageBanner } from '../../components/StorageBanner';
 import { GameFeedSettingsCard } from './GameFeedSettings';
 import { boothScene } from '../../components/wildcard/Desk';
 import { BoothPicker, DeskPicker, InterviewControls } from './Talent';
@@ -230,6 +231,7 @@ export function Controller({ onLogout, dockOnly = false, dockAll = false }: { on
 
   return (
     <div className="flex h-screen flex-col bg-[#101010] text-white">
+      {!dockOnly && <StorageBanner />}
       {/* Top bar */}
       <header className="flex h-16 flex-none items-center gap-5 border-b border-white/[0.07] px-5">
         <ThemeProvider theme={st.showLive.theme} brand={st.showLive.brand}><div data-theme={st.showLive.theme}><Logo height={st.showLive.theme === 'bnl' ? 40 : 34} /></div></ThemeProvider>
