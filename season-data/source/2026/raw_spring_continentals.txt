@@ -1,0 +1,91 @@
+Continental EMEA Swiss Stage|Brothers|WINGS|16.05.2026|2|0
+Continental EMEA Swiss Stage|Nyxar Competitive|Loading Pink|16.05.2026|2|0
+Continental EMEA Swiss Stage|Rex Regum Qeon|eLine Red|16.05.2026|2|1
+Continental EMEA Swiss Stage|Onyx Alpine|Requiem|16.05.2026|W|L
+Continental EMEA Swiss Stage|No Idea|Eline Express|16.05.2026|2|1
+Continental EMEA Swiss Stage|Danish Duo|Comfy|16.05.2026|2|0
+Continental EMEA Swiss Stage|Habeqeq|Route 33|16.05.2026|W|L
+Continental EMEA Swiss Stage|Skill Issue|Different Poles|16.05.2026|0|2
+Continental EMEA Swiss Stage|Brothers|No Idea|16.05.2026|2|0
+Continental EMEA Swiss Stage|Rex Regum Qeon|Habeqeq|16.05.2026|2|0
+Continental EMEA Swiss Stage|Onyx Alpine|Different Poles|16.05.2026|L|W
+Continental EMEA Swiss Stage|Nyxar Competitive|Danish Duo|16.05.2026|2|0
+Continental EMEA Swiss Stage|Eline Express|WINGS|16.05.2026|2|0
+Continental EMEA Swiss Stage|Route 33|eLine Red|16.05.2026|L|W
+Continental EMEA Swiss Stage|Skill Issue|Requiem|16.05.2026|W|L
+Continental EMEA Swiss Stage|Comfy|Loading Pink|16.05.2026|2|0
+Continental EMEA Swiss Stage|Brothers|Rex Regum Qeon|16.05.2026|2|0
+Continental EMEA Swiss Stage|Nyxar Competitive|Different Poles|16.05.2026|0|2
+Continental EMEA Swiss Stage|No Idea|Comfy|16.05.2026|2|0
+Continental EMEA Swiss Stage|Danish Duo|Eline Express|16.05.2026|2|1
+Continental EMEA Swiss Stage|Habeqeq|Skill Issue|16.05.2026|2|0
+Continental EMEA Swiss Stage|Onyx Alpine|eLine Red|16.05.2026|L|W
+Continental EMEA Swiss Stage|Route 33|WINGS|16.05.2026|L|W
+Continental EMEA Swiss Stage|Requiem|Loading Pink|16.05.2026|L|W
+Continental EMEA Swiss Stage|Rex Regum Qeon|Danish Duo|16.05.2026|2|0
+Continental EMEA Swiss Stage|Nyxar Competitive|eLine Red|16.05.2026|2|0
+Continental EMEA Swiss Stage|No Idea|Habeqeq|16.05.2026|2|0
+Continental EMEA Swiss Stage|Skill Issue|WINGS|16.05.2026|2|1
+Continental EMEA Swiss Stage|Onyx Alpine|Loading Pink|16.05.2026|0|2
+Continental EMEA Swiss Stage|Comfy|Eline Express|16.05.2026|0|2
+Continental EMEA Swiss Stage|Habeqeq|Eline Express|16.05.2026|1|2
+Continental EMEA Swiss Stage|eLine Red|Loading Pink|16.05.2026|2|0
+Continental EMEA Swiss Stage|Danish Duo|Skill Issue|16.05.2026|2|0
+Continental EMEA Playoffs|Brothers|Danish Duo|16.05.2026|3|0
+Continental EMEA Playoffs|Nyxar Competitive|No Idea|16.05.2026|3|0
+Continental EMEA Playoffs|Rex Regum Qeon|Eline Express|16.05.2026|3|0
+Continental EMEA Playoffs|Different Poles|eLine Red|16.05.2026|3|1
+Continental EMEA Playoffs|Brothers|Nyxar Competitive|16.05.2026|3|1
+Continental EMEA Playoffs|Rex Regum Qeon|Different Poles|16.05.2026|2|3
+Continental EMEA Playoffs|Danish Duo|No Idea|16.05.2026|3|1
+Continental EMEA Playoffs|Eline Express|eLine Red|16.05.2026|3|1
+Continental EMEA Playoffs|Brothers|Different Poles|16.05.2026|3|1
+Continental EMEA Playoffs|Rex Regum Qeon|Danish Duo|16.05.2026|3|0
+Continental EMEA Playoffs|Nyxar Competitive|Eline Express|16.05.2026|3|1
+Continental EMEA Playoffs|Rex Regum Qeon|Nyxar Competitive|16.05.2026|3|0
+Continental EMEA Playoffs|Different Poles|Rex Regum Qeon|16.05.2026|0|3
+Continental EMEA Playoffs|Brothers|Rex Regum Qeon|16.05.2026|3|0
+Continental Oceasia Playoffs|TMWA Casual|TMTAS|17.05.2026|3|1
+Continental Oceasia Playoffs|Aurora x SKUF|Team Singapore|17.05.2026|3|0
+Continental Oceasia Playoffs|TMWA Casual|Aurora x SKUF|17.05.2026|0|3
+Continental Oceasia Playoffs|TMTAS|Team Singapore|17.05.2026|3|0
+Continental Oceasia Playoffs|TMWA Casual|TMTAS|17.05.2026|3|1
+Continental Oceasia Playoffs|Aurora x SKUF|TMWA Casual|17.05.2026|3|0
+Continental Oceasia Swiss Stage|Aurora x SKUF|TMTAS 2|17.05.2026|L|W
+Continental Oceasia Swiss Stage|Team Singapore|team name|17.05.2026|0|2
+Continental Oceasia Swiss Stage|TMTAS|TMWA Casual|17.05.2026|0|2
+Continental Oceasia Swiss Stage|Trophy Farmers|Team Abyssal|17.05.2026|0|2
+Continental Oceasia Swiss Stage|TMTAS 2|TMWA Casual|17.05.2026|0|2
+Continental Oceasia Swiss Stage|Team Abyssal|team name|17.05.2026|0|2
+Continental Oceasia Swiss Stage|TMTAS|Aurora x SKUF|17.05.2026|0|2
+Continental Oceasia Swiss Stage|Team Singapore|Trophy Farmers|17.05.2026|2|0
+Continental Oceasia Swiss Stage|TMWA Casual|team name|17.05.2026|2|0
+Continental Oceasia Swiss Stage|TMTAS 2|Team Singapore|17.05.2026|1|2
+Continental Oceasia Swiss Stage|Team Abyssal|Aurora x SKUF|17.05.2026|0|2
+Continental Oceasia Swiss Stage|TMTAS|Trophy Farmers|17.05.2026|2|0
+Continental Oceasia Swiss Stage|team name|Aurora x SKUF|17.05.2026|0|2
+Continental Oceasia Swiss Stage|Team Singapore|TMTAS|17.05.2026|0|2
+Continental Oceasia Swiss Stage|TMTAS 2|Team Abyssal|17.05.2026|1|2
+Continental Oceasia Swiss Stage|Team Abyssal|Team Singapore|17.05.2026|1|2
+Continental Oceasia Swiss Stage|team name|TMTAS|17.05.2026|0|2
+Continental Americas Swiss Stage|Albert and Einstein|Who Let AIR Cook|17.05.2026|L|W
+Continental Americas Swiss Stage|aardvarks|Onyx X SHIFT|17.05.2026|W|L
+Continental Americas Swiss Stage|Holy Dynasty|MoeRU|17.05.2026|2|0
+Continental Americas Swiss Stage|UNC Racing|Turkey and the Cold Cuts|17.05.2026|2|0
+Continental Americas Swiss Stage|Who Let AIR Cook|Holy Dynasty|17.05.2026|0|2
+Continental Americas Swiss Stage|aardvarks|UNC Racing|17.05.2026|0|2
+Continental Americas Swiss Stage|MoeRU|Albert and Einstein|17.05.2026|W|L
+Continental Americas Swiss Stage|Turkey and the Cold Cuts|Onyx X SHIFT|17.05.2026|W|L
+Continental Americas Swiss Stage|Holy Dynasty|UNC Racing|17.05.2026|1|2
+Continental Americas Swiss Stage|Who Let AIR Cook|Turkey and the Cold Cuts|17.05.2026|W|L
+Continental Americas Swiss Stage|aardvarks|MoeRU|17.05.2026|2|1
+Continental Americas Swiss Stage|Albert and Einstein|Onyx X SHIFT|17.05.2026|L|L
+Continental Americas Swiss Stage|Who Let AIR Cook|MoeRU|17.05.2026|1|2
+Continental Americas Swiss Stage|Holy Dynasty|aardvarks|17.05.2026|2|0
+Continental Americas Swiss Stage|Turkey and the Cold Cuts|Albert and Einstein|17.05.2026|L|L
+Continental Americas Playoffs|UNC Racing|MoeRU|17.05.2026|3|0
+Continental Americas Playoffs|Holy Dynasty|aardvarks|17.05.2026|3|2
+Continental Americas Playoffs|UNC Racing|Holy Dynasty|18.05.2026|3|2
+Continental Americas Playoffs|MoeRU|aardvarks|18.05.2026|1|3
+Continental Americas Playoffs|Holy Dynasty|aardvarks|18.05.2026|2|3
+Continental Americas Playoffs|UNC Racing|aardvarks|18.05.2026|3|2

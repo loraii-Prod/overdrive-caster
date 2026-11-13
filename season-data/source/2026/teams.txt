@@ -1,0 +1,106 @@
+TEAM_0001|BIG|BIG|active||Granady||Massa||||||
+TEAM_0002|All Gamers|AG|active||Binkss|France|Gwen|France|Otaaaq|France|Alfadream||
+TEAM_0003|PACB|PACB|active||CarlJr||Pac||Affi||Bren||
+TEAM_0004|Weibo x FUT|WF|active|GenG x Weibo|Heav||Nayko||||||
+TEAM_0005|Team Nyxbar||active|GenG x Legu|ROtrex..|France|Maxtrak|France|Legu18||||
+TEAM_0006|NAVI x Joel|NJ|active|Nemesis x NAVI|mime||eLconn21||||||
+TEAM_0007|COOK|COOK|active||L1ngo||Scrapie||||||
+TEAM_0008|S8UL|S8UL|active|Team USAK|Neal||Whizzy||Spark||||
+TEAM_0009|Airwalkers|AIR|active|Orgless|Stufts||Whizzy||||||
+TEAM_0010|VP x Neon|VPN|active||pusztitopako||neon||||||
+TEAM_0011|ONIC x Josh||active|SHIFT|josh1248||jdon||||||
+TEAM_0012|rnboi|RB|active|TempoBros|Walegen|France|NablaTM||Azion||||
+TEAM_0013|BS+|BS+|active||Glast||Worker||Snow||Tjalic||
+TEAM_0014|Ragnarok|RGN|active||Epos.|United Kingdom|Melioo|France|Evon|Poland|||
+TEAM_0015|Grassboyz|GB|active|Team Heretics|Kakne||Flimsy||Key||||
+TEAM_0016|Loading|LDG|active||zulesTM|France|AckSterTM|France|||||played with AckSterTM & zulesTM in 2026 Split 2
+TEAM_0017|Va Bene|VB|active||AwayFridish||iPrime||Flow||||
+TEAM_0018|EvolupeGG|EVL|active||Auris||Yamii||Hand||Apo||
+TEAM_0019|Halcyon|HAL|active||Nixotica||Phegley||Toto||||
+TEAM_0020|PIWO|PIWO|active||Henkan67|Sweden|Hergam4|France|Ewin618|Sweden|xkoshy|Poland|
+TEAM_0021|Brothers|BRO|active||Hyll-TM|Czechia|Bestie77|Czechia|||||
+TEAM_0022|Onyx|ONYX|active|Aurora x SKUF|Bimy||Mince||||||
+TEAM_0023|BOMBO||active|Rex Regum Qeon|Cemkoo|Türkiye|Yekcosdo|Portugal|HusoTM|Türkiye|||
+TEAM_0024|UNC Racing|UNC|active||Baupro||Jandro||||||
+TEAM_0025|PoleSitters||active||Maitoo.||TONE.TM||junesalad||joshstanleyy||
+TEAM_0026|Sapphire Architect||retired||Chibby012||kung_fuu_man29||||||
+TEAM_0027|Team Abyssal||active||CarelessCobra|Australia|js___|Australia|boonie95_|Australia|||
+TEAM_0028|team name||active||TurwaithionX||Mr.Snowdie||Stargazer987||||
+TEAM_0029|TMTAS 2||active||AdHoc-||Defengee||straight_trunk||||
+TEAM_0030|312 MPH||active||Hunnid..||gagenfli_21||Matieuu_||||
+TEAM_0031|MoeRU||active||RuszkA||Sr.Moebius||||||
+TEAM_0032|Onyx X SHIFT||active||noiszia||charles-..||||||
+TEAM_0033|Surge||active||Qez..||IAmLoobs||||||
+TEAM_0034|Team crashgate||active||Beexytm||jacobq2442||||||
+TEAM_0035|Who Let AIR Cook||active||helix.tm||regrabmegrA||LimeDub||||
+TEAM_0036|5358||active||molot_OK||Danifill||||||
+TEAM_0037|Ascension||active||Kerze.||CheriCheriSir||||||
+TEAM_0038|B2 eSports||active||Mobbi._.||Flonko||JanTM-||s0nity||
+TEAM_0039|B2 Flutlichtblau||active||DrTilt.||EXistenzminimum||ExoTM.||||
+TEAM_0040|B2's Future||active||Jan_08.||Nismo_aeWinter||||||
+TEAM_0041|Campagna T-Rex||active||Nosshy||Ieupad1||||||
+TEAM_0042|Croquettes||active||S.o.u.p.||kukhumudwa||ento-||||
+TEAM_0043|Danish Duo||active||HyggeBis||skumf1dus3n||Dunste||||
+TEAM_0044|DBRUG RACING||active||TaMaR...||onzi.||Flueffel.||||
+TEAM_0045|DRX Racing||active||DRX-Invisible||jf961||||||
+TEAM_0046|Eclipse||active||Jingatak||Romain.TM||Tseko_.||||
+TEAM_0047|EKMEK||active||Goldennugg3t||BirdieTM||||||
+TEAM_0048|eLine Express||active||ShaDenis_||iFreezeR_||||||
+TEAM_0049|eLine Red||active||Speedself||Dam_Pouleto||||||
+TEAM_0050|eSports Cologne||active||LeWi_100||Inspector.||||||
+TEAM_0051|groovegang||active||brunohrz||KnetaugeTM||||||
+TEAM_0052|Habeqeq||active||Habe..||Sebeqeq_TM||fredbuh_tm||||
+TEAM_0053|Kubki||active||Bald_tm||zelibumba||swoppik||||
+TEAM_0054|Loading Pink||active||iStOrm.||tintin-81||AckSterTM||||
+TEAM_0055|Looks Like Damp||active||MattT_tm||Eggy-.-||||||
+TEAM_0056|Nd60||active||PinkXaciD||auwroom||||||
+TEAM_0057|No Idea||active||rozuu..||Suudo_W||||||
+TEAM_0058|Overdrive Staff||active||pecuniaadest||cherry2_0||||||
+TEAM_0059|PiemontTM||active||tekekaki||TommiPotter||||||
+TEAM_0060|Pizza Hut Boys||active||ScepticHamster||Zazurin||||||
+TEAM_0061|Requiem||active||SF-lnko||Kurisu-tina_||||||
+TEAM_0062|Retirement Home||active||Idoless.||ComradeLouis||Dantski||Seanywolf||
+TEAM_0063|RSI||active||Tailsdk||UnluckyCroco||Hydria_||||
+TEAM_0064|Sidi Bou Speed||active||Misty606||Youramon||||||
+TEAM_0065|Silnce 68||active||chamow||NablaTM||||||
+TEAM_0066|Skill Issue||active||Strip.||mrardaa||TunaFish-||||
+TEAM_0067|So visto||active||PauLL__||Pika.2s||Yekcosdo||||
+TEAM_0068|Veni Vidi Vici||active||Demotivator13||Magorian0212||||||
+TEAM_0069|WINGS||active||Dayvaz|Sweden|Jellso_|Switzerland|striker.TM||||
+TEAM_0070|Shark||active|TMWA Casual|Runna_TM||oieya||||||
+TEAM_0071|Turkey and the Cold Cuts||active||Jogusaurus||iBraxt||Ahriu-_-||Snaq_||
+TEAM_0072|Comfy||active||Xetins||Javzo||||||
+TEAM_0073|Rex Regum Qeon|RRQ|retired|F11|HusoTM||Cemkoo||Huba.Bibi||||
+TEAM_0074|Onyx Alpine||active||Nicoo-.||OxiD._.||||||
+TEAM_0075|Split the G||active||Killian_.||Lukas.tm||||||
+TEAM_0076|TMTAS||active||MrMrDUCK|Australia|xXStringShotXx|Australia|Defengee|Australia|hollist.|Australia|
+TEAM_0077|SKUF Gaming||retired||||||||||
+TEAM_0078|Trophy Farmers||active||||||||||
+TEAM_0079|Team Singapore||active||||||||||
+TEAM_0080|Holy Dynasty||active||Berree.||Topicc.||||||
+TEAM_0081|aardvarks||active||||||||||
+TEAM_0082|Albert and Einstein||active||||||||||
+TEAM_0083|Nyxar Competitive||active||Lukario|France|Kymi_RC|France|Hugo._-.|France|||
+TEAM_0084|Route 33||active||||||||||
+TEAM_0085|Different Poles||active||J4K_TM||Bobo247||||||
+TEAM_0086|RUNNA X BOONIE||active|TMWA x SPLIT|shark.___||solique.||mystral_||||
+TEAM_0087|Stargazers||active||NebulaeNyx||Tsurezaza||Jsnap.TM||||
+TEAM_0088|PHL||active||Equarmar||Dyno_Wai||||||
+TEAM_0089|Tiny Tone and I||active||its_numpty||TONE_9||worth0||||
+TEAM_0090|haddkay remdles||active||remkay_||Haddles33||Gui.tar||||
+TEAM_0091|gustav gaming||active||Fredwolf0811||purple_tm||||||
+TEAM_0092|DUREX RACING||active||DRX-Invisible||jf961||||||
+TEAM_0093|Chizuki||active||Shyvlee||LimeDub01||||||
+TEAM_0094|fullstoppah||active||SaboJr||Serphal||Mr.Snowdie||||
+TEAM_0095|Soggy Bread||active||Ethan_Legion||Br3adTM||||||
+TEAM_0096|iLadies||active||lane_-||Ybean||||||
+TEAM_0097|Sam²||active||BucketTm||Popsamnow||gohardware||||
+TEAM_0098|Loading||retired||AckSterTM||zulesTM||||||
+TEAM_0099|OLALA||active||AwayFridish||Maxtrak||||||
+TEAM_0100|MTA Racing Team||active||Mateoryt||PszymekTM||||||
+TEAM_0101|Shark||retired||oieya||Runna_TM||||||
+TEAM_0102|Dyslexai||active|ocd Competitive|GoldiePath|Poland|TunaFish-|Türkiye|KorkiiTM|Türkiye|Nass.ALG|Algeria|
+TEAM_0103|Fast Learners||active||RickyBaker1||nOvATM_||Roifler.||||
+TEAM_0104|One Salad||active||junesalad||SoloQuein||||||
+TEAM_0105|einsnoch||active||rylsht||Gixbor||||||
+TEAM_0106|ZasePB||active||GoroTM||Joeyom.TM||||||

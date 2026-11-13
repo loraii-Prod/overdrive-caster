@@ -1,0 +1,147 @@
+fall|Open Qualifier 1 Oceasia|TMTAS||05.09.2026|COMPLETED|W|L
+fall|Open Qualifier 1 Oceasia|TMWA x SPLIT||05.09.2026|COMPLETED|W|L
+fall|Open Qualifier 1 Oceasia|Stargazers|PHL|05.09.2026|COMPLETED|0|2
+fall|Open Qualifier 1 Oceasia|Tiny Tone and I|haddkay remdles|05.09.2026|COMPLETED|1|2
+fall|Open Qualifier 1 Oceasia|TMTAS|TMWA x SPLIT|05.09.2026|COMPLETED|0|2
+fall|Open Qualifier 1 Oceasia|PHL|haddkay remdles|05.09.2026|COMPLETED|0|2
+fall|Open Qualifier 1 Oceasia|Tiny Tone and I||05.09.2026|COMPLETED|W|L
+fall|Open Qualifier 1 Oceasia|Stargazers||05.09.2026|COMPLETED|W|L
+fall|Open Qualifier 1 Oceasia|TMWA x SPLIT|haddkay remdles|05.09.2026|COMPLETED|2|0
+fall|Open Qualifier 1 Oceasia|PHL|Tiny Tone and I|05.09.2026|COMPLETED|0|2
+fall|Open Qualifier 1 Oceasia|TMTAS|Stargazers|05.09.2026|COMPLETED|2|0
+fall|Open Qualifier 1 Oceasia|TMTAS|Tiny Tone and I|05.09.2026|COMPLETED|1|2
+fall|Open Qualifier 1 Oceasia|haddkay remdles|Tiny Tone and I|05.09.2026|COMPLETED|1|2
+fall|Open Qualifier 1 Oceasia|TMWA x SPLIT|Tiny Tone and I|05.09.2026|COMPLETED|2|0
+fall|Open Qualifier 1 EMEA|Nyxar Competitive||05.09.2026|COMPLETED|W|L
+fall|Open Qualifier 1 EMEA|WINGS||05.09.2026|COMPLETED|W|L
+fall|Open Qualifier 1 EMEA|No Idea||05.09.2026|COMPLETED|W|L
+fall|Open Qualifier 1 EMEA|gustav gaming|DUREX RACING|05.09.2026|COMPLETED|2|0
+fall|Open Qualifier 1 EMEA|Nyxar Competitive|WINGS|05.09.2026|COMPLETED|2|0
+fall|Open Qualifier 1 EMEA|No Idea|gustav gaming|05.09.2026|COMPLETED|0|2
+fall|Open Qualifier 1 EMEA||DUREX RACING|05.09.2026|COMPLETED|L|W
+fall|Open Qualifier 1 EMEA|Nyxar Competitive|gustav gaming|05.09.2026|COMPLETED|2|0
+fall|Open Qualifier 1 EMEA|No Idea|DUREX RACING|05.09.2026|COMPLETED|2|0
+fall|Open Qualifier 1 EMEA|WINGS||05.09.2026|COMPLETED|W|L
+fall|Open Qualifier 1 EMEA|No Idea|WINGS|05.09.2026|COMPLETED|2|0
+fall|Open Qualifier 1 EMEA|gustav gaming|No Idea|05.09.2026|COMPLETED|2|0
+fall|Open Qualifier 1 EMEA|Nyxar Competitive|gustav gaming|05.09.2026|COMPLETED|2|0
+fall|Open Qualifier 1 Americas|Chizuki||05.09.2026|COMPLETED|W|L
+fall|Open Qualifier 2 Oceasia|Tiny Tone and I||06.09.2026|COMPLETED|W|L
+fall|Open Qualifier 2 Oceasia|fullstoppah|PHL|06.09.2026|COMPLETED|2|0
+fall|Open Qualifier 2 Oceasia|Stargazers|Soggy Bread|06.09.2026|COMPLETED|2|0
+fall|Open Qualifier 2 Oceasia|Team Abyssal|haddkay remdles|06.09.2026|COMPLETED|2|0
+fall|Open Qualifier 2 Oceasia|Tiny Tone and I|fullstoppah|06.09.2026|COMPLETED|0|2
+fall|Open Qualifier 2 Oceasia|Stargazers|Team Abyssal|06.09.2026|COMPLETED|0|2
+fall|Open Qualifier 2 Oceasia||PHL|06.09.2026|COMPLETED|L|W
+fall|Open Qualifier 2 Oceasia|Soggy Bread|haddkay remdles|06.09.2026|COMPLETED|0|2
+fall|Open Qualifier 2 Oceasia|fullstoppah|Team Abyssal|06.09.2026|COMPLETED|0|2
+fall|Open Qualifier 2 Oceasia|Tiny Tone and I|PHL|06.09.2026|COMPLETED|2|0
+fall|Open Qualifier 2 Oceasia|Stargazers|haddkay remdles|06.09.2026|COMPLETED|0|2
+fall|Open Qualifier 2 Oceasia|Tiny Tone and I|haddkay remdles|06.09.2026|COMPLETED|1|2
+fall|Open Qualifier 2 Oceasia|fullstoppah|haddkay remdles|06.09.2026|COMPLETED|2|1
+fall|Open Qualifier 2 Oceasia|Team Abyssal|fullstoppah|06.09.2026|COMPLETED|2|0
+fall|Open Qualifier 2 EMEA|WINGS|DUREX RACING|06.09.2026|COMPLETED|4|1
+fall|Open Qualifier 2 Americas|Holy Dynasty||06.09.2026|COMPLETED|W|L
+fall|Open Qualifier 3 Oceasia|PHL|fullstoppah|19.09.2026|COMPLETED|0|2
+fall|Open Qualifier 3 Oceasia|Tiny Tone and I|haddkay remdles|19.09.2026|COMPLETED|0|2
+fall|Open Qualifier 3 Oceasia|Sam²|TMTAS|19.09.2026|COMPLETED|0|2
+fall|Open Qualifier 3 Oceasia|Stargazers||19.09.2026|COMPLETED|W|L
+fall|Open Qualifier 3 Oceasia|fullstoppah|haddkay remdles|19.09.2026|COMPLETED|2|0
+fall|Open Qualifier 3 Oceasia|TMTAS|Stargazers|19.09.2026|COMPLETED|2|0
+fall|Open Qualifier 3 Oceasia|Sam²||19.09.2026|COMPLETED|W|L
+fall|Open Qualifier 3 Oceasia|Tiny Tone and I||19.09.2026|COMPLETED|2|0
+fall|Open Qualifier 3 Oceasia|fullstoppah|TMTAS|19.09.2026|COMPLETED|2|0
+fall|Open Qualifier 3 Oceasia|haddkay remdles|Sam²|19.09.2026|COMPLETED|2|0
+fall|Open Qualifier 3 Oceasia|Tiny Tone and I|Stargazers|19.09.2026|COMPLETED|2|0
+fall|Open Qualifier 3 Oceasia|Tiny Tone and I|haddkay remdles|19.09.2026|COMPLETED|1|2
+fall|Open Qualifier 3 Oceasia|haddkay remdles|TMTAS|19.09.2026|COMPLETED|2|1
+fall|Open Qualifier 3 Oceasia|fullstoppah|haddkay remdles|19.09.2026|COMPLETED|2|0
+fall|Open Qualifier 3 EMEA|Loading|OLALA|19.09.2026|COMPLETED|1|2
+fall|Open Qualifier 3 Americas|iLadies||19.09.2026|COMPLETED|W|L
+fall|Open Qualifier 4 Oceasia|Tiny Tone and I|Stargazers|20.09.2026|COMPLETED|2|0
+fall|Open Qualifier 4 Oceasia|Sam²|haddkay remdles|20.09.2026|COMPLETED|0|2
+fall|Open Qualifier 4 Oceasia|TMTAS|Shark|20.09.2026|COMPLETED|0|2
+fall|Open Qualifier 4 Oceasia|PHL||20.09.2026|COMPLETED|W|L
+fall|Open Qualifier 4 Oceasia|Tiny Tone and I|haddkay remdles|20.09.2026|COMPLETED|0|2
+fall|Open Qualifier 4 Oceasia|Shark|PHL|20.09.2026|COMPLETED|2|0
+fall|Open Qualifier 4 Oceasia|TMTAS||20.09.2026|COMPLETED|W|L
+fall|Open Qualifier 4 Oceasia|Sam²|Stargazers|20.09.2026|COMPLETED|2|0
+fall|Open Qualifier 4 Oceasia|haddkay remdles|Shark|20.09.2026|COMPLETED|0|2
+fall|Open Qualifier 4 Oceasia|PHL|TMTAS|20.09.2026|COMPLETED|0|2
+fall|Open Qualifier 4 Oceasia|Tiny Tone and I|Sam²|20.09.2026|COMPLETED|2|0
+fall|Open Qualifier 4 Oceasia|TMTAS|Tiny Tone and I|20.09.2026|COMPLETED|2|0
+fall|Open Qualifier 4 Oceasia|TMTAS|haddkay remdles|20.09.2026|COMPLETED|2|0
+fall|Open Qualifier 4 Oceasia|Shark|TMTAS|20.09.2026|COMPLETED|1|2
+fall|Open Qualifier 4 EMEA|MTA Racing Team||20.09.2026|COMPLETED|W|L
+fall|Open Qualifier 4 Americas|ocd Competitive||20.09.2026|COMPLETED|W|L
+fall|Open Qualifier 5 Oceasia|haddkay remdles|Tiny Tone and I|26.09.2026|COMPLETED|2|0
+fall|Open Qualifier 5 Oceasia|Shark|Stargazers|26.09.2026|COMPLETED|2|0
+fall|Open Qualifier 5 Oceasia|Sam²|One Salad|26.09.2026|COMPLETED|2|1
+fall|Open Qualifier 5 Oceasia|Fast Learners||26.09.2026|COMPLETED|W|L
+fall|Open Qualifier 5 Oceasia|haddkay remdles|Shark|26.09.2026|COMPLETED|0|2
+fall|Open Qualifier 5 Oceasia|Sam²|Fast Learners|26.09.2026|COMPLETED|0|2
+fall|Open Qualifier 5 Oceasia|One Salad||26.09.2026|COMPLETED|W|L
+fall|Open Qualifier 5 Oceasia|Stargazers|Tiny Tone and I|26.09.2026|COMPLETED|0|2
+fall|Open Qualifier 5 Oceasia|Shark|Fast Learners|26.09.2026|COMPLETED|2|0
+fall|Open Qualifier 5 Oceasia|Sam²|One Salad|26.09.2026|COMPLETED|2|1
+fall|Open Qualifier 5 Oceasia|haddkay remdles|Tiny Tone and I|26.09.2026|COMPLETED|2|0
+fall|Open Qualifier 5 Oceasia|Sam²|haddkay remdles|26.09.2026|COMPLETED|0|2
+fall|Open Qualifier 5 Oceasia|Fast Learners|haddkay remdles|26.09.2026|COMPLETED|L|W
+fall|Open Qualifier 5 Oceasia|Shark|haddkay remdles|26.09.2026|COMPLETED|2|1
+fall|Open Qualifier 5 EMEA|einsnoch|ZasePB|26.09.2026|COMPLETED|2|0
+fall|Open Qualifier 5 EMEA|ZasePB||26.09.2026|COMPLETED|W|L
+fall|Open Qualifier 5 EMEA|einsnoch|ZasePB|26.09.2026|COMPLETED|0|2
+fall|Open Qualifier 6 Oceasia|haddkay remdles||27.09.2026|COMPLETED|W|L
+fall|Open Qualifier 6 Oceasia|Tiny Tone and I|Fast Learners|27.09.2026|COMPLETED|0|2
+fall|Open Qualifier 6 Oceasia|PHL||27.09.2026|COMPLETED|W|L
+fall|Open Qualifier 6 Oceasia|Stargazers|Sam²|27.09.2026|COMPLETED|0|2
+fall|Open Qualifier 6 Oceasia|haddkay remdles|Fast Learners|27.09.2026|COMPLETED|0|2
+fall|Open Qualifier 6 Oceasia|PHL|Sam²|27.09.2026|COMPLETED|0|2
+fall|Open Qualifier 6 Oceasia||Tiny Tone and I|27.09.2026|COMPLETED|L|W
+fall|Open Qualifier 6 Oceasia||Stargazers|27.09.2026|COMPLETED|L|W
+fall|Open Qualifier 6 Oceasia|Fast Learners|Sam²|27.09.2026|COMPLETED|2|0
+fall|Open Qualifier 6 Oceasia|PHL|Tiny Tone and I|27.09.2026|COMPLETED|0|2
+fall|Open Qualifier 6 Oceasia|haddkay remdles|Stargazers|27.09.2026|COMPLETED|2|0
+fall|Open Qualifier 6 Oceasia|Tiny Tone and I|haddkay remdles|27.09.2026|COMPLETED|1|2
+fall|Open Qualifier 6 Oceasia|Sam²|haddkay remdles|27.09.2026|COMPLETED|0|2
+fall|Open Qualifier 6 Oceasia|Fast Learners|haddkay remdles|27.09.2026|COMPLETED|1|2
+fall|Open Qualifier 6 EMEA|No Idea||27.09.2026|COMPLETED|W|L
+fall|Continental Oceasia Swiss Stage|RUNNA X BOONIE|Fast Learners|04.10.2026|COMPLETED|0|2
+fall|Continental Oceasia Swiss Stage|Team Abyssal|Tiny Tone and I|04.10.2026|COMPLETED|2|0
+fall|Continental Oceasia Swiss Stage|fullstoppah|haddkay remdles|04.10.2026|COMPLETED|2|1
+fall|Continental Oceasia Swiss Stage|TMTAS|Shark|04.10.2026|COMPLETED|0|2
+fall|Continental Oceasia Swiss Stage|Fast Learners|Shark|04.10.2026|COMPLETED|0|2
+fall|Continental Oceasia Swiss Stage|Team Abyssal|fullstoppah|04.10.2026|COMPLETED|2|0
+fall|Continental Oceasia Swiss Stage|RUNNA X BOONIE|TMTAS|04.10.2026|COMPLETED|2|0
+fall|Continental Oceasia Swiss Stage|haddkay remdles|Tiny Tone and I|04.10.2026|COMPLETED|2|1
+fall|Continental Oceasia Swiss Stage|Shark|Team Abyssal|04.10.2026|COMPLETED|0|2
+fall|Continental Oceasia Swiss Stage|Fast Learners|haddkay remdles|04.10.2026|COMPLETED|2|0
+fall|Continental Oceasia Swiss Stage|fullstoppah|RUNNA X BOONIE|04.10.2026|COMPLETED|2|0
+fall|Continental Oceasia Swiss Stage|TMTAS|Tiny Tone and I|04.10.2026|COMPLETED|2|1
+fall|Continental Oceasia Swiss Stage|Shark|fullstoppah|04.10.2026|COMPLETED|0|2
+fall|Continental Oceasia Swiss Stage|Fast Learners|RUNNA X BOONIE|04.10.2026|COMPLETED|2|0
+fall|Continental Oceasia Swiss Stage|TMTAS|haddkay remdles|04.10.2026|COMPLETED|1|2
+fall|Continental Oceasia Swiss Stage|Shark|haddkay remdles|04.10.2026|COMPLETED|0|2
+fall|Continental Oceasia Playoffs|Team Abyssal|haddkay remdles|04.10.2026|COMPLETED|3|0
+fall|Continental Oceasia Playoffs|fullstoppah|Fast Learners|04.10.2026|COMPLETED|3|0
+fall|Continental Oceasia Playoffs|Team Abyssal|fullstoppah|04.10.2026|COMPLETED|3|1
+fall|Continental Oceasia Playoffs|haddkay remdles|Fast Learners|04.10.2026|COMPLETED|0|3
+fall|Continental Oceasia Playoffs|fullstoppah|Fast Learners|04.10.2026|COMPLETED|3|0
+fall|Continental Oceasia Playoffs|Team Abyssal|fullstoppah|04.10.2026|COMPLETED|3|2
+fall|Continental Americas Playoffs|Chizuki|ocd Competitive|04.10.2026|COMPLETED|FF|W
+fall|Continental Americas Playoffs|Holy Dynasty|iLadies|04.10.2026|COMPLETED|FF|FF
+fall|Continental Americas Playoffs|ocd Competitive||04.10.2026|COMPLETED|W|L
+fall|Continental EMEA Playoffs|Nyxar Competitive||04.10.2026|COMPLETED|W|L
+fall|Continental EMEA Playoffs|WINGS|einsnoch|04.10.2026|COMPLETED|3|0
+fall|Continental EMEA Playoffs|MTA Racing Team|Loading|04.10.2026|COMPLETED|0|3
+fall|Continental EMEA Playoffs|ZasePB|DRX Racing|04.10.2026|COMPLETED|0|3
+fall|Continental EMEA Playoffs|Nyxar Competitive|WINGS|04.10.2026|COMPLETED|3|0
+fall|Continental EMEA Playoffs|Loading|DRX Racing|04.10.2026|COMPLETED|3|0
+fall|Continental EMEA Playoffs||einsnoch|04.10.2026|COMPLETED|L|W
+fall|Continental EMEA Playoffs|MTA Racing Team|ZasePB|04.10.2026|COMPLETED|2|3
+fall|Continental EMEA Playoffs|Nyxar Competitive|Loading|04.10.2026|COMPLETED|3|1
+fall|Continental EMEA Playoffs|DRX Racing|einsnoch|04.10.2026|COMPLETED|0|3
+fall|Continental EMEA Playoffs|WINGS|ZasePB|04.10.2026|COMPLETED|3|0
+fall|Continental EMEA Playoffs|einsnoch|WINGS|04.10.2026|COMPLETED|0|3
+fall|Continental EMEA Playoffs|Loading|WINGS|04.10.2026|COMPLETED|3|0
+fall|Continental EMEA Playoffs|Nyxar Competitive|Loading|04.10.2026|COMPLETED|W|FF

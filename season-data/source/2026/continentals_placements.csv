@@ -1,0 +1,39 @@
+split,event,place,team_id,team,overpoints
+spring,Continental Americas Playoffs,1,TEAM_0024,UNC Racing,40
+spring,Continental Americas Playoffs,2,TEAM_0081,aardvarks,30
+spring,Continental Americas Playoffs,3,TEAM_0080,Holy Dynasty,15
+spring,Continental Americas Playoffs,4,TEAM_0031,MoeRU,10
+spring,Continental Americas Swiss Stage,5,TEAM_0035,Who Let AIR Cook,5
+spring,Continental Americas Swiss Stage,6,TEAM_0071,Turkey and the Cold Cuts,3
+spring,Continental EMEA Playoffs,1,TEAM_0021,Brothers,40
+spring,Continental EMEA Playoffs,2,TEAM_0023,BOMBO,30
+spring,Continental EMEA Playoffs,3,TEAM_0085,Different Poles,15
+spring,Continental EMEA Playoffs,4,TEAM_0083,Nyxar Competitive,10
+spring,Continental EMEA Playoffs,5,TEAM_0043,Danish Duo,5
+spring,Continental EMEA Playoffs,6,TEAM_0048,eLine Express,3
+spring,Continental EMEA Playoffs,7,TEAM_0057,No Idea,2
+spring,Continental EMEA Playoffs,8,TEAM_0049,eLine Red,1
+spring,Continental Oceasia Playoffs,1,TEAM_0022,Onyx,40
+spring,Continental Oceasia Playoffs,2,TEAM_0070,Shark,30
+spring,Continental Oceasia Playoffs,3,TEAM_0076,TMTAS,15
+spring,Continental Oceasia Playoffs,4,TEAM_0079,Team Singapore,10
+spring,Continental Oceasia Swiss Stage,5,TEAM_0028,team name,5
+spring,Continental Oceasia Swiss Stage,6,TEAM_0027,Team Abyssal,3
+spring,Continental Oceasia Swiss Stage,7,TEAM_0029,TMTAS 2,2
+spring,Continental Oceasia Swiss Stage,8,TEAM_0078,Trophy Farmers,1
+fall,Continental EMEA Playoffs,1,TEAM_0083,Nyxar Competitive,40
+fall,Continental EMEA Playoffs,2,TEAM_0016,Loading,30
+fall,Continental EMEA Playoffs,3,TEAM_0069,WINGS,15
+fall,Continental EMEA Playoffs,4,TEAM_0105,einsnoch,10
+fall,Continental EMEA Playoffs,5,TEAM_0045,DRX Racing,5
+fall,Continental EMEA Playoffs,6,TEAM_0106,ZasePB,3
+fall,Continental EMEA Playoffs,7,TEAM_0100,MTA Racing Team,2
+fall,Continental Americas Playoffs,1,TEAM_0102,Dyslexai,40
+fall,Continental Oceasia Playoffs,1,TEAM_0027,Team Abyssal,40
+fall,Continental Oceasia Playoffs,2,TEAM_0094,fullstoppah,30
+fall,Continental Oceasia Playoffs,3,TEAM_0103,Fast Learners,15
+fall,Continental Oceasia Playoffs,4,TEAM_0090,haddkay remdles,10
+fall,Continental Oceasia Swiss Stage,5,TEAM_0070,Shark,5
+fall,Continental Oceasia Swiss Stage,6,TEAM_0086,RUNNA X BOONIE,3
+fall,Continental Oceasia Swiss Stage,7,TEAM_0076,TMTAS,2
+fall,Continental Oceasia Swiss Stage,8,TEAM_0089,Tiny Tone and I,1

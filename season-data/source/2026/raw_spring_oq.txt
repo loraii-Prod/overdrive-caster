@@ -1,0 +1,387 @@
+OQ1 OCE|Team Abyssal|Trophy Farmers|04.04.2026|FF|W
+OQ1 OCE|team name|TMTAS|04.04.2026|2|0
+OQ1 OCE|TMWA Casual|TMTAS 2|04.04.2026|W|FF
+OQ1 OCE|PoleSitters|SKUF Gaming|04.04.2026|FF|W
+OQ1 OCE|Trophy Farmers|team name|04.04.2026|2|0
+OQ1 OCE|TMWA Casual|SKUF Gaming|04.04.2026|0|2
+OQ1 OCE|Team Abyssal|TMTAS|04.04.2026|L|W
+OQ1 OCE|TMTAS 2|PoleSitters|04.04.2026|FF|FF
+OQ1 OCE|Trophy Farmers|SKUF Gaming|04.04.2026|W|L
+OQ1 OCE|team name||04.04.2026|W|L
+OQ1 OCE|TMWA Casual|TMTAS|04.04.2026|2|1
+OQ1 OCE|team name|TMWA Casual|04.04.2026|FF|W
+OQ1 OCE|SKUF Gaming|TMWA Casual|04.04.2026|2|0
+OQ1 OCE|Trophy Farmers|SKUF Gaming|04.04.2026|0|2
+OQ1 AM|Turkey and the Cold Cuts|Albert and Einstein|04.04.2026|0|2
+OQ1 AM|UNC Racing|MoeRU|04.04.2026|W|L
+OQ1 AM|Who Let AIR Cook|aardvarks|04.04.2026|L|W
+OQ1 AM|Holy Dynasty|Team crashgate|04.04.2026|2|0
+OQ1 AM|Albert and Einstein|UNC Racing|04.04.2026|2|1
+OQ1 AM|aardvarks|Holy Dynasty|04.04.2026|1|2
+OQ1 AM|Turkey and the Cold Cuts|MoeRU|04.04.2026|FF|FF
+OQ1 AM|Who Let AIR Cook|Team crashgate|04.04.2026|FF|FF
+OQ1 AM|Albert and Einstein|Holy Dynasty|04.04.2026|2|0
+OQ1 AM|UNC Racing||04.04.2026|W|L
+OQ1 AM|aardvarks||04.04.2026|W|L
+OQ1 AM|UNC Racing|aardvarks|04.04.2026|2|0
+OQ1 AM|Holy Dynasty|UNC Racing|04.04.2026|0|2
+OQ1 AM|Albert and Einstein|UNC Racing|04.04.2026|2|1
+OQ2 OCE|TMTAS 2||05.04.2026|W|L
+OQ2 OCE|Trophy Farmers|TMTAS|05.04.2026|1|2
+OQ2 OCE|team name||05.04.2026|W|L
+OQ2 OCE|PoleSitters||05.04.2026|W|L
+OQ2 OCE|TMTAS 2|TMTAS|05.04.2026|0|2
+OQ2 OCE|team name|PoleSitters|05.04.2026|0|2
+OQ2 OCE||Trophy Farmers|05.04.2026|L|W
+OQ2 OCE|TMTAS|PoleSitters|05.04.2026|2|1
+OQ2 OCE|team name|Trophy Farmers|05.04.2026|1|2
+OQ2 OCE|TMTAS 2||05.04.2026|W|L
+OQ2 OCE|Trophy Farmers|TMTAS 2|05.04.2026|2|0
+OQ2 OCE|PoleSitters|Trophy Farmers|05.04.2026|1|2
+OQ2 OCE|TMTAS|Trophy Farmers|05.04.2026|0|2
+OQ2 EMEA|B2 Flutlichtblau||05.04.2026|W|L
+OQ2 EMEA|WINGS|Skill Issue|05.04.2026|0|2
+OQ2 EMEA|Nyxar Competitive||05.04.2026|W|L
+OQ2 EMEA|PiemontTM||05.04.2026|W|L
+OQ2 EMEA|eLine Red||05.04.2026|W|L
+OQ2 EMEA|RSI|groovegang|05.04.2026|1|2
+OQ2 EMEA|Nd60||05.04.2026|W|L
+OQ2 EMEA|Route 33|Requiem|05.04.2026|2|0
+OQ2 EMEA|B2 Flutlichtblau|Skill Issue|05.04.2026|0|2
+OQ2 EMEA|Nyxar Competitive|PiemontTM|05.04.2026|2|0
+OQ2 EMEA|eLine Red|groovegang|05.04.2026|2|0
+OQ2 EMEA|Nd60|Route 33|05.04.2026|0|2
+OQ2 EMEA|Requiem||05.04.2026|W|L
+OQ2 EMEA|RSI||05.04.2026|W|L
+OQ2 EMEA|WINGS||05.04.2026|W|L
+OQ2 EMEA|Skill Issue|Nyxar Competitive|05.04.2026|0|2
+OQ2 EMEA|eLine Red|Route 33|05.04.2026|2|1
+OQ2 EMEA|PiemontTM|Requiem|05.04.2026|L|W
+OQ2 EMEA|B2 Flutlichtblau|RSI|05.04.2026|2|1
+OQ2 EMEA|Nd60||05.04.2026|W|L
+OQ2 EMEA|groovegang|WINGS|05.04.2026|2|1
+OQ2 EMEA|Nyxar Competitive|eLine Red|05.04.2026|2|1
+OQ2 EMEA|Requiem|B2 Flutlichtblau|05.04.2026|2|0
+OQ2 EMEA|Nd60|groovegang|05.04.2026|0|2
+OQ2 EMEA|Route 33|Requiem|05.04.2026|2|0
+OQ2 EMEA|Skill Issue|groovegang|05.04.2026|1|2
+OQ2 EMEA|Route 33|groovegang|05.04.2026|2|0
+OQ2 EMEA|eLine Red|Route 33|05.04.2026|1|2
+OQ2 EMEA|Nyxar Competitive|Route 33|05.04.2026|2|0
+OQ2 AM|MoeRU|aardvarks|05.04.2026|0|2
+OQ3 OCE|PoleSitters|Team Singapore|11.04.2026|2|1
+OQ3 OCE|TMTAS|TMTAS 2|11.04.2026|2|0
+OQ3 OCE|team name|Team Abyssal|11.04.2026|0|2
+OQ3 OCE|TMWA Casual||11.04.2026|W|L
+OQ3 OCE|PoleSitters|TMTAS|11.04.2026|0|2
+OQ3 OCE|Team Abyssal|TMWA Casual|11.04.2026|2|1
+OQ3 OCE||team name|11.04.2026|L|W
+OQ3 OCE|TMTAS 2|Team Singapore|11.04.2026|2|1
+OQ3 OCE|TMTAS|Team Abyssal|11.04.2026|1|2
+OQ3 OCE|PoleSitters|team name|11.04.2026|1|2
+OQ3 OCE|TMWA Casual|TMTAS 2|11.04.2026|1|2
+OQ3 OCE|team name|TMTAS 2|11.04.2026|2|0
+OQ3 OCE|TMTAS|team name|11.04.2026|2|1
+OQ3 OCE|Team Abyssal|TMTAS|11.04.2026|1|2
+OQ1 EMEA|Ascension||11.04.2026|W|L
+OQ1 EMEA|PiemontTM||11.04.2026|W|L
+OQ1 EMEA|DRX Racing||11.04.2026|W|L
+OQ1 EMEA|B2 Flutlichtblau||11.04.2026|W|L
+OQ1 EMEA|eSports Cologne||11.04.2026|W|L
+OQ1 EMEA|eLine Express||11.04.2026|W|L
+OQ1 EMEA|WINGS||11.04.2026|W|L
+OQ1 EMEA|Kubki||11.04.2026|W|L
+OQ1 EMEA|eLine Red||11.04.2026|W|L
+OQ1 EMEA|Sidi Bou Speed||11.04.2026|W|L
+OQ1 EMEA|Skill Issue||11.04.2026|W|L
+OQ1 EMEA|Eclipse||11.04.2026|W|L
+OQ1 EMEA|Silnce 68||11.04.2026|W|L
+OQ1 EMEA|No Idea||11.04.2026|W|L
+OQ1 EMEA|Route 33||11.04.2026|W|L
+OQ1 EMEA|Campagna T-Rex||11.04.2026|W|L
+OQ1 EMEA|Brothers||11.04.2026|W|L
+OQ1 EMEA|B2 eSports||11.04.2026|W|L
+OQ1 EMEA|Comfy||11.04.2026|W|L
+OQ1 EMEA|Different Poles||11.04.2026|W|L
+OQ1 EMEA|5358||11.04.2026|W|L
+OQ1 EMEA|Split the G||11.04.2026|W|L
+OQ1 EMEA|Nyxar Competitive|B2's Future|11.04.2026|W|L
+OQ1 EMEA|Loading Pink|Retirement Home|11.04.2026|W|L
+OQ1 EMEA|Onyx Alpine|Pizza Hut Boys|11.04.2026|W|L
+OQ1 EMEA|groovegang|F11|11.04.2026|W|L
+OQ1 EMEA|Croquettes|Habeqeq|11.04.2026|W|L
+OQ1 EMEA||EKMEK|11.04.2026|L|W
+OQ1 EMEA|So visto|Veni Vidi Vici|11.04.2026|W|L
+OQ1 EMEA|Nd60|RSI|11.04.2026|L|W
+OQ1 EMEA|Looks Like Damp||11.04.2026|W|L
+OQ1 EMEA|Ascension|PiemontTM|11.04.2026|W|L
+OQ1 EMEA|DRX Racing|B2 Flutlichtblau|11.04.2026|L|W
+OQ1 EMEA|eSports Cologne|eLine Express|11.04.2026|W|L
+OQ1 EMEA|WINGS|Kubki|11.04.2026|1|2
+OQ1 EMEA|eLine Red||11.04.2026|W|L
+OQ1 EMEA|Sidi Bou Speed|Skill Issue|11.04.2026|0|2
+OQ1 EMEA|Eclipse|Silnce 68|11.04.2026|0|2
+OQ1 EMEA|No Idea|Route 33|11.04.2026|W|L
+OQ1 EMEA|Campagna T-Rex|Brothers|11.04.2026|L|W
+OQ1 EMEA|B2 eSports|Comfy|11.04.2026|W|L
+OQ1 EMEA|Different Poles|5358|11.04.2026|W|L
+OQ1 EMEA|Split the G|Nyxar Competitive|11.04.2026|L|W
+OQ1 EMEA|Loading Pink|Onyx Alpine|11.04.2026|L|W
+OQ1 EMEA|groovegang|Croquettes|11.04.2026|L|W
+OQ1 EMEA|EKMEK|So visto|11.04.2026|L|W
+OQ1 EMEA|RSI|Looks Like Damp|11.04.2026|W|L
+OQ1 EMEA||B2's Future|11.04.2026|W|L
+OQ1 EMEA|Retirement Home|Pizza Hut Boys|11.04.2026|L|L
+OQ1 EMEA|F11|Habeqeq|11.04.2026|W|L
+OQ1 EMEA||Veni Vidi Vici|11.04.2026|L|W
+OQ1 EMEA|Nd60||11.04.2026|W|L
+OQ1 EMEA|Ascension|B2 Flutlichtblau|11.04.2026|L|W
+OQ1 EMEA|eSports Cologne|Kubki|11.04.2026|L|W
+OQ1 EMEA|eLine Red|Skill Issue|11.04.2026|L|W
+OQ1 EMEA|Silnce 68|No Idea|11.04.2026|W|L
+OQ1 EMEA|Brothers|B2 eSports|11.04.2026|2|0
+OQ1 EMEA|Different Poles|Nyxar Competitive|11.04.2026|2|0
+OQ1 EMEA|Onyx Alpine|Croquettes|11.04.2026|2|0
+OQ1 EMEA|So visto|RSI|11.04.2026|2|0
+OQ1 EMEA|Looks Like Damp||11.04.2026|W|L
+OQ1 EMEA|EKMEK||11.04.2026|W|L
+OQ1 EMEA|groovegang||11.04.2026|W|L
+OQ1 EMEA|Loading Pink||11.04.2026|W|L
+OQ1 EMEA|Split the G||11.04.2026|W|L
+OQ1 EMEA|5358||11.04.2026|W|L
+OQ1 EMEA|Comfy||11.04.2026|W|L
+OQ1 EMEA|Campagna T-Rex||11.04.2026|W|L
+OQ1 EMEA|Route 33||11.04.2026|W|L
+OQ1 EMEA|Eclipse||11.04.2026|W|L
+OQ1 EMEA|Sidi Bou Speed||11.04.2026|W|L
+OQ1 EMEA|WINGS||11.04.2026|W|L
+OQ1 EMEA|eLine Express|F11|11.04.2026|W|L
+OQ1 EMEA|DRX Racing|Veni Vidi Vici|11.04.2026|L|L
+OQ1 EMEA|PiemontTM|Nd60|11.04.2026|L|W
+OQ1 EMEA|B2 Flutlichtblau|Kubki|11.04.2026|1|2
+OQ1 EMEA|Skill Issue|Silnce 68|11.04.2026|0|2
+OQ1 EMEA|Brothers|Different Poles|11.04.2026|2|0
+OQ1 EMEA|Onyx Alpine|So visto|11.04.2026|2|1
+OQ1 EMEA|Looks Like Damp|EKMEK|11.04.2026|L|L
+OQ1 EMEA|groovegang|Loading Pink|11.04.2026|0|2
+OQ1 EMEA|Split the G|5358|11.04.2026|L|W
+OQ1 EMEA|Comfy|Campagna T-Rex|11.04.2026|L|L
+OQ1 EMEA|Route 33|Eclipse|11.04.2026|L|W
+OQ1 EMEA|Sidi Bou Speed||11.04.2026|W|L
+OQ1 EMEA|WINGS|eLine Express|11.04.2026|W|L
+OQ1 EMEA||Nd60|11.04.2026|L|W
+OQ1 EMEA|Kubki|Silnce 68|11.04.2026|L|W
+OQ1 EMEA|Brothers|Onyx Alpine|11.04.2026|W|L
+OQ1 EMEA|No Idea||11.04.2026|W|L
+OQ1 EMEA|eLine Red|Loading Pink|11.04.2026|L|W
+OQ1 EMEA|eSports Cologne|5358|11.04.2026|L|W
+OQ1 EMEA|Ascension||11.04.2026|L|L
+OQ1 EMEA|RSI|Eclipse|11.04.2026|0|2
+OQ1 EMEA|Croquettes|Sidi Bou Speed|11.04.2026|2|0
+OQ1 EMEA|Nyxar Competitive|WINGS|11.04.2026|2|0
+OQ1 EMEA|B2 eSports|Nd60|11.04.2026|2|0
+OQ1 EMEA|Silnce 68|Brothers|11.04.2026|L|W
+OQ1 EMEA|No Idea|Loading Pink|11.04.2026|L|W
+OQ1 EMEA|5358||11.04.2026|W|L
+OQ1 EMEA|Eclipse|Croquettes|11.04.2026|2|1
+OQ1 EMEA|Nyxar Competitive|B2 eSports|11.04.2026|2|0
+OQ1 EMEA|Different Poles|Loading Pink|11.04.2026|2|0
+OQ1 EMEA|So visto|5358|11.04.2026|2|0
+OQ1 EMEA|B2 Flutlichtblau|Eclipse|11.04.2026|1|2
+OQ1 EMEA|Skill Issue|Nyxar Competitive|11.04.2026|0|2
+OQ1 EMEA|Different Poles|So visto|11.04.2026|2|1
+OQ1 EMEA|Eclipse|Nyxar Competitive|11.04.2026|L|W
+OQ1 EMEA|Kubki|Different Poles|11.04.2026|0|2
+OQ1 EMEA|Onyx Alpine|Nyxar Competitive|11.04.2026|L|W
+OQ1 EMEA|Different Poles|Nyxar Competitive|11.04.2026|2|0
+OQ3 AM|312 MPH||11.04.2026|W|L
+OQ3 AM|Holy Dynasty||11.04.2026|W|L
+OQ3 AM|UNC Racing||11.04.2026|W|L
+OQ3 AM|Who Let AIR Cook|MoeRU|11.04.2026|W|L
+OQ3 AM|312 MPH|Holy Dynasty|11.04.2026|0|2
+OQ3 AM|UNC Racing|Who Let AIR Cook|11.04.2026|2|0
+OQ3 AM||MoeRU|11.04.2026|L|W
+OQ1 EMEA|Silnce 68|Different Poles|11.04.2026|0|2
+OQ3 AM|Holy Dynasty|UNC Racing|11.04.2026|2|0
+OQ3 AM|312 MPH|MoeRU|11.04.2026|2|0
+OQ3 AM|Who Let AIR Cook||11.04.2026|W|L
+OQ1 EMEA|Brothers|Different Poles|11.04.2026|2|0
+OQ3 AM|312 MPH|Who Let AIR Cook|11.04.2026|0|2
+OQ3 AM|UNC Racing|312 MPH|11.04.2026|2|0
+OQ3 AM|Holy Dynasty|UNC Racing|11.04.2026|2|1
+OQ4 OCE|TMTAS 2||12.04.2026|W|L
+OQ4 OCE|PoleSitters|Team Abyssal|12.04.2026|0|2
+OQ4 OCE|TMWA Casual|TMTAS|12.04.2026|W|L
+OQ4 OCE|team name|Team Singapore|12.04.2026|0|2
+OQ4 OCE|TMTAS 2|Team Abyssal|12.04.2026|2|0
+OQ4 OCE|TMWA Casual|Team Singapore|12.04.2026|2|1
+OQ4 OCE||PoleSitters|12.04.2026|L|W
+OQ4 OCE|TMTAS|team name|12.04.2026|L|W
+OQ4 OCE|TMTAS 2|TMWA Casual|12.04.2026|1|2
+OQ4 OCE|Team Singapore|PoleSitters|12.04.2026|2|0
+OQ4 OCE|Team Abyssal|team name|12.04.2026|2|1
+OQ4 OCE|Team Singapore|Team Abyssal|12.04.2026|2|1
+OQ4 OCE|TMTAS 2|Team Singapore|12.04.2026|0|2
+OQ4 OCE|TMWA Casual|Team Singapore|12.04.2026|0|2
+OQ4 AM|312 MPH||12.04.2026|W|L
+OQ4 AM|UNC Racing|Who Let AIR Cook|12.04.2026|2|0
+OQ4 AM|MoeRU||12.04.2026|W|L
+OQ4 AM|Team crashgate|Turkey and the Cold Cuts|12.04.2026|W|L
+OQ4 AM|312 MPH|UNC Racing|12.04.2026|0|2
+OQ4 AM|MoeRU|Team crashgate|12.04.2026|2|0
+OQ4 AM||Who Let AIR Cook|12.04.2026|L|W
+OQ4 AM||Turkey and the Cold Cuts|12.04.2026|L|W
+OQ4 AM|UNC Racing|MoeRU|12.04.2026|2|0
+OQ4 AM|312 MPH|Turkey and the Cold Cuts|12.04.2026|2|0
+OQ4 AM|Team crashgate|Who Let AIR Cook|12.04.2026|0|2
+OQ4 AM|312 MPH|Who Let AIR Cook|12.04.2026|0|2
+OQ4 AM|MoeRU|312 MPH|12.04.2026|0|2
+OQ4 AM|UNC Racing|312 MPH|12.04.2026|2|0
+OQ5 OCE|PoleSitters|TMTAS 2|18.04.2026|1|2
+OQ5 OCE|team name|Team Abyssal|18.04.2026|2|0
+OQ5 OCE|TMTAS 2|team name|18.04.2026|1|2
+OQ5 OCE|PoleSitters|Team Abyssal|18.04.2026|2|0
+OQ5 OCE|TMTAS 2|PoleSitters|18.04.2026|2|0
+OQ5 OCE|team name|TMTAS 2|18.04.2026|2|1
+OQ3 EMEA|DRX Racing||18.04.2026|W|L
+OQ3 EMEA|Croquettes|5358|18.04.2026|2|0
+OQ3 EMEA|Comfy|Eline Express|18.04.2026|1|2
+OQ3 EMEA|B2 eSports|Danish Duo|18.04.2026|2|0
+OQ3 EMEA|Overdrive Staff|Habeqeq|18.04.2026|2|1
+OQ3 EMEA|Kubki|WINGS|18.04.2026|0|2
+OQ3 EMEA|groovegang|Skill Issue|18.04.2026|0|2
+OQ3 EMEA|F11|Pizza Hut Boys|18.04.2026|2|0
+OQ3 EMEA|DRX Racing|Croquettes|18.04.2026|0|2
+OQ3 EMEA|Eline Express|B2 eSports|18.04.2026|0|2
+OQ3 EMEA|Overdrive Staff|WINGS|18.04.2026|1|2
+OQ3 EMEA|Skill Issue|F11|18.04.2026|0|2
+OQ3 EMEA||5358|18.04.2026|L|W
+OQ3 EMEA|Comfy|Danish Duo|18.04.2026|2|1
+OQ3 EMEA|Habeqeq|Kubki|18.04.2026|2|0
+OQ3 EMEA|groovegang|Pizza Hut Boys|18.04.2026|2|0
+OQ3 EMEA|Croquettes|B2 eSports|18.04.2026|0|2
+OQ3 EMEA|WINGS|F11|18.04.2026|0|2
+OQ3 EMEA|Skill Issue|5358|18.04.2026|2|0
+OQ3 EMEA|Overdrive Staff|Comfy|18.04.2026|1|2
+OQ3 EMEA|Eline Express|Habeqeq|18.04.2026|2|1
+OQ3 EMEA|DRX Racing|groovegang|18.04.2026|1|2
+OQ3 EMEA|B2 eSports|F11|18.04.2026|0|2
+OQ3 EMEA|Skill Issue|Comfy|18.04.2026|1|2
+OQ3 EMEA|Eline Express|groovegang|18.04.2026|2|0
+OQ3 EMEA|WINGS|Comfy|18.04.2026|0|2
+OQ3 EMEA|Croquettes|Eline Express|18.04.2026|0|2
+OQ3 EMEA|Comfy|Eline Express|18.04.2026|2|1
+OQ3 EMEA|B2 eSports|Comfy|18.04.2026|0|2
+OQ3 EMEA|F11|Comfy|18.04.2026|2|0
+OQ5 AM|Turkey and the Cold Cuts|Surge|18.04.2026|2|1
+OQ6 AM|MoeRU|Team crashgate|18.04.2026|2|0
+OQ6 AM||312 MPH|18.04.2026|L|W
+OQ6 AM|MoeRU|312 MPH|18.04.2026|2|1
+OQ6 AM|Team crashgate||18.04.2026|W|L
+OQ6 AM|312 MPH|Team crashgate|18.04.2026|2|0
+OQ6 AM|MoeRU|312 MPH|18.04.2026|2|0
+OQ6 OCE|TMTAS 2|Team Abyssal|19.04.2026|0|2
+OQ6 OCE|TMWA Casual|PoleSitters|19.04.2026|2|0
+OQ6 OCE|Team Abyssal|TMWA Casual|19.04.2026|0|2
+OQ6 OCE|TMTAS 2|PoleSitters|19.04.2026|2|0
+OQ6 OCE|Team Abyssal|TMTAS 2|19.04.2026|2|1
+OQ6 OCE|TMWA Casual|Team Abyssal|19.04.2026|2|0
+OQ7 OCE|TMTAS 2|Team Abyssal|25.04.2026|1|2
+OQ7 AM|Onyx X SHIFT|Who Let AIR Cook|25.04.2026|2|0
+OQ8 OCE|TMTAS 2|PoleSitters|26.04.2026|2|1
+OQ6 EMEA|Loading Pink||26.04.2026|W|L
+OQ6 EMEA|groovegang|eLine Red|26.04.2026|0|2
+OQ6 EMEA|Habeqeq|Danish Duo|26.04.2026|0|2
+OQ6 EMEA|WINGS|Skill Issue|26.04.2026|0|2
+OQ6 EMEA|Loading Pink|eLine Red|26.04.2026|0|2
+OQ6 EMEA|Danish Duo|Skill Issue|26.04.2026|2|0
+OQ6 EMEA||groovegang|26.04.2026|L|W
+OQ6 EMEA|Habeqeq|WINGS|26.04.2026|1|2
+OQ6 EMEA|eLine Red|Danish Duo|26.04.2026|0|2
+OQ6 EMEA|Skill Issue|groovegang|26.04.2026|2|0
+OQ6 EMEA|Loading Pink|WINGS|26.04.2026|2|1
+OQ6 EMEA|Skill Issue|Loading Pink|26.04.2026|0|2
+OQ6 EMEA|eLine Red|Loading Pink|26.04.2026|2|0
+OQ6 EMEA|Danish Duo|eLine Red|26.04.2026|2|0
+OQ8 AM|Team crashgate||26.04.2026|W|L
+OQ8 AM|Who Let AIR Cook|312 MPH|26.04.2026|1|2
+OQ8 AM|Team crashgate|312 MPH|26.04.2026|0|2
+OQ8 AM||Who Let AIR Cook|26.04.2026|L|W
+OQ8 AM|Team crashgate|Who Let AIR Cook|26.04.2026|0|2
+OQ8 AM|312 MPH|Who Let AIR Cook|26.04.2026|1|2
+OQ7 EMEA|Loading Pink|groovegang|09.05.2026|2|0
+OQ7 EMEA|Skill Issue|Croquettes|09.05.2026|2|0
+OQ7 EMEA|Habeqeq|Campagna T-Rex|09.05.2026|1|2
+OQ7 EMEA|Overdrive Staff|WINGS|09.05.2026|2|0
+OQ7 EMEA|Loading Pink|Skill Issue|09.05.2026|2|1
+OQ7 EMEA|Campagna T-Rex|Overdrive Staff|09.05.2026|2|0
+OQ7 EMEA|groovegang|Croquettes|09.05.2026|0|2
+OQ7 EMEA|Habeqeq|WINGS|09.05.2026|2|0
+OQ7 EMEA|Loading Pink|Campagna T-Rex|09.05.2026|2|0
+OQ7 EMEA|Overdrive Staff|Croquettes|09.05.2026|2|0
+OQ7 EMEA|Skill Issue|Habeqeq|09.05.2026|0|2
+OQ7 EMEA|Overdrive Staff|Habeqeq|09.05.2026|0|2
+OQ7 EMEA|Campagna T-Rex|Habeqeq|09.05.2026|1|2
+OQ7 EMEA|Loading Pink|Habeqeq|09.05.2026|1|2
+OQ8 EMEA|Skill Issue|WINGS|10.05.2026|2|1
+OQ8 EMEA|DRX Racing||10.05.2026|W|L
+OQ8 EMEA|Skill Issue|DRX Racing|10.05.2026|2|0
+OQ8 EMEA|WINGS||10.05.2026|W|L
+OQ8 EMEA|DRX Racing|WINGS|10.05.2026|0|2
+OQ8 EMEA|Skill Issue|WINGS|10.05.2026|2|0
+OQ4 EMEA|No Idea||19.05.2026|W|L
+OQ4 EMEA|Onyx Alpine||19.05.2026|W|L
+OQ4 EMEA|Skill Issue|Pizza Hut Boys|19.05.2026|2|0
+OQ4 EMEA|WINGS|Ascension|19.05.2026|2|0
+OQ4 EMEA|Nd60|Danish Duo|19.05.2026|0|2
+OQ4 EMEA|Loading Pink|B2 Flutlichtblau|19.05.2026|2|0
+OQ4 EMEA|Habeqeq|Eline Express|19.05.2026|0|2
+OQ4 EMEA|groovegang|DRX Racing|19.05.2026|2|1
+OQ4 EMEA|No Idea|Onyx Alpine|19.05.2026|0|2
+OQ4 EMEA|Skill Issue|WINGS|19.05.2026|2|0
+OQ4 EMEA|Danish Duo|Loading Pink|19.05.2026|2|0
+OQ4 EMEA|Eline Express|groovegang|19.05.2026|2|0
+OQ4 EMEA|Pizza Hut Boys|Ascension|19.05.2026|0|2
+OQ4 EMEA|Nd60|B2 Flutlichtblau|19.05.2026|0|2
+OQ4 EMEA|Habeqeq|DRX Racing|19.05.2026|2|0
+OQ4 EMEA|Onyx Alpine|Skill Issue|19.05.2026|2|0
+OQ4 EMEA|Danish Duo|Eline Express|19.05.2026|2|0
+OQ4 EMEA|groovegang||19.05.2026|W|L
+OQ4 EMEA|Loading Pink|Ascension|19.05.2026|1|2
+OQ4 EMEA|WINGS|B2 Flutlichtblau|19.05.2026|1|2
+OQ4 EMEA|No Idea|Habeqeq|19.05.2026|2|0
+OQ4 EMEA|Onyx Alpine|Danish Duo|19.05.2026|2|0
+OQ4 EMEA|groovegang|Ascension|19.05.2026|2|1
+OQ4 EMEA|B2 Flutlichtblau|No Idea|19.05.2026|0|2
+OQ4 EMEA|Eline Express|groovegang|19.05.2026|2|0
+OQ4 EMEA|Skill Issue|No Idea|19.05.2026|0|2
+OQ4 EMEA|Eline Express|No Idea|19.05.2026|2|1
+OQ4 EMEA|Danish Duo|Eline Express|19.05.2026|0|2
+OQ4 EMEA|Onyx Alpine|Eline Express|19.05.2026|2|0
+OQ5 EMEA|Nd60||25.05.2026|W|L
+OQ5 EMEA|No Idea||25.05.2026|W|L
+OQ5 EMEA|Pizza Hut Boys||25.05.2026|W|L
+OQ5 EMEA|Requiem||25.05.2026|W|L
+OQ5 EMEA|Croquettes||25.05.2026|W|L
+OQ5 EMEA|WINGS||25.05.2026|W|L
+OQ5 EMEA|Loading Pink||25.05.2026|W|L
+OQ5 EMEA|eLine Red|Skill Issue|25.05.2026|2|0
+OQ5 EMEA|Nd60|No Idea|25.05.2026|0|2
+OQ5 EMEA|Pizza Hut Boys|Requiem|25.05.2026|0|2
+OQ5 EMEA|Croquettes|WINGS|25.05.2026|2|0
+OQ5 EMEA|Loading Pink|eLine Red|25.05.2026|0|2
+OQ5 EMEA||Skill Issue|25.05.2026|L|W
+OQ5 EMEA|No Idea|Requiem|25.05.2026|1|2
+OQ5 EMEA|Croquettes|eLine Red|25.05.2026|0|2
+OQ5 EMEA|Loading Pink||25.05.2026|W|L
+OQ5 EMEA|WINGS||25.05.2026|W|L
+OQ5 EMEA|Pizza Hut Boys||25.05.2026|W|L
+OQ5 EMEA|Nd60|Skill Issue|25.05.2026|0|2
+OQ5 EMEA|Requiem|eLine Red|25.05.2026|2|1
+OQ5 EMEA|Loading Pink|WINGS|25.05.2026|2|0
+OQ5 EMEA|Pizza Hut Boys|Skill Issue|25.05.2026|0|2
+OQ5 EMEA|Croquettes|Loading Pink|25.05.2026|2|1
+OQ5 EMEA|No Idea|Skill Issue|25.05.2026|2|0
+OQ5 EMEA|Croquettes|No Idea|25.05.2026|0|2
+OQ5 EMEA|eLine Red|No Idea|25.05.2026|1|2
+OQ5 EMEA|Requiem|No Idea|25.05.2026|0|2

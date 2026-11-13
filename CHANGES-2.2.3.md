@@ -1,0 +1,22 @@
+# Overdrive 2.2.3: verified OverDrive 2026 tournament dataset
+
+- **`public/season/overdrive-2026.json`** is the single offline dataset. It is served as `/season/overdrive-2026.json` and is part of every build, so it needs neither Google Sheets nor Render at runtime. It holds:
+  - 61 tournaments and stages: Split 1 and Split 2 leagues, playoffs, promotion/barrage, the Wildcard, the Major (dates only), and every Open Qualifier and Continental in 3 regions;
+  - 108 teams, using the site sheet's own `TEAM_xxxx` ids, plus 2 provisional Split 1 entries;
+  - 247 players and 851 matches, with track scores where the sheets have them;
+  - standings, Split 1 weekly snapshots, Continental placings and the Overpoints ranking;
+  - Split 1 player times and track records, broadcasts, viewership, articles and socials.
+- **Sources** are the read-only exports of the two verified sheets in `season-data/source/2026/`: the tinySheet and the overdrivegg.com data sheet, read 13 Nov 2026.
+  - The importer `scripts/season/import_season.py` links names to teams only by evidence: the same name, the sheet's own `team_id`, or its previous-name column.
+  - Everything else is kept as written and reported in `season-data/IMPORT-REPORT-2026.md`.
+- **Graphics binding.** This uses the existing data path: `seasonOf()`, which feeds the analyst desk's Head to head and the match-intro "Fill roads from the season" button.
+  - Curated lines in `shared/season.ts` stay as they are.
+  - `shared/seasonVerified.ts` (generated) fills empty fields and corrects one contradicted record: COOK's Split 1 changes from "5th (4–4)" to the verified "6th (4–5)".
+  - Lines whose Split 1 predecessor team is unconfirmed (FUT Esports, Natus Vincere) are left as curated.
+  - No layout or design changes.
+- **`tests/dataset.test.ts`** has 20 checks:
+  - every source row is imported once;
+  - ids are unique and every reference resolves;
+  - league tables recomputed from the 180 league matches equal the sheets' standings;
+  - Major logos exist;
+  - the season merge behaves as described.

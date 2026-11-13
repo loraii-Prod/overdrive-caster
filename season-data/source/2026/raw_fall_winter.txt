@@ -1,0 +1,125 @@
+fall|Division 1|TEAM_0010|TEAM_0005|VP x Neon|GenG x Legu|04.09.2026||canceled||FF|FF
+fall|Division 1|TEAM_0003|TEAM_0009|PACB|Airwalkers|04.09.2026||COMPLETED|Airwalkers|FF|W
+fall|Division 1|TEAM_0003|TEAM_0014|PACB|Ragnarok|04.09.2026||canceled||FF|FF
+fall|Division 1|TEAM_0001|TEAM_0002|BIG|All Gamers|04.09.2026||COMPLETED|BIG|W|FF
+fall|Division 1|TEAM_0001|TEAM_0014|BIG|Ragnarok|04.09.2026||COMPLETED|BIG|W|FF
+fall|Division 1|TEAM_0007|TEAM_0005|COOK|GenG x Legu|04.09.2026||COMPLETED|COOK|W|FF
+fall|Division 1|TEAM_0003|TEAM_0004|PACB|Weibo x FUT|04.09.2026||COMPLETED|Weibo x FUT|FF|W
+fall|Division 1|TEAM_0010|TEAM_0009|VP x Neon|Airwalkers|04.09.2026||COMPLETED|Airwalkers|FF|W
+fall|Division 1|TEAM_0004|TEAM_0014|Weibo x FUT|Ragnarok|04.09.2026||COMPLETED|Weibo x FUT|W|FF
+fall|Division 1|TEAM_0002|TEAM_0011|All Gamers|SHIFT|04.09.2026||COMPLETED|SHIFT|FF|W
+fall|Division 1|TEAM_0010|TEAM_0011|VP x Neon|SHIFT|04.09.2026||COMPLETED|SHIFT|FF|W
+fall|Division 1|TEAM_0002|TEAM_0005|All Gamers|GenG x Legu|04.09.2026||canceled||FF|FF
+fall|Division 1|TEAM_0004|TEAM_0005|Weibo x FUT|GenG x Legu|04.09.2026||COMPLETED|Weibo x FUT|W|FF
+fall|Division 1|TEAM_0011|TEAM_0014|SHIFT|Ragnarok|04.09.2026||COMPLETED|SHIFT|W|FF
+fall|Division 1|TEAM_0010|TEAM_0002|VP x Neon|All Gamers|04.09.2026||canceled||FF|FF
+fall|Division 1|TEAM_0002|TEAM_0003|All Gamers|PACB|04.09.2026||canceled||FF|FF
+fall|Division 1|TEAM_0010|TEAM_0007|VP x Neon|COOK|04.09.2026||COMPLETED|COOK|FF|W
+fall|Division 1|TEAM_0001|TEAM_0003|BIG|PACB|04.09.2026||COMPLETED|BIG|W|FF
+fall|Division 1|TEAM_0005|TEAM_0014|GenG x Legu|Ragnarok|04.09.2026||canceled||FF|FF
+fall|Division 1|TEAM_0009|TEAM_0014|Airwalkers|Ragnarok|04.09.2026||COMPLETED|Airwalkers|W|FF
+fall|Division 1|TEAM_0010|TEAM_0003|VP x Neon|PACB|04.09.2026||canceled||FF|FF
+fall|Division 1|TEAM_0001|TEAM_0005|BIG|GenG x Legu|04.09.2026||COMPLETED|BIG|W|FF
+fall|Division 1|TEAM_0002|TEAM_0009|All Gamers|Airwalkers|04.09.2026||COMPLETED|Airwalkers|FF|W
+fall|Division 1|TEAM_0010|TEAM_0014|VP x Neon|Ragnarok|04.09.2026||canceled||FF|FF
+fall|Division 1|TEAM_0003|TEAM_0011|PACB|SHIFT|04.09.2026||COMPLETED|SHIFT|FF|W
+fall|Division 1|TEAM_0001|TEAM_0010|BIG|VP x Neon|04.09.2026||COMPLETED|BIG|W|FF
+fall|Division 1|TEAM_0007|TEAM_0014|COOK|Ragnarok|04.09.2026||COMPLETED|COOK|W|FF
+fall|Division 1|TEAM_0003|TEAM_0005|PACB|GenG x Legu|04.09.2026||canceled||FF|FF
+fall|Division 1|TEAM_0005|TEAM_0011|GenG x Legu|SHIFT|04.09.2026||COMPLETED|SHIFT|FF|W
+fall|Division 1|TEAM_0002|TEAM_0004|All Gamers|Weibo x FUT|04.09.2026||COMPLETED|Weibo x FUT|FF|W
+fall|Division 1|TEAM_0003|TEAM_0007|PACB|COOK|04.09.2026||COMPLETED|COOK|FF|W
+fall|Division 1|TEAM_0010|TEAM_0004|VP x Neon|Weibo x FUT|04.09.2026||COMPLETED|Weibo x FUT|FF|W
+fall|Division 1|TEAM_0002|TEAM_0007|All Gamers|COOK|04.09.2026||COMPLETED|COOK|FF|W
+fall|Division 1|TEAM_0002|TEAM_0014|All Gamers|Ragnarok|04.09.2026||canceled||FF|FF
+fall|Division 1|TEAM_0009|TEAM_0005|Airwalkers|GenG x Legu|04.09.2026||COMPLETED|Airwalkers|W|FF
+fall|Division 2|TEAM_0020|BYE|PIWO||04.09.2026||canceled||||
+fall|Division 2|TEAM_0021|BYE|Brothers||04.09.2026||canceled||||
+fall|Division 2|TEAM_0023|BYE|Rex Regum Qeon||04.09.2026||canceled||||
+fall|Division 2|TEAM_0022|BYE|Onyx||04.09.2026||canceled||||
+fall|Division 2|TEAM_0006|BYE|NAVI x Joel||04.09.2026||canceled||||
+fall|Division 2|TEAM_0015|BYE|Grassboyz||04.09.2026||canceled||||
+fall|Division 2|TEAM_0024|BYE|UNC Racing||04.09.2026||canceled||||
+fall|Division 2|TEAM_0012|BYE|rnboi||04.09.2026||canceled||||
+fall|Division 2|TEAM_0019|BYE|Halcyon||04.09.2026||canceled||||
+fall|Division 2|TEAM_0006|TEAM_0012|Nemesis x Navi|rnboi|06.09.2026|14:00|COMPLETED|Nemesis x Navi|3|0|Argentina|11|1|Norway|10|2|Japan|10|2
+fall|Division 2|TEAM_0006|TEAM_0024|Nemesis x Navi|UNC Racing|06.09.2026|16:00|COMPLETED|Nemesis x Navi|3|0|Argentina|10|2|Saudi Arabia|11|1|Poland|11|1
+fall|Division 1|TEAM_0001|TEAM_0007|BIG|COOK|06.09.2026|17:00|COMPLETED|BIG|3|1|Poland|7|12|Norway|10|4|Saudi Arabia|10|2|Argentina||
+fall|Division 1|TEAM_0004|TEAM_0009|Weibo x FUT|Airwalkers|06.09.2026|19:00|COMPLETED|Weibo x FUT|3|1|Argentina|10|3|Japan|10|5|Saudi Arabia|4|11|Norway||
+fall|Division 2|TEAM_0019|TEAM_0022|Halcyon|Onyx|06.09.2026|19:00|COMPLETED|Halcyon|3|2|Saudi Arabia|6|11|Norway|3|10|Argentina|12|3|Japan||
+fall|Division 2|TEAM_0021|TEAM_0023|Brothers|Rex Regum Qeon|06.09.2026|19:00|COMPLETED|Brothers|3|0|Japan|11|1|Saudi Arabia|12|7|Poland|12|4
+fall|Division 2|TEAM_0006|TEAM_0019|Nemesis x Navi|Halcyon|06.09.2026|19:00|COMPLETED|Nemesis x Navi|3|0|Argentina|10|6|Japan|10|5|Saudi Arabia|13|10
+fall|Division 1|TEAM_0004|TEAM_0007|Weibo x FUT|COOK|06.09.2026|20:00|COMPLETED|Weibo x FUT|3|0|Japan|10|8|Poland|11|8|Saudi Arabia|12|8
+fall|Division 2|TEAM_0022|TEAM_0024|Onyx|UNC Racing|06.09.2026|20:30|COMPLETED|Onyx|3|0|Argentina|12|2|Poland|10|6|Saudi Arabia|10|2
+fall|Division 2|TEAM_0015|TEAM_0021|Grassboyz|Brothers|18.09.2026|17:00|COMPLETED|Brothers|1|3|Saudi Arabia|10|1|Poland|2|10|Japan|5|10|Argentina||
+fall|Division 2|TEAM_0006|TEAM_0023|NAVI x Joel|Rex Regum Qeon|18.09.2026|21:00|COMPLETED|NAVI x Joel|3|0|Argentina|10|2|Japan|10|9|Poland|10|4
+fall|Division 2|TEAM_0015|TEAM_0022|Grassboyz|Onyx|18.09.2026|21:00|COMPLETED|Onyx|1|3|Saudi Arabia|10|6|Norway|1|11|Japan|11|12|Poland||
+fall|Division 2|TEAM_0012|TEAM_0020|rnboi|PIWO|19.09.2026|16:00|COMPLETED|rnboi|3|2
+fall|Division 2|TEAM_0020|TEAM_0019|PIWO|Halcyon|19.09.2026|17:00|COMPLETED|Halcyon|1|3|Saudi Arabia|3|11|Japan|7|11|Norway|10|5|Poland||
+fall|Division 2|TEAM_0012|TEAM_0023|rnboi|Rex Regum Qeon|19.09.2026|18:00|COMPLETED|rnboi|3|1|Japan|10|9|Saudi Arabia|10|13|Poland|12|6|Argentina||
+fall|Division 2|TEAM_0022|TEAM_0023|Onyx|Rex Regum Qeon|19.09.2026|19:00|COMPLETED|Onyx|3|0|Norway|10|2|Japan|10|8|Saudi Arabia|11|1
+fall|Division 1|TEAM_0007|TEAM_0009|COOK|Airwalkers|20.09.2026|17:00|COMPLETED|Airwalkers|0|3|Poland|6|12|Saudi Arabia|4|11|Japan|5|12
+fall|Division 1|TEAM_0009|TEAM_0011|Airwalkers|SHIFT|20.09.2026|18:00|COMPLETED|Airwalkers|3|0|Saudi Arabia|11|3|Argentina|11|4|Norway|11|7
+fall|Division 2|TEAM_0019|TEAM_0021|Halcyon|Brothers|20.09.2026|18:00|COMPLETED|Halcyon|3|1|Japan|10|8|Poland|||Saudi Arabia|5|10|Argentina||
+fall|Division 2|TEAM_0006|TEAM_0020|NAVI x Joel|PIWO|20.09.2026|21:00|COMPLETED|NAVI x Joel|3|0
+fall|Division 2|TEAM_0012|TEAM_0019|rnboi|Halcyon|25.09.2026|20:00|COMPLETED|Halcyon|2|3|Poland|10|7|Saudi Arabia|4|10|Japan|11|7|Argentina||
+fall|Division 2|TEAM_0020|TEAM_0023|PIWO|Rex Regum Qeon|26.09.2026|17:00|COMPLETED|PIWO|3|1|Argentina|11|3|Saudi Arabia|10|6|Japan|8|11|Norway||
+fall|Division 2|TEAM_0006|TEAM_0022|NAVI x Joel|Onyx|26.09.2026|20:00|COMPLETED|NAVI x Joel|3|0|Argentina|11|1|Japan|10|7|Poland|10|4
+fall|Division 2|TEAM_0012|TEAM_0024|rnboi|UNC Racing|26.09.2026|21:00|COMPLETED|UNC Racing|0|3
+fall|Division 2|TEAM_0023|TEAM_0024|Rex Regum Qeon|UNC Racing|27.09.2026|16:00|COMPLETED|Rex Regum Qeon|3|0|Japan|11|2|Norway|12|7|Saudi Arabia|10|1
+fall|Division 2|TEAM_0020|TEAM_0024|PIWO|UNC Racing|27.09.2026|17:00|COMPLETED|PIWO|3|0|Japan|12|2|Norway|12|8|Poland|10|2|Argentina||
+fall|Division 1|TEAM_0007|TEAM_0011|COOK|SHIFT|27.09.2026|20:00|COMPLETED|COOK|3|0|Norway|11|5|Poland|11|7|Saudi Arabia|11|5
+fall|Division 1|TEAM_0001|TEAM_0004|BIG|Weibo x FUT|27.09.2026|20:00|COMPLETED|BIG|3|0|Argentina|11|2|Poland|11|5|Norway|13|10|Japan||
+fall|Division 2|TEAM_0006|TEAM_0015|NAVI x Joel|Grassboyz|27.09.2026|20:00|COMPLETED|NAVI x Joel|3|0|Argentina|10|2|Saudi Arabia|11|7|Japan|10|8
+fall|Division 1|TEAM_0004|TEAM_0011|Weibo x FUT|SHIFT|27.09.2026|21:00|COMPLETED|Weibo x FUT|3|0|Norway|11|3|Japan|11|8|Poland|11|5|Argentina||
+fall|Division 2|TEAM_0012|TEAM_0015|rnboi|Grassboyz|27.09.2026|21:00|COMPLETED|rnboi|3|0|Poland|10|8|Saudi Arabia|12|2|Japan|10|2
+fall|Division 2|TEAM_0012|TEAM_0022|rnboi|Onyx|01.10.2026|21:00|COMPLETED|Onyx|2|3
+fall|Division 2|TEAM_0021|TEAM_0022|Brothers|Onyx|02.10.2026|18:00|COMPLETED|Onyx|2|3|Saudi Arabia|6|12|Norway|11|5|Japan|12|7|Poland||
+fall|Division 2|TEAM_0020|TEAM_0021|PIWO|Brothers|03.10.2026|17:00|COMPLETED|Brothers|0|3|Japan|11|14|Argentina|9|11|Norway|3|10|Poland||
+fall|Division 2|TEAM_0015|TEAM_0019|Grassboyz|Halcyon|03.10.2026|18:00|COMPLETED|Halcyon|0|3|Argentina|3|12|Saudi Arabia|6|12|Japan|3|10|Poland||
+fall|Division 2|TEAM_0015|TEAM_0024|Grassboyz|UNC Racing|03.10.2026|19:00|COMPLETED|Grassboyz|3|1|Saudi Arabia|12|2|Norway|1|10|Poland|11|4|Japan||
+fall|Division 2|TEAM_0020|TEAM_0022|PIWO|Onyx|03.10.2026|19:00|COMPLETED|PIWO|3|2|Norway|10|7|Saudi Arabia|5|11|Argentina|3|12|Japan||
+fall|Division 2|TEAM_0006|TEAM_0021|NAVI x Joel|Brothers|03.10.2026|20:00|COMPLETED|NAVI x Joel|3|1|Argentina|11|6|Japan|6|10|Saudi Arabia|12|8|Norway||
+fall|Division 2|TEAM_0015|TEAM_0020|Grassboyz|PIWO|03.10.2026|21:00|COMPLETED|PIWO|0|3|Norway|0|12|Saudi Arabia|7|10|Japan|8|12
+fall|Division 2|TEAM_0012|TEAM_0021|rnboi|Brothers|03.10.2026|22:00|COMPLETED|Brothers|0|3
+fall|Division 2|TEAM_0015|TEAM_0023|Grassboyz|Rex Regum Qeon|04.10.2026|15:30|COMPLETED|Rex Regum Qeon|0|3|Saudi Arabia|8|10|Japan|5|12|Norway|0|12
+fall|Division 1|TEAM_0001|TEAM_0011|BIG|SHIFT|04.10.2026|16:00|COMPLETED|BIG|3|0|Argentina|11|5|Norway|10|2|Saudi Arabia|10|6|Poland||
+fall|Division 1|TEAM_0001|TEAM_0009|BIG|Airwalkers|04.10.2026|17:00|COMPLETED|BIG|3|0|Argentina|10|2|Saudi Arabia|12|2|Japan|10|2|Norway||
+fall|Division 2|TEAM_0021|TEAM_0024|Brothers|UNC Racing|04.10.2026|18:00|COMPLETED|Brothers|3|1|Norway|5|11|Japan|10|3|Poland|12|2|Argentina||
+fall|Division 2|TEAM_0019|TEAM_0023|Halcyon|Rex Regum Qeon|04.10.2026|18:00|COMPLETED|Halcyon|3|1|Japan|10|11|Norway|10|7|Saudi Arabia|10|5|Argentina||
+fall|Division 2|TEAM_0019|TEAM_0024|Halcyon|UNC Racing|04.10.2026|20:15|COMPLETED|Halcyon|3|0|Poland|11|4|Norway|10|9|Japan|10|7
+fall|Promotion & Relegation|TEAM_0024|TEAM_0016|UNC Racing|Loading|10.10.2026|16:00|COMPLETED|Loading|0|3|Norway|9|11|Argentina|2|10|Japan|7|11
+fall|Promotion & Relegation|TEAM_0023|TEAM_0102|Rex Regum Qeon|ocd Competitive|10.10.2026|18:00|COMPLETED|Rex Regum Qeon|3|1|Japan|12|0|Saudi Arabia|11|4|Poland|7|10|Norway||
+fall|Division 1 Playoffs|TEAM_0001|TEAM_0007|BIG|COOK|11.10.2026|17:00|COMPLETED|BIG|3|0|Argentina|11|1|Norway|12|2|Poland|11|7|Japan||
+fall|Division 1 Playoffs|TEAM_0004|TEAM_0009|Weibo x FUT|Airwalkers|11.10.2026|17:00|COMPLETED|Weibo x FUT|3|1|Argentina|10|9|Saudi Arabia|1|10|Japan|12|3|Norway||
+fall|Promotion & Relegation|TEAM_0015|TEAM_0027|Grassboyz|Team Abyssal|11.10.2026|17:00|COMPLETED|Grassboyz|3|1
+fall|Division 1 Playoffs|TEAM_0001|TEAM_0004|BIG|Weibo x FUT|11.10.2026|18:00|COMPLETED|BIG|3|0|Argentina|11|4|Norway|12|9|Japan|10|1|Saudi Arabia||
+fall|Division 1 Playoffs|TEAM_0007|TEAM_0009|COOK|Airwalkers|11.10.2026|18:00|canceled||FF|FF
+fall|Division 1 Playoffs|TEAM_0004|BYE|Weibo x FUT||11.10.2026|19:00|canceled||||
+fall|Division 1 Playoffs|TEAM_0001|W_MATCH_0842|BIG||11.10.2026|20:00|canceled||||
+winter|Wildcard|TEAM_0002|BYE|All Gamers||07.11.2026|15:00|COMPLETED|All Gamers|W|L
+winter|Wildcard|TEAM_0023|TEAM_0014|BOMBO|Ragnarok|07.11.2026|15:00|COMPLETED|Ragnarok|0|3|New Zealand|3|11|Czech Republic|2|11|Egypt|7|12
+winter|Wildcard|TEAM_0012|TEAM_0027|rnboi|Team Abyssal|07.11.2026|15:00|COMPLETED|rnboi|3|0|New Zealand|11|9|Czech Republic|10|3|India|11|1|United Kingdom||
+winter|Wildcard|TEAM_0005|TEAM_0102|Team Nyxbar|Dyslexai|07.11.2026|15:00|COMPLETED|Team Nyxbar|3|0|India|11|6|Egypt|10|2|United Kingdom|10|3
+winter|Wildcard|TEAM_0006|TEAM_0076|NAVI x Joel|TMTAS|07.11.2026|15:00|COMPLETED|NAVI x Joel|3|0|India|11|2|United Kingdom|10|1|Czech Republic|12|0
+winter|Wildcard|TEAM_0021|TEAM_0083|Brothers|Nyxar Competitive|07.11.2026|15:00|COMPLETED|Brothers|3|1|Czech Republic|9|12|United Kingdom|10|4|New Zealand|10|4|India||
+winter|Wildcard|TEAM_0020|TEAM_0016|PIWO|Loading|07.11.2026|15:00|COMPLETED|PIWO|3|1||11|2||12|2|Czech Republic|5|10|New Zealand||
+winter|Wildcard|TEAM_0011|TEAM_0069|ONIC x Josh|WINGS|07.11.2026|15:00|COMPLETED|ONIC x Josh|3|0|India|12|4|United Kingdom|10|5|Czech Republic|11|1
+winter|Wildcard|TEAM_0002|TEAM_0014|All Gamers|Ragnarok|07.11.2026|16:00|COMPLETED|Ragnarok|1|3|Egypt|12|11|Czech Republic|6|12|New Zealand|5|12|India||
+winter|Wildcard|TEAM_0012|TEAM_0005|rnboi|Team Nyxbar|07.11.2026|16:00|COMPLETED|rnboi|3|2|New Zealand|7|10|United Kingdom|10|5|India|8|10|Czech Republic||
+winter|Wildcard|TEAM_0006|TEAM_0021|NAVI x Joel|Brothers|07.11.2026|16:00|COMPLETED|NAVI x Joel|3|0
+winter|Wildcard|TEAM_0020|TEAM_0011|PIWO|ONIC x Josh|07.11.2026|16:00|COMPLETED|ONIC x Josh|0|3|United Kingdom|3|11|India|5|10|Czech Republic|5|10|New Zealand||
+winter|Wildcard|BYE|TEAM_0023||BOMBO|07.11.2026|16:00|COMPLETED|BOMBO|L|W
+winter|Wildcard|TEAM_0027|TEAM_0102|Team Abyssal|Dyslexai|07.11.2026|16:00|COMPLETED|Team Abyssal|3|2|Egypt|11|6|United Kingdom|4|10|Czech Republic|3|11|India||
+winter|Wildcard|TEAM_0076|TEAM_0083|TMTAS|Nyxar Competitive|07.11.2026|16:00|COMPLETED|Nyxar Competitive|0|3|Egypt|2|12|New Zealand|6|12|India|5|12
+winter|Wildcard|TEAM_0016|TEAM_0069|Loading|WINGS|07.11.2026|16:00|COMPLETED|Loading|3|1|Czech Republic|10|8|New Zealand|3|10|United Kingdom|10|7|Egypt||
+winter|Wildcard|TEAM_0014|TEAM_0012|Ragnarok|rnboi|07.11.2026|17:00|COMPLETED|Ragnarok|3|0|Czech Republic|10|3|India|11|4|United Kingdom|10|7
+winter|Wildcard|TEAM_0006|TEAM_0011|NAVI x Joel|ONIC x Josh|07.11.2026|18:00|COMPLETED|NAVI x Joel|3|0|India|10|6|United Kingdom|12|4|Czech Republic|3|10|New Zealand||
+winter|Wildcard|TEAM_0020|TEAM_0023|PIWO|BOMBO|08.11.2026|15:00|COMPLETED|BOMBO|0|3||||||New Zealand|8|11
+winter|Wildcard|TEAM_0021|TEAM_0027|Brothers|Team Abyssal|08.11.2026|15:00|COMPLETED|Brothers|3|0|India|10|4|United Kingdom|11|2|Egypt|11|2|New Zealand||
+winter|Wildcard|TEAM_0005|TEAM_0083|Team Nyxbar|Nyxar Competitive|08.11.2026|15:00|COMPLETED|Team Nyxbar|W|FF
+winter|Wildcard|TEAM_0002|TEAM_0016|All Gamers|Loading|08.11.2026|15:00|COMPLETED|All Gamers|3|0|United Kingdom|11|1|Egypt|11|1|Czech Republic|10|6
+winter|Wildcard|TEAM_0023|TEAM_0021|BOMBO|Brothers|08.11.2026|16:00|COMPLETED|Brothers|1|3|India|5|11|United Kingdom|11|10|New Zealand|6|10|Czech Republic||
+winter|Wildcard|TEAM_0005|TEAM_0002|Team Nyxbar|All Gamers|08.11.2026|16:00|COMPLETED|All Gamers|2|3|India|10|6|New Zealand|10|6|Egypt|3|12|United Kingdom||
+winter|Wildcard|TEAM_0012|TEAM_0021|rnboi|Brothers|08.11.2026|17:00|COMPLETED|rnboi|3|2|India|12|4|New Zealand|10|9|Czech Republic|4|10|United Kingdom||
+winter|Wildcard|TEAM_0011|TEAM_0002|ONIC x Josh|All Gamers|08.11.2026|18:00|COMPLETED|All Gamers|2|3|India|3|12|Egypt|10|4|United Kingdom|10|8|New Zealand||

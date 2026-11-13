@@ -1,0 +1,102 @@
+stage,match_code,base_week,base_dates,played_week,date,time_cest,team_a,score_a,score_b,team_b,winner,track1,track2,track3,track4,track5,track_data,admin,comment,check
+Div 1,D1M02,1,03-05.04.2026,1,03.04.2026,18:00,Navi,2,3,COOK,COOK,10-1,5-12,10-1,8-10,4-10,ok,,,ok
+Div 1,D1M07,1,03-05.04.2026,1,03.04.2026,21:00,All Gamers,3,0,Navi,All Gamers,11-1,11-4,11-7,,,ok,,,ok
+Div 1,D1M13,2,10-12.04.2026,1,04.04.2026,13:00,All Gamers,3,0,GenG x Weibo,All Gamers,12-6,13-10,12-3,,,ok,,,ok
+Div 1,D1M01,1,03-05.04.2026,1,04.04.2026,14:00,GenG x Weibo,3,2,S8UL,GenG x Weibo,10-6,3-11,9-11,11-5,10-6,ok,,,ok
+Div 2,D2M02,1,03-05.04.2026,1,04.04.2026,17:00,TempoBros,3,0,Va Bene,TempoBros,11-3,10-4,12-3,,,ok,,,ok
+Div 2,D2M03,1,03-05.04.2026,1,04.04.2026,17:00,SHIFT,3,0,Halcyon,SHIFT,10-3,10-4,10-2,,,ok,,,ok
+Div 2,D2M04,1,03-05.04.2026,1,04.04.2026,17:00,Team Heretics,3,1,EvolupeGG,Team Heretics,8-11,10-2,11-4,10-4,,ok,,,ok
+Div 2,D2M06,1,03-05.04.2026,1,04.04.2026,18:00,SHIFT,3,1,TempoBros,SHIFT,10-6,8-10,10-8,11-9,,ok,,,ok
+Div 2,D2M07,1,03-05.04.2026,1,04.04.2026,19:00,Va Bene,2,3,Halcyon,Halcyon,3-12,10-4,11-1,7-10,5-10,ok,,,ok
+Div 2,D2M12,2,10-12.04.2026,2,10.04.2026,19:00,Team Heretics,3,0,Piwo,Team Heretics,12-6,12-4,10-2,,,ok,,,ok
+Div 2,D2M08,1,03-05.04.2026,2,10.04.2026,20:00,Loading,3,0,EvolupeGG,Loading,10-3,10-7,10-7,,,ok,,,ok
+Div 2,D2M10,1,03-05.04.2026,2,10.04.2026,20:00,Ragnarok,3,0,Piwo,Ragnarok,10-2,10-2,12-6,,,ok,,,ok
+Div 2,D2M13,2,10-12.04.2026,2,11.04.2026,17:00,Loading,0,3,Halcyon,Halcyon,5-10,5-12,6-10,,,ok,,,ok
+Div 2,D2M14,2,10-12.04.2026,2,11.04.2026,17:00,TempoBros,3,2,Ragnarok,TempoBros,10-2,9-10,11-14,12-2,10-6,ok,,,ok
+Div 2,D2M19,2,10-12.04.2026,2,11.04.2026,18:00,Ragnarok,3,0,Halcyon,Ragnarok,11-1,11-6,10-1,,,ok,,,ok
+Div 2,D2M17,2,10-12.04.2026,2,11.04.2026,19:00,SHIFT,3,1,Team Heretics,SHIFT,12-4,10-8,9-10,12-8,,ok,,,ok
+Div 2,D2M18,2,10-12.04.2026,2,11.04.2026,19:00,Loading,1,3,Va Bene,Va Bene,7-11,11-8,4-11,9-11,,ok,,,ok
+Div 1,D1M10,1,03-05.04.2026,2,12.04.2026,15:00,Pacb,3,0,S8UL,Pacb,11-7,11-3,11-4,,,ok,,,ok
+Div 1,D1M12,2,10-12.04.2026,2,12.04.2026,16:00,FUT,3,0,S8UL,FUT,11-3,11-7,10-9,,,ok,,,ok
+Div 1,D1M14,2,10-12.04.2026,2,12.04.2026,17:00,Pacb,3,0,COOK,Pacb,10-3,10-3,12-3,,,ok,,,ok
+Div 2,D2M15,2,10-12.04.2026,2,12.04.2026,17:00,SHIFT,3,0,BS+,SHIFT,,,,,,missing,Cherry,,ok
+Div 1,D1M11,2,10-12.04.2026,2,12.04.2026,18:30,Navi,0,3,VP x Neon,VP x Neon,5-10,8-10,7-11,,,ok,Marchielli,,ok
+Div 1,D1M17,2,10-12.04.2026,2,12.04.2026,19:00,FUT,3,2,Orgless,FUT,9-11,12-6,3-11,10-7,10-8,ok,Pecuniaadest,,ok
+Div 2,D2M09,1,03-05.04.2026,2,12.04.2026,19:00,BS+,2,3,Team Heretics,Team Heretics,11-5,5-11,10-5,9-12,6-10,ok,Cherry,,ok
+Div 1,D1M18,2,10-12.04.2026,2,12.04.2026,19:30,GenG x Weibo,3,2,Navi,GenG x Weibo,4-10,6-10,10-6,10-7,11-6,ok,Marchielli,picks as Navi vs GenG x Weibo (if ECM correct!?),ok
+Div 2,D2M20,2,10-12.04.2026,2,12.04.2026,20:00,TempoBros,1,3,BS+,BS+,6-11,10-2,9-10,5-10,,ok,Cherry,picks as BS+ vs TempoBros (see vod),ok
+Div 1,D1M08,1,03-05.04.2026,2,12.04.2026,20:30,GenG x Weibo,3,2,VP x Neon,GenG x Weibo,12-4,1-10,5-10,14-11,11-4,ok,Marchielli,,ok
+Div 1,D1M06,1,03-05.04.2026,2,12.04.2026,21:00,COOK,3,1,Orgless,COOK,10-7,12-8,4-12,10-5,,ok,Pecuniaadest,,ok
+Div 2,D2M05,1,03-05.04.2026,2,12.04.2026,21:00,BS+,1,3,Ragnarok,Ragnarok,,,,,,missing,Cherry,,ok
+Div 2,D2M16,2,10-12.04.2026,3,17.04.2026,19:00,EvolupeGG,0,3,Piwo,Piwo,8-10,4-10,7-10,,,ok,,,ok
+Div 2,D2M01,1,03-05.04.2026,3,17.04.2026,20:00,Loading,1,3,Piwo,Piwo,11-5,5-11,6-10,3-11,,ok,Xerutiws,,ok
+Div 1,D1M16,2,10-12.04.2026,3,18.04.2026,14:30,S8UL,1,3,VP x Neon,VP x Neon,10-4,3-10,2-11,5-11,,ok,Xerutiws,,ok
+Div 2,D2M23,3,17-19.04.2026,3,18.04.2026,17:00,Team Heretics,3,0,Halcyon,Team Heretics,11-5,10-5,12-9,,,ok,,,ok
+Div 2,D2M28,3,17-19.04.2026,3,18.04.2026,17:00,Va Bene,2,3,Piwo,Piwo,10-7,7-11,8-10,11-7,7-10,ok,Xerutiws,from ECM: picks as Piwo vs Va Bene ecm was created based on mastersheet so it has same problem of not necessarily having top seed showing first,ok
+Div 2,D2M21,3,17-19.04.2026,3,18.04.2026,18:00,Ragnarok,3,0,Va Bene,Ragnarok,12-2,10-1,10-2,,,ok,NitroFeint,,ok
+Div 2,D2M25,3,17-19.04.2026,3,18.04.2026,18:00,SHIFT,3,0,Piwo,SHIFT,10-5,10-5,10-6,,,ok,Pecuniaadest,,ok
+Div 2,D2M30,3,17-19.04.2026,3,18.04.2026,19:00,EvolupeGG,0,3,Halcyon,Halcyon,2-10,2-12,4-11,,,ok,,,ok
+Div 2,D2M29,3,17-19.04.2026,3,18.04.2026,20:00,SHIFT,2,3,Ragnarok,Ragnarok,11-6,5-10,12-8,8-11,9-10,ok,,,ok
+Div 1,D1M30,3,17-19.04.2026,3,18.04.2026,21:00,All Gamers,3,1,VP x Neon,All Gamers,12-7,7-10,11-5,12-7,,ok,Xerutiws,,ok
+Div 1,D1M28,3,17-19.04.2026,3,19.04.2026,14:00,Navi,3,0,S8UL,Navi,11-2,12-4,10-7,,,ok,,,ok
+Div 1,D1M25,3,17-19.04.2026,3,19.04.2026,15:00,S8UL,0,3,Orgless,Orgless,4-10,9-10,5-10,,,ok,NitroFeint,,ok
+Div 1,D1M21,3,17-19.04.2026,3,19.04.2026,19:00,Pacb,3,0,Navi,Pacb,11-3,11-8,10-4,,,ok,Xerutiws,,ok
+Div 1,D1M27,3,17-19.04.2026,3,19.04.2026,20:00,FUT,1,3,COOK,COOK,10-2,7-10,9-11,5-11,,ok,,,ok
+Div 1,D1M29,3,17-19.04.2026,3,19.04.2026,20:00,Pacb,3,0,Orgless,Pacb,10-5,11-3,10-2,,,ok,Xerutiws,,ok
+Div 1,D1M23,3,17-19.04.2026,3,19.04.2026,21:00,All Gamers,3,1,FUT,All Gamers,11-5,7-10,10-2,12-5,,ok,Xerutiws,,ok
+Div 1,D1M03,1,03-05.04.2026,3,19.04.2026,22:00,All Gamers,3,0,Orgless,All Gamers,10-6,11-4,11-7,,,ok,Xerutiws,,ok
+Div 1,D1M19,2,10-12.04.2026,4,22.04.2026,15:00,All Gamers,0,3,Pacb,Pacb,4-10,7-10,0-12,,,ok,Marchielli,,ok
+Div 1,D1M31,4,24-26.04.2026,4,24.04.2026,16:00,All Gamers,3,0,S8UL,All Gamers,10-2,11-5,10-1,,,ok,Marchielli,,ok
+Div 1,D1M04,1,03-05.04.2026,4,24.04.2026,20:00,FUT,1,3,VP x Neon,VP x Neon,10-9,5-10,4-10,6-11,,ok,Marchielli,,ok
+Div 1,D1M26,3,17-19.04.2026,4,25.04.2026,13:30,BIG,3,1,VP x Neon,BIG,7-10,11-7,10-6,10-7,,ok,Marchielli,,ok
+Div 1,D1M37,4,24-26.04.2026,4,25.04.2026,16:00,All Gamers,3,0,COOK,All Gamers,11-1,10-8,11-3,,,ok,Marchielli,,ok
+Div 1,D1M32,4,24-26.04.2026,4,25.04.2026,17:00,COOK,0,3,VP x Neon,VP x Neon,9-10,1-10,2-10,,,ok,Pecuniaadest,,ok
+Div 2,D2M41,5,01-03.05.2026,4,25.04.2026,17:00,SHIFT,3,0,EvolupeGG,SHIFT,12-3,10-6,10-7,,,ok,Marchielli,,ok
+Div 2,D2M11,2,10-12.04.2026,4,25.04.2026,18:00,Va Bene,2,3,EvolupeGG,EvolupeGG,9-11,11-9,9-12,11-1,5-10,ok,Marchielli,,ok
+Div 2,D2M27,3,17-19.04.2026,4,25.04.2026,18:00,TempoBros,3,2,Team Heretics,TempoBros,8-10,11-4,6-12,11-1,11-3,ok,Xerutiws,,ok
+Div 2,D2M37,4,24-26.04.2026,4,25.04.2026,19:00,TempoBros,3,0,Halcyon,TempoBros,12-2,10-6,11-7,,,ok,Marchielli,,ok
+Div 2,D2M38,4,24-26.04.2026,4,25.04.2026,19:00,Team Heretics,3,1,Loading,Team Heretics,11-5,9-10,10-6,11-7,,ok,Pecuniaadest,result from ecm,ok
+Div 2,D2M39,4,24-26.04.2026,4,25.04.2026,19:00,Ragnarok,3,0,EvolupeGG,Ragnarok,11-1,11-3,10-4,,,ok,Marijn,result from ecm,ok
+Div 2,D2M40,4,24-26.04.2026,4,25.04.2026,19:00,SHIFT,3,0,Va Bene,SHIFT,11-2,10-8,12-3,,,ok,Xerutiws,,ok
+Div 2,D2M34,4,24-26.04.2026,4,25.04.2026,20:00,SHIFT,3,1,Loading,SHIFT,10-4,10-3,5-10,10-1,,ok,Xerutiws,,ok
+Div 2,D2M35,4,24-26.04.2026,4,25.04.2026,20:00,Ragnarok,1,3,Team Heretics,Team Heretics,11-3,11-14,5-12,8-10,,ok,Marijn,,ok
+Div 2,D2M42,5,01-03.05.2026,4,25.04.2026,22:00,Ragnarok,3,0,Loading,Ragnarok,11-1,11-1,12-7,,,ok,Pecuniaadest,,ok
+Div 1,D1M24,3,17-19.04.2026,4,26.04.2026,13:00,BIG,3,0,GenG x Weibo,BIG,11-3,10-7,11-9,,,ok,Marchielli,,ok
+Div 1,D1M05,1,03-05.04.2026,4,26.04.2026,14:00,BIG,3,1,Pacb,BIG,10-5,11-8,9-10,11-9,,ok,Marchielli,,ok
+Div 1,D1M15,2,10-12.04.2026,4,26.04.2026,15:00,BIG,3,0,Orgless,BIG,12-0,10-2,10-1,,,ok,Pecuniaadest,,ok
+Div 1,D1M45,5,01-03.05.2026,4,26.04.2026,15:00,FUT,1,3,Navi,Navi,10-8,8-11,3-10,10-11,,ok,Marchielli,,ok
+Div 1,D1M09,1,03-05.04.2026,4,26.04.2026,16:00,BIG,3,0,FUT,BIG,10-5,10-6,10-3,,,ok,Pecuniaadest,,ok
+Div 1,D1M40,4,24-26.04.2026,4,26.04.2026,16:00,Navi,0,3,Orgless,Orgless,9-10,9-11,5-10,,,ok,Marchielli,,ok
+Div 2,D2M33,4,24-26.04.2026,4,26.04.2026,16:00,BS+,3,1,Va Bene,BS+,10-4,10-6,8-10,11-6,,ok,Xerutiws,,ok
+Div 1,D1M20,2,10-12.04.2026,4,26.04.2026,17:00,BIG,3,1,COOK,BIG,10-1,11-8,9-10,10-4,,ok,Pecuniaadest,,ok
+Div 2,D2M26,3,17-19.04.2026,4,26.04.2026,17:00,BS+,3,1,EvolupeGG,BS+,11-3,11-3,3-12,10-2,,ok,Marijn,,ok
+Div 2,D2M45,5,01-03.05.2026,4,26.04.2026,17:00,Team Heretics,3,1,Va Bene,Team Heretics,10-1,6-10,11-2,11-2,,ok,Marchielli,,ok
+Div 1,D1M34,4,24-26.04.2026,4,26.04.2026,17:15,GenG x Weibo,2,3,Orgless,Orgless,10-2,4-10,6-10,10-6,6-10,ok,Xerutiws,,ok
+Div 1,D1M33,4,24-26.04.2026,4,26.04.2026,18:00,BIG,3,0,Navi,BIG,10-1,12-7,10-1,,,ok,Pecuniaadest,,ok
+Div 1,D1M35,4,24-26.04.2026,4,26.04.2026,18:00,Pacb,3,0,FUT,Pacb,11-5,10-6,11-6,,,ok,Xerutiws,,ok
+Div 2,D2M24,3,17-19.04.2026,4,26.04.2026,18:00,BS+,3,0,Loading,BS+,10-4,10-5,10-6,,,ok,Marijn,,ok
+Div 2,D2M31,4,24-26.04.2026,4,26.04.2026,18:00,Halcyon,2,3,Piwo,Piwo,11-8,8-10,7-10,11-8,1-11,ok,Marchielli,,ok
+Div 1,D1M38,4,24-26.04.2026,4,26.04.2026,19:00,GenG x Weibo,3,2,FUT,GenG x Weibo,12-9,8-10,11-5,9-10,10-7,ok,Pecuniaadest,,ok
+Div 1,D1M39,4,24-26.04.2026,4,26.04.2026,19:00,Pacb,3,0,VP x Neon,Pacb,10-8,10-4,10-2,,,ok,Xerutiws,,ok
+Div 2,D2M44,5,01-03.05.2026,4,26.04.2026,19:00,BS+,3,0,Halcyon,BS+,10-5,11-3,12-5,,,ok,Marchielli,,ok
+Div 2,D2M36,4,24-26.04.2026,4,26.04.2026,20:00,BS+,3,0,Piwo,BS+,10-4,10-7,12-11,,,ok,Xerutiws,,ok
+Div 1,D1M42,5,01-03.05.2026,5,01.05.2026,17:00,Pacb,3,0,GenG x Weibo,Pacb,11-3,10-6,10-3,,,ok,,,ok
+Div 2,D2M43,5,01-03.05.2026,5,02.05.2026,18:00,TempoBros,3,0,Piwo,TempoBros,11-1,11-7,12-3,,,ok,,,ok
+Div 1,D1M43,5,01-03.05.2026,5,03.05.2026,20:00,COOK,3,1,S8UL,COOK,9-10,10-2,11-10,11-3,,ok,Xerutiws,,ok
+Div 1,D1M44,5,01-03.05.2026,6,06.05.2026,16:00,BIG,2,3,All Gamers,All Gamers,10-6,4-12,7-11,11-9,8-12,ok,Vingummi,admin swap (Pecuniaadest unavailable),ok
+Div 1,D1M36,4,24-26.04.2026,6,06.05.2026,17:00,BIG,3,0,S8UL,BIG,12-2,11-4,11-5,,,ok,Pecuniaadest,,ok
+Div 1,D1M41,5,01-03.05.2026,6,10.05.2026,16:30,Orgless,0,3,VP x Neon,VP x Neon,4-12,8-11,5-10,,,ok,Marchielli,,ok
+Div 2,D2M32,4,24-26.04.2026,6,10.05.2026,17:00,TempoBros,3,0,EvolupeGG,TempoBros,11-4,10-1,11-6,,,ok,Pecuniaadest,,ok
+Div 1,D1M22,3,17-19.04.2026,6,10.05.2026,17:30,GenG x Weibo,3,2,COOK,GenG x Weibo,10-9,3-10,13-12,9-10,12-11,ok,Marchielli,,ok
+Div 2,D2M22,3,17-19.04.2026,6,10.05.2026,18:00,TempoBros,3,0,Loading,TempoBros,,,,,,missing,Pecuniaadest,forfeit Loading,ok
+Promo,PRM01,8,29-31.05.2026,8,29.05.2026,19:00,EvolupeGG,1,3,Brothers,Brothers,4-10,3-10,10-7,0-12,,ok,Vingummi,,ok
+Promo,PRM02,8,29-31.05.2026,8,29.05.2026,20:00,Va Bene,1,3,Aurora x SKUF,Aurora x SKUF,10-9,5-10,5-10,6-10,,ok,Vingummi,,ok
+Promo,PRM03,8,29-31.05.2026,8,29.05.2026,21:00,Loading,0,3,Rex Regum Qeon,Rex Regum Qeon,5-11,9-11,6-10,,,ok,Xerutiws,,ok
+Barrage,BM01,8,29-31.05.2026,8,29.05.2026,22:00,Navi,0,3,Ragnarok,Ragnarok,4-10,7-10,1-11,,,ok,Marchielli,,ok
+Promo,PRM04,8,29-31.05.2026,8,31.05.2026,16:00,Halcyon,3,0,UNC Racing,Halcyon,10-8,11-7,10-1,,,ok,,,ok
+Div 1 Playoffs,D1PM01,8,29-31.05.2026,8,31.05.2026,17:00,Pacb,2,3,VP X Neon,VP X Neon,11-8,9-12,10-4,7-10,7-10,ok,Pecuniaadest,,ok
+Div 1 Playoffs,D1PM02,8,29-31.05.2026,8,31.05.2026,17:00,BIG,0,3,All Gamers,All Gamers,7-12,7-10,4-11,,,ok,Pecuniaadest,,ok
+Div 1 Playoffs,D1PM03,8,29-31.05.2026,8,31.05.2026,18:00,All Gamers,1,3,VP X Neon,VP X Neon,11-6,9-10,7-10,3-11,,ok,Pecuniaadest,,ok
+Div 1 Playoffs,D1PM04,8,29-31.05.2026,8,31.05.2026,18:00,Pacb,0,3,BIG,BIG,4-11,9-11,6-11,,,ok,Pecuniaadest,,ok
+Div 1 Playoffs,D1PM05,8,29-31.05.2026,8,31.05.2026,19:00,All Gamers,0,3,BIG,BIG,9-10,7-10,2-12,,,ok,Pecuniaadest,,ok
+Div 1 Playoffs,D1PM06,8,29-31.05.2026,8,31.05.2026,20:00,BIG,3,0,VP X Neon,BIG,10-4,10-5,11-4,,,ok,Pecuniaadest,,ok

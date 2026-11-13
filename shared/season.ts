@@ -3,6 +3,8 @@
  * '' = not found; fill it in here before the show. Used by the analyst desk's Head to head
  * panel and the match intro's "Fill roads from the season" button.
  */
+import { SEASON_VERIFIED } from './seasonVerified';
+
 export interface SeasonLine {
   /** Split 1 (spring): Division 1 league stage unless noted. */
   split1: string;
@@ -25,4 +27,10 @@ export const SEASON: Record<string, SeasonLine> = {
   'All Gamers Global': { split1: 'Div 1 · 3rd in the league (8–1)', split2: '', wildcards: 'Qualified · 3rd–4th', road: 'Through the Wildcards (3rd–4th)' },
 };
 
-export const seasonOf = (team: string): SeasonLine | undefined => SEASON[team];
+/** Curated line merged with the verified OverDrive 2026 data (shared/seasonVerified.ts fills empty fields and corrects
+ * ranks/records that contradict the verified standings; see season-data/IMPORT-REPORT-2026.md). */
+export const seasonOf = (team: string): SeasonLine | undefined => {
+  const c = SEASON[team], v = SEASON_VERIFIED[team];
+  const empty: SeasonLine = { split1: '', split2: '', wildcards: '', road: '' };
+  return c || v ? { ...empty, ...(c ?? {}), ...(v ?? {}) } : undefined;
+};
