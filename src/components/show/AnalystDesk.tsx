@@ -10,14 +10,15 @@
  * and the panel slides in/out. Camera feeds are never remounted (no WebRTC/VDO.Ninja reconnect).
  */
 import { AnimatePresence, motion } from 'motion/react';
-import { useRef } from 'react';
+import { useLayoutEffect, useRef, useState } from 'react';
 import type { Caster, Scene, Show } from '../../../shared/types';
 import type { MatchData } from '../../../shared/protocol';
 import type { Skin } from '../../../shared/skins';
 import type { WildcardState } from '../../../shared/wildcard';
 import type { RtcViewer } from '../../lib/rtcViewer';
 import { EASE } from '../../lib/motion';
-import { HoleBacking, StageVideo, useGfxTransition, useRecent, useStaged } from '../../gfx/transition';
+import { EASE_OUT, HoleBacking, StageVideo, useGfxTransition, useRecent, useStaged } from '../../gfx/transition';
+const EASE_OUT_ARR = [0.22, 1, 0.36, 1] as const;
 import { Feed } from '../Feed';
 import { Reveal } from '../Reveal';
 import { DeskPanel, PickBadge, deskCasters, deskLayout } from '../wildcard/Desk';
@@ -31,6 +32,8 @@ export function SkinAnalystDesk({ skin, scene, show, wc, now, bnl, viewer, monit
   skin: Skin; scene: Scene; show: Show; wc: WildcardState | null; now: number; bnl: MatchData | null; viewer?: RtcViewer | null; monitor?: boolean;
 }) {
   const tr = useGfxTransition();
+  const lastCams = useRef(new Map<number, { r: Rect; on: boolean }>());
+  const [, bumpCams] = useState(0);
   const live = deskCasters(scene, wc?.desk);
   const mode: 'cams' | 'panel' = (wc?.desk.panel ?? 'cams') === 'cams' ? 'cams' : 'panel';
   const { kind, frame } = boothFrame(skin, Math.max(1, live.length), true);
@@ -48,7 +51,14 @@ export function SkinAnalystDesk({ skin, scene, show, wc, now, bnl, viewer, monit
   const picks = wc?.intro.picksShow ? wc.intro.picks : {};
   const ms = tr.kind === 'cut' ? 0 : tr.ms;
   const s = ms / 1000;
-  const move = { duration: s, ease: EASE };
+  // Names move on the same curve as the cameras and the frame videos (CSS EASE_OUT), so they stay one element.
+  const move = { duration: s, ease: EASE_OUT_ARR };
+  // Cameras: every analyst position that is seated stays mounted (hidden when not in the layout), so its
+  // stream never stops; a camera that stays on screen moves with CSS transitions on the frame's own curve
+  // and duration (the frame videos crossfade with CSS EASE_OUT), so camera and frame read as one element.
+  const pool = [...cams, ...scene.casters.filter(c => !S.ids.includes(c.id) && ((c.id >= 4 && c.id <= 5 && c.enabled) || lastCams.current.has(c.id)))];
+  const nextCams = new Map<number, { r: Rect; on: boolean; fresh?: boolean }>();
+  useLayoutEffect(() => { const fresh = [...nextCams.values()].some(v => v.fresh); lastCams.current = nextCams; if (fresh) bumpCams(x => x + 1); });
   const it = wc?.intro;
   const solo = n <= 1;
   const stripTop = solo ? 890 : 196;
@@ -73,25 +83,28 @@ export function SkinAnalystDesk({ skin, scene, show, wc, now, bnl, viewer, monit
       <HoleBacking holes={backing} z={1} />
       {/* Cameras: the same elements in both modes (keyed by position id). */}
       <div className="absolute inset-0" style={{ zIndex: 10 }}>
-        <AnimatePresence>
-          {cams.map((c, i) => {
-            const r = rects[i];
-            if (!r) return null;
-            const desk = S.mode === 'panel';
-            return (
-              <motion.div key={c.id} data-cam={c.id} className="absolute overflow-hidden"
-                style={{ background: desk ? '#120A08' : '#140a0a', boxShadow: desk ? '0 10px 30px rgba(0,0,0,.45)' : '0 10px 30px rgba(0,0,0,0)', transition: `box-shadow ${ms}ms` }}
-                initial={{ opacity: 0, scale: 0.96, left: r.x, top: r.y, width: r.w, height: r.h }}
-                animate={{ opacity: 1, scale: 1, left: r.x, top: r.y, width: r.w, height: r.h }}
-                exit={{ opacity: 0, scale: 0.96, transition: { duration: s * 0.8, ease: EASE } }}
-                transition={{ default: move, opacity: { duration: 0.35, ease: EASE, delay: 0.06 + i * 0.06 }, scale: { duration: 0.35, ease: EASE, delay: 0.06 + i * 0.06 } }}>
-                {c.cameraOn && <Feed caster={c} viewer={viewer} size={n >= 3 ? 'sm' : n > 1 ? 'md' : 'lg'} showName={false} monitor={monitor} />}
-                {/* The desk camera's accent top edge (.dk-cam border-top), faded instead of popping. */}
-                <div className="absolute inset-x-0 top-0 h-[4px]" style={{ background: 'var(--hot)', opacity: desk ? 1 : 0, transition: `opacity ${ms}ms` }} />
-              </motion.div>
-            );
-          })}
-        </AnimatePresence>
+        {pool.map(c => {
+          const i = S.ids.indexOf(c.id), r = i >= 0 ? rects[i] : undefined;
+          const prev = lastCams.current.get(c.id);
+          const on = !!r && !!prev;
+          const rect = r ?? prev?.r ?? rects[0] ?? { x: 80, y: 190, w: col.w, h: col.h };
+          const entering = on && !prev?.on;
+          nextCams.set(c.id, { r: rect, on, fresh: !prev && !!r });
+          const desk = S.mode === 'panel';
+          const geo = ms === 0 || entering ? '' : `left ${ms}ms ${EASE_OUT}, top ${ms}ms ${EASE_OUT}, width ${ms}ms ${EASE_OUT}, height ${ms}ms ${EASE_OUT}, `;
+          const fd = on ? ms : Math.round(ms * 0.8);
+          return (
+            <div key={c.id} data-cam={c.id} data-cam-on={on ? '1' : '0'} className="absolute overflow-hidden"
+              style={{ left: rect.x, top: rect.y, width: rect.w, height: rect.h, opacity: on ? 1 : 0, transform: on ? 'none' : 'scale(0.96)',
+                visibility: on || prev?.on || (!prev && r) ? undefined : 'hidden',
+                background: desk ? '#120A08' : '#140a0a', boxShadow: desk && on ? '0 10px 30px rgba(0,0,0,.45)' : '0 10px 30px rgba(0,0,0,0)',
+                transition: `${geo}opacity ${fd}ms ${EASE_OUT}, transform ${fd}ms ${EASE_OUT}, box-shadow ${ms}ms` }}>
+              {c.cameraOn && <Feed caster={c} viewer={viewer} size={n >= 3 ? 'sm' : n > 1 ? 'md' : 'lg'} showName={false} monitor={monitor} />}
+              {/* The desk camera's accent top edge (.dk-cam border-top), faded instead of popping. */}
+              <div className="absolute inset-x-0 top-0 h-[4px]" style={{ background: 'var(--hot)', opacity: desk ? 1 : 0, transition: `opacity ${ms}ms` }} />
+            </div>
+          );
+        })}
       </div>
 
       {/* Desk frame videos over the cameras (cameras mode). Solo/duo/trio crossfade frame over frame;

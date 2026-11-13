@@ -41,7 +41,7 @@ export function boothIds(casters: Caster[], booth: number[] = []): number[] {
 export function boothScene(scene: Scene, booth: number[] = []): Scene {
   const ids = boothIds(scene.casters, booth);
   const pos = (c: Caster) => (ids.includes(c.id) ? ids.indexOf(c.id) : 99);
-  return { ...scene, casters: [...scene.casters].sort((a, b) => pos(a) - pos(b)).map(c => (ids.includes(c.id) ? c : { ...c, enabled: false })) };
+  return { ...scene, casters: [...scene.casters].sort((a, b) => pos(a) - pos(b)).map(c => (ids.includes(c.id) ? c : { ...c, enabled: false, standby: c.enabled && isCaster(c) })) };
 }
 
 /** Analysts at the desk: the picked ones, else every analyst in the show. */

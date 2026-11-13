@@ -1,5 +1,5 @@
 import { Reveal } from '../Reveal';
-import { useEffect, useRef, useState, type CSSProperties } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import type { Caster, Scene, Show } from '../../../shared/types';
 import type { RtcViewer } from '../../lib/rtcViewer';
@@ -14,7 +14,9 @@ import type { MatchData } from '../../../shared/protocol';
 import type { WcPick } from '../../../shared/wildcard';
 import { PickBadge } from '../wildcard/Desk';
 import { teamLogo } from '../../../shared/major';
-import { HoleBacking, StageVideo, useGfxTransition, useRecent, useStaged } from '../../gfx/transition';
+import { EASE_OUT, HoleBacking, StageVideo, useGfxTransition, useRecent, useStaged } from '../../gfx/transition';
+
+const EASE_OUT_ARR = [0.22, 1, 0.36, 1] as const; // = EASE_OUT (the frame-video crossfade curve)
 
 export function useSkin(): Skin | null {
   const { brand } = useTheme();
@@ -55,27 +57,45 @@ export function SkinCasters({ skin, scene, show, viewer, monitor, picks, casters
   const holes = skin.holes[kind];
   const cams = ids.map(id => live.find(c => c.id === id) ?? scene.casters.find(c => c.id === id)).filter((c): c is Caster => !!c);
   const s = tr.ms / 1000;
-  const move = { duration: s, ease: EASE };
+  // Cameras, names and badges move on the SAME curve and clock as the frame-video crossfade (StageVideo: CSS
+  // opacity over tr.ms with EASE_OUT). Before, the cameras used a slower ease-in-out driven from JS a frame or more
+  // after the frame fade had started, so the new frame was already showing while the camera was still in its old
+  // hole (measured: camera half-way ~120 ms after the frame).
+  const cut = tr.kind === 'cut';
+  const move = { duration: cut ? 0 : s, ease: EASE_OUT_ARR };
   const backing = useRecent(kind, k => k, tr.ms).flatMap(k => skin.holes[k]);
+  // Every seated booth camera stays mounted (hidden ones at opacity 0): a camera leaving the layout keeps its
+  // video/VDO.Ninja view, so coming back is instant and never reconnects.
+  const pool = [...cams, ...live.filter(c => !ids.includes(c.id)), ...scene.casters.filter(c => (c.enabled || c.standby) && c.id <= 3 && !ids.includes(c.id) && !live.some(l => l.id === c.id))].slice(0, 3);
+  // what each camera showed at the last COMMITTED render (written after commit, so a re-render never misreads it)
+  const last = useRef(new Map<number, { r: { x: number; y: number; w: number; h: number }; on: boolean }>());
+  const next = new Map<number, { r: { x: number; y: number; w: number; h: number }; on: boolean; fresh?: boolean }>();
+  const [, bump] = useState(0);
+  // a camera mounted straight into a hole is first committed hidden, then entered with the transition
+  useLayoutEffect(() => { const fresh = [...next].some(([id, v]) => v.fresh); last.current = next; if (fresh) bump(n => n + 1); });
   return (
     <div className="absolute inset-0" style={{ isolation: 'isolate' }} data-booth={kind}>
       <HoleBacking holes={backing} />
       {/* Cameras: one persistent element per caster, moving between holes. */}
-      <AnimatePresence>
-        {cams.map((c, i) => {
-          const r = holes[i];
-          if (!r) return null;
-          return (
-            <motion.div key={c.id} data-cam={c.id} className="absolute overflow-hidden bg-[#140a0a]" style={{ zIndex: 1 }}
-              initial={{ opacity: 0, scale: 0.96, left: r.x, top: r.y, width: r.w, height: r.h }}
-              animate={{ opacity: 1, scale: 1, left: r.x, top: r.y, width: r.w, height: r.h }}
-              exit={{ opacity: 0, scale: 0.96, transition: { duration: s * 0.8, ease: EASE } }}
-              transition={{ default: move, opacity: { duration: 0.35, ease: EASE, delay: 0.06 + i * 0.06 }, scale: { duration: 0.35, ease: EASE, delay: 0.06 + i * 0.06 } }}>
-              {c.cameraOn && <Feed caster={c} viewer={viewer} size={kind === 'solo' ? 'lg' : 'md'} showName={false} monitor={monitor} />}
-            </motion.div>
-          );
-        })}
-      </AnimatePresence>
+      {pool.map(c => {
+        const i = ids.indexOf(c.id), r = i >= 0 ? holes[i] : undefined;
+        const prev = last.current.get(c.id);
+        const on = !!r && !!prev; // never shown before: one hidden commit first, so it can enter like the others
+        const rect = r ?? prev?.r ?? holes[0];
+        const entering = on && !prev?.on;
+        next.set(c.id, { r: rect, on, fresh: !prev && !!r });
+        const geo = cut || entering ? 'none' : `left ${tr.ms}ms ${EASE_OUT}, top ${tr.ms}ms ${EASE_OUT}, width ${tr.ms}ms ${EASE_OUT}, height ${tr.ms}ms ${EASE_OUT}`;
+        // an entering camera is already live (kept mounted), so it fades in WITH its new hole (same curve and clock as
+        // the frame video) instead of 60-180 ms later: the hole is never shown empty
+        const fd = cut ? 0 : tr.ms;
+        const fade = on ? `opacity ${fd}ms ${EASE_OUT}, transform ${fd}ms ${EASE_OUT}` : `opacity ${Math.round(fd * 0.8)}ms ${EASE_OUT}, transform ${Math.round(fd * 0.8)}ms ${EASE_OUT}`;
+        return (
+          <div key={c.id} data-cam={c.id} data-cam-on={on ? '1' : '0'} className="absolute overflow-hidden bg-[#140a0a]"
+            style={{ zIndex: 1, left: rect.x, top: rect.y, width: rect.w, height: rect.h, opacity: on ? 1 : 0, transform: on ? 'none' : 'scale(0.96)', transition: geo === 'none' ? fade : `${geo}, ${fade}`, visibility: on || prev?.on || (!prev && r) ? undefined : 'hidden' }}>
+            {c.cameraOn && <Feed caster={c} viewer={viewer} size={kind === 'solo' ? 'lg' : 'md'} showName={false} monitor={monitor} />}
+          </div>
+        );
+      })}
       {/* Frame videos: the shown one on top; the outgoing one stays fully visible under it until the crossfade ends. */}
       {st.mounted.map(src => (
         <StageVideo key={src} src={src} visible={src === frame} ms={tr.kind === 'cut' ? 0 : tr.ms} wipe={tr.kind === 'wipe'} leave="hold" z={src === frame ? 3 : 2} onReady={st.ready} />

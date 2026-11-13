@@ -24,6 +24,8 @@ export interface CameraSource {
 export type CameraOffMode = 'card' | 'remove';
 
 export interface Caster {
+  /** Render-only: seated and enabled but not in the current booth layout (its camera stays mounted, hidden). */
+  standby?: boolean;
   id: CasterId;
   enabled: boolean;
   name: string;
