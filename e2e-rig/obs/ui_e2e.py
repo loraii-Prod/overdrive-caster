@@ -25,7 +25,7 @@ async def main():
         check("OBS Setup tab shows the connection + OBS version", "mock" in (await pg.inner_text("[data-obs-version]")), await pg.inner_text("[data-obs-version]"))
         await pg.wait_for_selector("[data-target]", timeout=10000)
         n_rows = await pg.locator("[data-target]").count()
-        check("every Overdrive output listed (scan ran automatically on connect)", n_rows == 20, f"{n_rows} rows")
+        check("every Overdrive output listed (scan ran automatically on connect)", n_rows == 23, f"{n_rows} rows")  # 2.3: + the 3 audience graphics (pickem, mvp, qr)
         check("all scenes start MISSING in an empty OBS", await pg.locator("[data-target-status='missing']").count() >= 14)
         await pg.screenshot(path="/tmp/obs-ui-1-scan.png")
         log0 = len(mock()["log"])
@@ -40,9 +40,9 @@ async def main():
         await pg.wait_for_timeout(600)
         st = mock()
         scenes = {s["name"]: s for s in st["scenes"]}
-        check("Confirm builds one OBS scene per output", len(scenes) == 16, f"{len(scenes)} scenes")
+        check("Confirm builds one OBS scene per output", len(scenes) == 19, f"{len(scenes)} scenes")  # 2.3: + 3 audience graphics
         check("rows now OK", await pg.locator("[data-target][data-target-status='ok']").count() >= 14, f"{await pg.locator('[data-target-status=ok]').count()} ok")
-        check("last run summary shown", "15/15" in await pg.inner_text("[data-last-run]"), await pg.inner_text("[data-last-run]"))
+        check("last run summary shown", "18/18" in await pg.inner_text("[data-last-run]"), await pg.inner_text("[data-last-run]"))
         check("Program scene untouched, no switch / transition / delete sent", st["program"] == "Scene" and not [l for l in st["log"] if l["req"] in FORBIDDEN])
         await pg.screenshot(path="/tmp/obs-ui-3-built.png")
         # select one scene, break it in OBS, Verify All flags it, Repair Selected fixes only it

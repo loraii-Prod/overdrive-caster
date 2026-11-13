@@ -1,0 +1,123 @@
+/* Audience graphics. Scoped under .aud; fonts come from wildcard.css (WC Anton / WC Montserrat). */
+.aud{position:absolute;inset:0;overflow:hidden;color:#fff;font-family:'WC Montserrat',sans-serif;--red:#E3261B;--or:#FF6A13;--ember:#FFB23F;--char:#160A07;--box:#F4F2EF;--steel:#B9AEA8;--ease:cubic-bezier(.22,1,.36,1)}
+.aud *{box-sizing:border-box}
+.aud .logo{object-fit:contain;flex:none}
+.aud-dim{position:absolute;inset:0;background:linear-gradient(180deg,rgba(10,4,3,.35),rgba(10,4,3,.6))}
+.aud .kick{font:800 italic 26px 'WC Montserrat';color:var(--or);letter-spacing:.06em;text-transform:uppercase}
+.aud .h1{font:400 92px/0.95 'WC Anton';text-transform:uppercase}
+.aud .h2{font:400 48px/1 'WC Anton';text-transform:uppercase}
+.aud .sub{font:700 italic 22px 'WC Montserrat';color:var(--steel);text-transform:uppercase;letter-spacing:.04em;margin-top:8px}
+.aud .tag{font:800 italic 18px 'WC Montserrat';text-transform:uppercase;letter-spacing:.05em;color:var(--steel)}
+.aud .panel{background:rgba(22,10,7,.92);box-shadow:0 18px 50px rgba(0,0,0,.5)}
+.aud-head{position:absolute;left:0;right:0;top:56px;text-align:center;animation:aud-down .5s var(--ease) both}
+@keyframes aud-down{from{opacity:0;transform:translateY(-14px)}to{opacity:1;transform:none}}
+@keyframes aud-up{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:none}}
+@keyframes aud-fade{from{opacity:0}to{opacity:1}}
+@keyframes aud-upc{from{opacity:0;transform:translate(-50%,18px)}to{opacity:1;transform:translateX(-50%)}}
+@keyframes aud-flip{0%{opacity:0;transform:perspective(600px) rotateX(-80deg)}60%{opacity:1}100%{opacity:1;transform:none}}
+@keyframes aud-grow{from{width:0}to{width:var(--w)}}
+
+/* match prediction */
+.aud .mp-match{position:absolute;left:50%;top:240px;transform:translateX(-50%);display:flex;align-items:center;gap:30px;animation:aud-fade .5s .1s both}
+.aud .mp-team{display:flex;align-items:center;gap:18px;height:86px;padding:0 26px;background:rgba(22,10,7,.92);white-space:nowrap}
+.aud .mp-team b{font:400 46px 'WC Anton';text-transform:uppercase}
+.aud .mp-team.ul{border-bottom:5px solid var(--or)}.aud .mp-team.ul2{border-bottom:5px solid var(--steel)}
+.aud .vs{font:400 54px 'WC Anton';color:var(--or)}
+.aud .mp-cols{position:absolute;left:110px;right:110px;top:372px;display:grid;grid-template-columns:1fr 1fr;gap:46px}
+.aud .colh{display:flex;justify-content:space-between;align-items:flex-end;padding-bottom:12px;border-bottom:3px solid rgba(255,255,255,.16);margin-bottom:22px}
+.aud .an{display:grid;grid-template-columns:1fr 210px;height:100px;margin-bottom:14px;animation:aud-up .45s var(--ease) both}
+.aud .an:nth-child(3){animation-delay:.06s}.aud .an:nth-child(4){animation-delay:.12s}.aud .an:nth-child(5){animation-delay:.18s}
+.aud .an .who{background:var(--box);color:#121212;display:flex;flex-direction:column;justify-content:center;padding:0 28px;min-width:0}
+.aud .an .who b{font:900 italic 32px 'WC Montserrat';text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.aud .an .who span{font:700 italic 16px 'WC Montserrat';color:#7A716C;text-transform:uppercase;letter-spacing:.05em}
+.aud .an .pick{background:var(--char);display:flex;align-items:center;justify-content:center;gap:16px;border-bottom:5px solid var(--or)}
+.aud .an .pick b{font:400 52px 'WC Anton';text-transform:uppercase}
+.aud .an .pick.rev{animation:aud-flip .55s var(--ease) both;transform-origin:50% 50%}
+.aud .an .pick.hidden{background:repeating-linear-gradient(135deg,#1d0d09 0 14px,#26120c 14px 28px);border-bottom-color:#4a2a20}
+.aud .an .pick.hidden b{color:#5d3a2e;font-size:60px}
+.aud .an-empty{font:700 italic 22px 'WC Montserrat';color:var(--steel);text-transform:uppercase;padding:30px 0}
+.aud .cm{padding:28px 30px 30px;height:398px;animation:aud-fade .4s both}
+.aud .cm.locked{display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;background:repeating-linear-gradient(135deg,rgba(29,13,9,.94) 0 18px,rgba(38,18,12,.94) 18px 36px)}
+.aud .cm .big{font-size:64px}
+.aud .cm .meta{display:flex;justify-content:space-between;font:700 italic 20px 'WC Montserrat';color:var(--steel);text-transform:uppercase;letter-spacing:.04em}
+.aud .split{position:relative;height:96px;display:flex;margin:22px 0 18px;overflow:hidden;background:#3a2620}
+.aud .split .a{background:linear-gradient(90deg,#c51e14,var(--red));display:flex;align-items:center;padding-left:22px;gap:14px;width:var(--w);animation:aud-grow .9s .15s var(--ease) both;white-space:nowrap;overflow:hidden}
+.aud .split .b{display:flex;align-items:center;justify-content:flex-end;padding-right:22px;gap:14px;flex:1;white-space:nowrap}
+.aud .split b{font:400 62px 'WC Anton'}.aud .split .b b{color:var(--steel)}
+.aud .scores{display:flex;gap:10px;margin-top:22px}
+.aud .scores div{flex:1;background:rgba(255,255,255,.06);padding:10px 14px;animation:aud-up .4s var(--ease) both;position:relative}
+.aud .scores small{display:block;font:700 italic 15px 'WC Montserrat';color:var(--steel);text-transform:uppercase;letter-spacing:.05em}
+.aud .scores b{font:400 40px 'WC Anton'}
+.aud .scores em{position:absolute;right:12px;bottom:12px;font:800 italic 16px 'WC Montserrat';color:var(--steel);font-style:italic}
+.aud .scores .top{background:rgba(255,106,19,.16);box-shadow:inset 0 -4px 0 var(--or)}
+.aud .verdict{position:absolute;left:50%;transform:translateX(-50%);bottom:62px;display:flex;align-items:center;gap:22px;background:var(--or);color:#160A07;padding:16px 38px;font:400 46px 'WC Anton';text-transform:uppercase;white-space:nowrap;animation:aud-upc .5s var(--ease) both}
+.aud .verdict small{font:800 italic 20px 'WC Montserrat';letter-spacing:.05em}
+
+/* MVP voting */
+.aud .aud-head:has(+ .aud-left){text-align:left;left:110px}
+.aud .mv{position:absolute;left:110px;top:250px;display:grid;grid-template-columns:repeat(4,300px);gap:22px}
+.aud .pc{height:470px;background:rgba(22,10,7,.92);position:relative;overflow:hidden;display:flex;flex-direction:column;justify-content:flex-end;padding:0 22px 22px;animation:aud-up .5s var(--ease) both}
+.aud .pc .num{position:absolute;top:18px;left:22px;font:400 64px 'WC Anton';color:rgba(255,255,255,.12)}
+.aud .pc .logo{position:absolute;top:22px;right:20px}
+.aud .pc .sil{position:absolute;left:50%;top:60px;transform:translateX(-50%);width:200px;height:250px;background:radial-gradient(ellipse 60px 70px at 50% 30%,#3d2820 98%,transparent 100%),radial-gradient(ellipse 100px 90px at 50% 100%,#3d2820 98%,transparent 100%)}
+.aud .pc b{font:400 52px 'WC Anton';text-transform:uppercase;position:relative;white-space:nowrap}
+.aud .pc small{font:700 italic 18px 'WC Montserrat';color:var(--steel);text-transform:uppercase;letter-spacing:.05em;position:relative}
+.aud .pc .tm{height:6px;margin:14px -22px -22px;background:var(--or)}
+.aud .pc.b .tm{background:var(--steel)}
+.aud .qrbox{position:absolute;right:110px;top:250px;width:420px;height:470px;background:var(--box);color:#121212;display:flex;flex-direction:column;align-items:center;padding:28px;animation:aud-fade .5s .2s both}
+.aud .qrbox b{font:400 40px 'WC Anton';text-transform:uppercase;margin-top:14px}
+.aud .qrbox span{font:800 15px 'WC Montserrat';color:#6E625C;letter-spacing:.02em}
+.aud .status{position:absolute;left:110px;right:110px;top:770px;display:flex;align-items:center;gap:26px;height:96px;background:rgba(22,10,7,.92);padding:0 34px;animation:aud-up .5s .15s var(--ease) both}
+.aud .live{display:flex;align-items:center;gap:14px;font:400 40px 'WC Anton';color:var(--or)}
+.aud .live i{width:18px;height:18px;border-radius:50%;background:var(--red);box-shadow:0 0 0 6px rgba(227,38,27,.3);animation:aud-pulse 1.6s ease-in-out infinite}
+.aud .live.off{color:var(--steel)}.aud .live.off i{background:#6E625C;box-shadow:none;animation:none}
+@keyframes aud-pulse{50%{box-shadow:0 0 0 10px rgba(227,38,27,.12)}}
+.aud .status .t{font:700 italic 22px 'WC Montserrat';color:var(--steel);text-transform:uppercase;letter-spacing:.04em}
+
+/* MVP winner: name drops in, then the team tag, then the share bar fills, then the rest */
+.aud .win .glow{position:absolute;left:50%;top:52%;width:1300px;height:700px;transform:translate(-50%,-50%);background:radial-gradient(closest-side,rgba(255,106,19,.42),transparent);animation:aud-fade 1s both}
+.aud .win .name{position:absolute;left:0;right:0;top:330px;text-align:center;font:400 250px/0.9 'WC Anton';text-transform:uppercase;text-shadow:0 12px 40px rgba(0,0,0,.6);white-space:nowrap;animation:aud-drop .7s .15s var(--ease) both}
+@keyframes aud-drop{from{opacity:0;transform:translateY(-60px) scale(1.08)}to{opacity:1;transform:none}}
+.aud .win .wtm{position:absolute;left:50%;transform:translateX(-50%);top:600px;display:flex;align-items:center;gap:18px;background:var(--char);padding:12px 30px;border-bottom:5px solid var(--or);animation:aud-upc .4s .6s var(--ease) both}
+.aud .win .wtm b{font:400 40px 'WC Anton';text-transform:uppercase}
+.aud .win .share{position:absolute;left:560px;right:560px;top:740px;animation:aud-fade .3s .8s both}
+.aud .win .share .bar{height:22px;background:#3a2620;overflow:hidden}
+.aud .win .share .bar i{display:block;height:100%;width:var(--w);background:linear-gradient(90deg,var(--red),var(--or));animation:aud-grow 1s .9s var(--ease) both}
+.aud .win .share .lbl{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:12px;font:800 italic 22px 'WC Montserrat';text-transform:uppercase;color:var(--steel);letter-spacing:.04em}
+.aud .win .share .lbl b{color:#fff;font:400 40px 'WC Anton'}
+.aud .win .rest{position:absolute;left:560px;right:560px;top:850px;display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.aud .win .rest div{background:rgba(22,10,7,.9);padding:10px 16px;display:flex;justify-content:space-between;align-items:center;animation:aud-up .4s var(--ease) both}
+.aud .win .rest div:nth-child(1){animation-delay:1.5s}.aud .win .rest div:nth-child(2){animation-delay:1.6s}.aud .win .rest div:nth-child(3){animation-delay:1.7s}
+.aud .win .rest b{font:400 30px 'WC Anton';text-transform:uppercase}.aud .win .rest span{font:400 30px 'WC Anton';color:var(--steel)}
+
+/* community vs desk */
+.aud .cmp{position:absolute;left:160px;right:160px;top:250px;display:grid;grid-template-columns:1fr 1fr}
+.aud .cmp .h{height:560px;position:relative;display:flex;flex-direction:column;justify-content:flex-end;padding:40px 46px;overflow:hidden}
+.aud .cmp .h.l{background:linear-gradient(180deg,rgba(22,10,7,.6),rgba(22,10,7,.95));border-bottom:6px solid var(--or);animation:aud-in-l .6s var(--ease) both}
+.aud .cmp .h.r{background:var(--box);color:#121212;border-bottom:6px solid var(--red);animation:aud-in-r .6s .1s var(--ease) both}
+@keyframes aud-in-l{from{opacity:0;transform:translateX(-80px)}to{opacity:1;transform:none}}
+@keyframes aud-in-r{from{opacity:0;transform:translateX(80px)}to{opacity:1;transform:none}}
+.aud .cmp .h .who{position:absolute;top:36px;left:46px}
+.aud .cmp .h.r .kick{color:var(--red)}
+.aud .cmp .h .nm{font:400 150px/0.9 'WC Anton';text-transform:uppercase;white-space:nowrap}
+.aud .cmp .h .tmn{display:flex;align-items:center;gap:14px;font:800 italic 26px 'WC Montserrat';text-transform:uppercase;margin-top:14px}
+.aud .cmp .h.r .tmn .logo{filter:invert(1)}
+.aud .cmp .h .why{font:700 italic 22px 'WC Montserrat';color:#7A716C;margin-top:18px;text-transform:uppercase}
+.aud .cmp .h .bigp{position:absolute;top:30px;right:40px;font:400 96px 'WC Anton';text-align:right}
+.aud .cmp .h .bigp small{display:block;font:800 italic 16px 'WC Montserrat';color:var(--steel);letter-spacing:.05em}
+.aud .cmp .h.r .bigp small{color:#7A716C}
+.aud .agree{position:absolute;left:50%;top:860px;transform:translateX(-50%);background:var(--char);border:3px solid var(--or);padding:14px 40px;font:400 52px 'WC Anton';text-transform:uppercase;display:flex;gap:22px;align-items:center;white-space:nowrap;animation:aud-upc .5s .7s var(--ease) both}
+.aud .agree span{font:800 italic 24px 'WC Montserrat';color:var(--steel)}
+
+/* QR */
+.aud .l3{position:absolute;left:90px;bottom:84px;display:flex;align-items:stretch;height:192px;box-shadow:0 18px 50px rgba(0,0,0,.55);animation:aud-up .5s var(--ease) both}
+.aud .l3 .q,.aud .qr-desk .q,.aud .qr-corner .q{background:#fff;padding:12px}
+.aud .l3 .tx{background:var(--char);padding:20px 40px;display:flex;flex-direction:column;justify-content:center;border-bottom:5px solid var(--or);min-width:640px}
+.aud .l3 .tx b{font:400 58px/1 'WC Anton';text-transform:uppercase}
+.aud .l3 .tx span,.aud .qr-desk .tx span{font:800 22px 'WC Montserrat';color:var(--ember);margin-top:8px}
+.aud .qr-corner{position:absolute;right:40px;bottom:40px;display:flex;flex-direction:column;align-items:stretch;box-shadow:0 12px 40px rgba(0,0,0,.5);animation:aud-fade .4s both}
+.aud .qr-corner b{background:var(--char);border-bottom:4px solid var(--or);font:400 26px 'WC Anton';text-transform:uppercase;padding:8px 12px;text-align:center;max-width:194px}
+.aud .qr-desk{position:absolute;right:80px;bottom:190px;display:flex;align-items:stretch;box-shadow:0 18px 50px rgba(0,0,0,.55);animation:aud-up .5s var(--ease) both}
+.aud .qr-desk .tx{background:var(--char);padding:18px 30px;display:flex;flex-direction:column;justify-content:center;border-bottom:5px solid var(--or);max-width:520px}
+.aud .qr-desk .tx b{font:400 46px/1 'WC Anton';text-transform:uppercase}
+@media (prefers-reduced-motion:reduce){.aud *{animation-duration:1ms!important;animation-delay:0s!important}}

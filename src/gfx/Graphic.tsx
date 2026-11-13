@@ -13,12 +13,13 @@ import type { Tournament } from '../../shared/tournament';
 import type { GfxInstance } from '../../shared/gfx';
 import { pkgById } from '../../shared/gfx';
 import type { RtcViewer } from '../lib/rtcViewer';
-import type { WcLive } from '../lib/hooks';
+import type { AudLive, WcLive } from '../lib/hooks';
+import { AUD_RENDERERS } from './audience';
 import { ScreenView } from '../components/show/Program';
 import { Scoreboard } from '../components/show/Overlays';
 import { Swap, TransitionProvider, transitionOf, whenVisualsReady } from './transition';
 
-export interface GfxData { scene: Scene; show: Show; wc: WcLive | null; now: number; tournament: Tournament | null; bnl: MatchData | null; viewer?: RtcViewer | null; monitor?: boolean }
+export interface GfxData { scene: Scene; show: Show; wc: WcLive | null; aud?: AudLive | null; now: number; tournament: Tournament | null; bnl: MatchData | null; viewer?: RtcViewer | null; monitor?: boolean }
 type Cfg = GfxInstance['config'];
 type Renderer = (p: { cfg: Cfg; d: GfxData }) => ReactNode;
 
@@ -26,6 +27,7 @@ const seated = (scene: Scene, ids: number[]) => ids.filter(id => scene.casters.f
 
 /** The official Overdrive collection: each renderer reuses the approved scene components unchanged. */
 export const RENDERERS: Record<string, Renderer> = {
+  ...AUD_RENDERERS,
   'caster-desk': ({ cfg, d }) => {
     const on = seated(d.scene, [1, 2, 3]);
     const n = cfg.layout === 'solo' ? 1 : cfg.layout === 'duo' ? 2 : cfg.layout === 'trio' ? 3 : on.length;

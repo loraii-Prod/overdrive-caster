@@ -17,6 +17,7 @@ import { defaultTournament, sanitizeTournament, type Tournament } from '../share
 import { majorSheet, sanitizeSheet, type SheetState } from '../shared/sheet';
 import { MAJOR_TICKER, WC_BRACKET, WILDCARD_SHEET_ID, defaultWildcard, sanitizeWildcard, type WildcardState } from '../shared/wildcard';
 import { emptyTwitchStore, sanitizeTwitchStore, type TwitchStore } from './twitch';
+import { emptyAudStore, sanitizeAudStore, type AudStore } from './audience';
 
 export interface Persisted {
   /** 2.0: 10 permanent talent profiles and who sits in which position. */
@@ -62,6 +63,8 @@ export interface Persisted {
   wildcard: WildcardState;
   /** Twitch connection (global, tokens never leave the server). */
   twitch: TwitchStore;
+  /** Audience interaction (Pick'ems + Community MVP): producer-side state; votes live in the vote service. */
+  audience: AudStore;
   /** Game feed for casters (stream server WHEP + caster login). */
   gameFeed: GameFeedSettings;
   /** Events (productions). The active one's data lives in the top-level fields. */
@@ -123,6 +126,7 @@ function fresh(): Persisted {
     sheet: od.sheet,
     wildcard: defaultWildcard(true),
     twitch: emptyTwitchStore(),
+    audience: emptyAudStore(),
     gameFeed: defaultGameFeed(),
     events: [{ id: 'overdrive', name: 'Overdrive Grand League', createdAt: Date.now() }],
     activeEvent: 'overdrive',
@@ -201,6 +205,7 @@ function load(): Persisted {
       // This install is Overdrive's: an upgraded state.json gets the wildcard switched on.
       wildcard: sanitizeWildcard(raw.wildcard, true),
       twitch: sanitizeTwitchStore(raw.twitch),
+      audience: sanitizeAudStore(raw.audience),
       gameFeed: sanitizeGameFeed(raw.gameFeed),
       events: Array.isArray(raw.events) && raw.events.length ? raw.events.map((e: any) => ({ id: String(e.id).replace(/[^\w-]/g, '').slice(0, 40), name: String(e.name ?? 'Event').slice(0, 60), createdAt: Number(e.createdAt) || Date.now() })) : base.events,
       activeEvent: typeof raw.activeEvent === 'string' ? raw.activeEvent : base.activeEvent,

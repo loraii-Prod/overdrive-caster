@@ -110,3 +110,17 @@ export function useGraphics(sock: Socket) {
   useEffect(() => sock.on(msg => { if (msg.t === 'gfx') setG(msg.graphics); }), [sock]);
   return g;
 }
+
+/** Audience results everyone may draw (frozen only) + desk MVPs + approved QR links. */
+export type AudLive = Extract<import('../../shared/protocol').ServerMsg, { t: 'aud' }>['aud'];
+export function useAudience(sock: Socket) {
+  const [a, setA] = useState<AudLive | null>(null);
+  useEffect(() => sock.on(m => { if (m.t === 'aud') setA(m.aud); }), [sock]);
+  return a;
+}
+/** Producer only: live counts, vote-service health. */
+export function useAudPrivate(sock: Socket) {
+  const [a, setA] = useState<import('../../shared/protocol').AudPrivate | null>(null);
+  useEffect(() => sock.on(m => { if (m.t === 'aud-private') setA(m.aud); }), [sock]);
+  return a;
+}

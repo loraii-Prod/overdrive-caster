@@ -10,6 +10,7 @@
  * This file is shared by the server (validation, persistence) and the browser (controls, rendering).
  * Renderers live in src/gfx (browser only) and are looked up by `renderer`.
  */
+import { WC_IDS, matchName } from './wildcard';
 
 export type PropType = 'text' | 'number' | 'boolean' | 'color' | 'select';
 export interface PropDef {
@@ -29,7 +30,8 @@ export type Binding =
   | { kind: 'match'; label: string } // the cast match (teams, logos, score)
   | { kind: 'predictions'; label: string; seats: number[] }
   | { kind: 'score'; label: string }
-  | { kind: 'bracket'; label: string }; // tournament results (match scores, sheet sync)
+  | { kind: 'bracket'; label: string } // tournament results (match scores, sheet sync)
+  | { kind: 'audience'; label: string; module: 'pickems' | 'mvp' | 'qr' }; // vote service (Pick'ems / MVP / QR)
 
 export type AnimAction = 'in' | 'out' | 'update' | 'reset';
 export interface AnimDef { action: AnimAction; label: string; ms: number; how: 'waapi' | 'css' | 'video' }
@@ -41,7 +43,7 @@ export interface PackageDef {
   name: string;
   version: string;
   collection: string;
-  category: 'Desk' | 'Game' | 'Overlay' | 'Bracket' | 'Intermission' | 'Interview' | 'Media';
+  category: 'Desk' | 'Game' | 'Overlay' | 'Bracket' | 'Intermission' | 'Interview' | 'Media' | 'Audience';
   description: string;
   renderer: string;
   resolution: [number, number];
@@ -164,6 +166,49 @@ export const PACKAGES: PackageDef[] = [
     animations: IN_OUT, assets: ['/brand/overdrive/loop.webm'], commands: [], permissions: ['match-data'],
   },
 ];
+
+// ------------------------------------------------------------ audience (Pick'ems + Community MVP)
+const MATCH_OPTS = [{ value: '', label: 'Cast match' }, ...WC_IDS.map(id => ({ value: id, label: matchName(id) }))];
+PACKAGES.push(
+  {
+    id: 'od.pickem', name: "Pick'ems: match prediction", version: '1.0.0', collection: 'Overdrive Major', category: 'Audience', renderer: 'pickem',
+    description: "The desk's picks against the community's for one match. Each step is prepared, then taken: picks are revealed one by one, then the community split, then the verdict. Showing the community step on air also reveals it on the voting page.",
+    resolution: [1920, 1080],
+    props: [
+      { key: 'match', label: 'Match', type: 'select', default: '', group: 'Content', options: MATCH_OPTS },
+      { key: 'step', label: 'Reveal step', type: 'select', default: 'intro', group: 'Reveal', options: [
+        { value: 'intro', label: 'Picks sealed' }, { value: 'd1', label: 'Desk pick 1' }, { value: 'd2', label: 'Desk picks 1–2' }, { value: 'd3', label: 'Desk picks 1–3' },
+        { value: 'd4', label: 'Desk picks 1–4' }, { value: 'd5', label: 'Desk picks 1–5' }, { value: 'community', label: 'Community split' }, { value: 'verdict', label: 'Final comparison' }] },
+      { key: 'title', label: 'Title', type: 'text', default: 'Who takes it?', group: 'Content' },
+    ],
+    bindings: [{ kind: 'audience', label: "Pick'ems", module: 'pickems' }, { kind: 'predictions', label: 'Desk picks', seats: [1, 2, 3, 4, 5] }, { kind: 'audience', label: 'QR', module: 'qr' }],
+    animations: IN_OUT, assets: ['/brand/overdrive/loop.webm'], commands: [], permissions: ['match-data'],
+  },
+  {
+    id: 'od.mvp', name: 'Community MVP', version: '1.0.0', collection: 'Overdrive Major', category: 'Audience', renderer: 'mvp',
+    description: 'Community MVP of a finished match: voting open (players + QR), the winner reveal, and the community vs desk comparison. The winner shows only from the result frozen when voting closed; showing it on air also reveals it on the voting page.',
+    resolution: [1920, 1080],
+    props: [
+      { key: 'match', label: 'Match', type: 'select', default: '', group: 'Content', options: MATCH_OPTS },
+      { key: 'step', label: 'Show', type: 'select', default: 'voting', group: 'Reveal', options: [{ value: 'voting', label: 'Voting open' }, { value: 'winner', label: 'Winner reveal' }, { value: 'compare', label: 'Community vs desk' }] },
+    ],
+    bindings: [{ kind: 'audience', label: 'Community MVP', module: 'mvp' }, { kind: 'audience', label: 'QR', module: 'qr' }],
+    animations: IN_OUT, assets: ['/brand/overdrive/loop.webm'], commands: [], permissions: ['match-data'],
+  },
+  {
+    id: 'od.qr', name: 'Voting QR', version: '1.0.0', collection: 'Overdrive Major', category: 'Audience', renderer: 'qr',
+    description: 'A QR code from the QR Manager as a lower third, a gameplay corner or an analyst-desk element. Only approved https links are drawn; an expired or invalid link draws nothing.',
+    resolution: [1920, 1080],
+    props: [
+      { key: 'qr', label: 'QR link', type: 'text', default: 'vote', group: 'Content', help: 'Id of a link in the QR Manager ("vote" = the voting page).' },
+      { key: 'position', label: 'Position', type: 'select', default: 'lower-third', group: 'Content', options: [{ value: 'lower-third', label: 'Lower third' }, { value: 'corner', label: 'Gameplay corner' }, { value: 'desk', label: 'Analyst desk' }] },
+      { key: 'title', label: 'Title', type: 'text', default: "Make your pick'ems", group: 'Content' },
+      { key: 'showUrl', label: 'Show the address', type: 'boolean', default: true, group: 'Content' },
+    ],
+    bindings: [{ kind: 'audience', label: 'QR codes', module: 'qr' }],
+    animations: IN_OUT, assets: [], commands: [], permissions: [],
+  },
+);
 
 export const pkgById = (id: string) => PACKAGES.find(p => p.id === id);
 export const defaultsOf = (p: PackageDef) => Object.fromEntries(p.props.map(d => [d.key, d.default])) as GfxInstance['config'];

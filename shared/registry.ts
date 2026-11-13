@@ -12,7 +12,8 @@ import type { ScreenId } from './types';
 
 export type ModuleId =
   | 'talent-casters' | 'talent-analysts' | 'talent-guest' | 'cameras' | 'scoreboard' | 'match' | 'predictions'
-  | 'stats' | 'h2h' | 'media' | 'countdown' | 'graphics' | 'bracket' | 'music' | 'veto' | 'interview' | 'intro' | 'showcase';
+  | 'stats' | 'h2h' | 'media' | 'countdown' | 'graphics' | 'bracket' | 'music' | 'veto' | 'interview' | 'intro' | 'showcase'
+  | 'pickems' | 'mvp' | 'qr';
 
 export const MODULES: Record<ModuleId, { name: string; about: string }> = {
   'talent-casters': { name: 'Talent · Caster desk', about: '3 caster positions (left / center / right), Solo / Duo / Trio, assign any talent' },
@@ -27,6 +28,9 @@ export const MODULES: Record<ModuleId, { name: string; about: string }> = {
   media: { name: 'Media player', about: 'Playlist, play / pause / stop, volume, auto-advance' },
   countdown: { name: 'Countdown', about: 'Start / extend / stop the "starts in" countdown' },
   graphics: { name: 'Graphics trigger', about: 'Map card, Replay / Highlights, clear popups, Champions' },
+  pickems: { name: "Pick'ems", about: 'Public picks per match (lock / reopen), the desk picks, the reveal steps, the community record' },
+  mvp: { name: 'Community MVP', about: 'Eligible players, open / close voting, private counts, the desk MVP, the winner reveal' },
+  qr: { name: 'QR codes', about: 'Choose an approved link, preview it, position, show / hide' },
   bracket: { name: 'Tournament bracket', about: 'Upper / lower half on screen, auto switch, match states' },
   music: { name: 'Music & audio', about: "This scene's music bed, level, skip, master on/off" },
   veto: { name: 'Map veto', about: 'Pick / ban the maps in order, undo, reset, team PBs' },
@@ -75,6 +79,14 @@ export const REGISTRY: SourceDef[] = [
   S('ending', 'Ending', 'Intermission', 'ending', ['countdown', 'graphics', 'music'], ['Card build-in', 'Champions']),
   { id: 'media', name: 'Media Playback', category: 'Media', view: 'media', route: '/output/media', resolution: [1920, 1080], animations: ['Fade between items'], modules: ['media'] },
 ];
+
+/** Producer modules of the audience graphics (graphics-engine only: no scene source, not in the OBS builder). */
+const AUD = (id: string, name: string, route: string, modules: ModuleId[]): SourceDef => ({ id, name, category: 'Overlay', route, resolution: [1920, 1080], animations: ['Step reveals'], modules });
+export const AUD_SOURCES: Record<string, SourceDef> = {
+  pickem: AUD('aud-pickem', "Pick'ems", '/g/pickem', ['pickems', 'predictions', 'qr']),
+  mvp: AUD('aud-mvp', 'Community MVP', '/g/mvp', ['mvp', 'qr']),
+  qr: AUD('aud-qr', 'Voting QR', '/g/qr', ['qr', 'pickems', 'mvp']),
+};
 
 export const sourceById = (id: string) => REGISTRY.find(s => s.id === id);
 

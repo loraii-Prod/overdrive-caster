@@ -8,7 +8,8 @@ import type { ControllerState } from '../../../shared/types';
 import type { ProducerCmd, EngineState } from '../../../shared/engine';
 import { PACKAGES, pkgById, type GfxInstance, type PackageDef, type PropDef } from '../../../shared/gfx';
 import { SEAT_LABELS, talentLabel, type Seat } from '../../../shared/talent';
-import { sourceById } from '../../../shared/registry';
+import { AUD_SOURCES, sourceById } from '../../../shared/registry';
+import { MvpModule, PickemsModule, QrModule } from './audienceModules';
 import type { WildcardState } from '../../../shared/wildcard';
 import { Btn, MatchModule, PredictionsModule, ScoreRow, Seg, Tiny, PGM, PVW, WARN, type Ack, type Ctx } from './modules';
 import { B } from './ws';
@@ -126,7 +127,8 @@ export function Inspector({ g, st, run, ctxBase }: { g: GfxInstance; st: Control
               {b.kind === 'match' && <MatchModule x={{ ...ctxBase, src: sourceById('gameplay')! }} />}
               {b.kind === 'score' && <ScoreRow x={{ ...ctxBase, src: sourceById('scoreboard')! }} />}
               {b.kind === 'bracket' && <div className="text-[11.5px] text-white/55">Results come from the match scores (Match / Scoreboard) and the sheet sync. Every bracket graphic uses the same results.</div>}
-              {b.kind === 'predictions' && <PredictionsModule x={{ ...ctxBase, src: sourceById(b.seats[0] >= 4 ? 'analyst-desk' : 'caster-desk')! }} />}
+              {b.kind === 'predictions' && <PredictionsModule x={{ ...ctxBase, src: b.seats.length >= 5 ? AUD_SOURCES.pickem : sourceById(b.seats[0] >= 4 ? 'analyst-desk' : 'caster-desk')! }} />}
+              {b.kind === 'audience' && ctxBase.aud && (() => { const x = { ...ctxBase, src: AUD_SOURCES.pickem }; return b.module === 'pickems' ? <PickemsModule x={x} a={ctxBase.aud} /> : b.module === 'mvp' ? <MvpModule x={x} a={ctxBase.aud} /> : <QrModule x={x} a={ctxBase.aud} />; })()}
             </section>
           ))}
         </div>

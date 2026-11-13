@@ -61,6 +61,8 @@ export type ClientMsg =
   | { t: 'wc'; op: WcOp }
   /** Twitch predictions & polls (controller). */
   | { t: 'tw'; op: TwOp }
+  /** Audience interaction (Pick'ems + Community MVP), producer only; answered with aud-ack. */
+  | { t: 'aud'; id?: string; op: import('./audience').AudOp }
   /** A caster's own prediction, from their camera link page. */
   | { t: 'caster-pick'; pick: import('./wildcard').WcPick | null }
   | { t: 'event-rename'; id: string; name: string }
@@ -118,6 +120,11 @@ export type ServerMsg =
   /** A map was won or a match ended (gameplay popups). Only sent live, never replayed on connect. */
   | { t: 'wc-pop'; pop: WcPop }
   | { t: 'twitch'; tw: TwitchPublic }
+  /** Audience results everyone may draw (frozen only) + the desk MVPs + approved QR links. */
+  | { t: 'aud'; aud: import('./audience').AudPublic & { staffMvp: import('./audience').StaffMvp; qr: import('./audience').QrLink[] } }
+  /** Producer only: live counts and vote-service health. */
+  | { t: 'aud-private'; aud: AudPrivate }
+  | { t: 'aud-ack'; id: string; ok: boolean; error?: string }
   | { t: 'caster-info'; name: string; role: string; cameraVisible: boolean; /** 2.0 talent page: their current position (null = not seated) */ seat?: number | null; /** Camera sent through VDO.Ninja: the push stream ID and the VDO password (only to this caster). */ vdo: { id: string; password: string; room: string } | null; /** Names of everyone in the show (for the picks on the caster page). */ talent?: { id: number; name: string }[] }
   | { t: 'rtc-viewer-join'; viewerId: string; req: WatchRequest }
   | { t: 'rtc-viewer-leave'; viewerId: string }
@@ -125,3 +132,8 @@ export type ServerMsg =
   | { t: 'rtc-publisher'; slot: CasterId; online: boolean }
   | { t: 'error'; code: string; message: string }
   | { t: 'pong' };
+
+export interface AudPrivate {
+  configured: boolean; online: boolean; error: string | null; summary: import('./audience').AudSummary | null;
+  lockedMatches: string[]; championLocked: boolean; qrHosts: string[]; customQr: import('./audience').QrLink[]; publicUrl: string;
+}

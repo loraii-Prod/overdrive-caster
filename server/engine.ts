@@ -46,6 +46,8 @@ export interface EngineDeps {
   pushMedia(): void;
   /** Send the graphics instances to every source and controller. */
   pushGfx(): void;
+  /** A graphic's prepared state was published (audience reveals follow the producer's take). */
+  onGfxPublish?(g: GfxInstance): void;
   /** Talent / positions (hub owns the camera routing). Return an error message or null. */
   setSeat(seat: number, talent: string | null): string | null;
   editTalent(id: string, patch: { name?: string; role?: 'caster' | 'analyst'; mode?: 'webrtc' | 'vdo' }): string | null;
@@ -186,6 +188,7 @@ export function createEngine(d: EngineDeps) {
     const changed = JSON.stringify(g.draft) !== JSON.stringify(g.config);
     g.config = g.draft; g.draft = null;
     if (changed && g.anim.action !== 'out') anim(g, 'update');
+    if (changed) d.onGfxPublish?.(g);
   }
 
   // ---------------------------------------------------------------- media

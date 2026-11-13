@@ -10,7 +10,7 @@ import { Ticker } from '../components/show/parts';
 import { SpotlightCard } from '../components/show/Spotlight';
 import { PlayerCam, playerCamBox } from '../components/show/PlayerCam';
 import { ThemeProvider } from '../lib/theme';
-import { useGraphics, useMatchData, useConnState, useLive, useNow, useSocket, useTournament, useViewer, useWantedCameras, useWildcard, query } from '../lib/hooks';
+import { useAudience, useGraphics, useMatchData, useConnState, useLive, useNow, useSocket, useTournament, useViewer, useWantedCameras, useWildcard, query } from '../lib/hooks';
 import { GraphicHost } from '../gfx/Graphic';
 import { pkgById } from '../../shared/gfx';
 import { WcBracket, WcCasters, WcPopups, WcWaiting } from '../components/wildcard/Wildcard';
@@ -227,6 +227,7 @@ export function GraphicOutput() {
   const bnl = useMatchData(sock);
   const wc = useWildcard(sock);
   const graphics = useGraphics(sock);
+  const aud = useAudience(sock);
   const now = useNow(live?.skew ?? 0, 250);
   const viewer = useViewer(sock, 'hq');
   const inst = graphics?.find(g => g.id === id);
@@ -246,7 +247,7 @@ export function GraphicOutput() {
       <ScaledCanvas>
         <ThemeProvider theme={live?.show.theme ?? 'bnl'} brand={live?.show.brand ?? null}>
           <div className="od-stage relative h-[1080px] w-[1920px] overflow-hidden" data-theme={live?.show.theme ?? 'bnl'}>
-            {inst && live && <GraphicHost inst={inst} d={{ scene: live.scene, show: live.show, wc, now, tournament, bnl, viewer }} onHealth={health} />}
+            {inst && live && <GraphicHost inst={inst} d={{ scene: live.scene, show: live.show, wc, aud, now, tournament, bnl, viewer }} onHealth={health} />}
           </div>
         </ThemeProvider>
       </ScaledCanvas>

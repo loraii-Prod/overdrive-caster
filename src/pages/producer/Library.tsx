@@ -11,7 +11,7 @@ import { REGISTRY, type SourceDef } from '../../../shared/registry';
 import type { Ack } from './modules';
 import { C, DraftBadge, LABEL, PanelHead, VisBadge } from './ws';
 
-export const CATEGORIES = ['Desks', 'Gameplay', 'Match graphics', 'Tournament graphics', 'Player & team', 'Media', 'Utility'] as const;
+export const CATEGORIES = ['Desks', 'Gameplay', 'Match graphics', 'Tournament graphics', 'Audience', 'Player & team', 'Media', 'Utility'] as const;
 export type Category = typeof CATEGORIES[number];
 
 const SOURCE_CAT: Record<string, Category> = {
@@ -19,7 +19,7 @@ const SOURCE_CAT: Record<string, Category> = {
   bracket: 'Tournament graphics', standings: 'Tournament graphics', matches: 'Tournament graphics', 'team-intro': 'Player & team', media: 'Media',
   starting: 'Utility', brb: 'Utility', ending: 'Utility',
 };
-const PKG_CAT: Record<string, Category> = { Desk: 'Desks', Game: 'Gameplay', Overlay: 'Match graphics', Bracket: 'Tournament graphics', Interview: 'Match graphics', Intermission: 'Utility', Media: 'Media' };
+const PKG_CAT: Record<string, Category> = { Desk: 'Desks', Game: 'Gameplay', Overlay: 'Match graphics', Bracket: 'Tournament graphics', Interview: 'Match graphics', Intermission: 'Utility', Media: 'Media', Audience: 'Audience' };
 
 export const gfxCategory = (g: GfxInstance): Category => PKG_CAT[pkgById(g.pkg)?.category ?? ''] ?? 'Utility';
 export const sourceCategory = (s: SourceDef): Category => SOURCE_CAT[s.id] ?? 'Utility';

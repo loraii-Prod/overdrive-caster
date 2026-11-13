@@ -13,12 +13,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import type { CasterId, ControllerState, ScreenId } from '../../../shared/types';
 import { applyDraft, draftLabel, type EngineState, type ProducerCmd } from '../../../shared/engine';
-import { REGISTRY, sourceById, studioFor } from '../../../shared/registry';
+import { AUD_SOURCES, REGISTRY, sourceById, studioFor } from '../../../shared/registry';
+import type { AudOp } from '../../../shared/audience';
 import { ScreenView } from '../../components/show/Program';
 import { Scoreboard } from '../../components/show/Overlays';
 import { WcBracket } from '../../components/wildcard/Wildcard';
 import { MediaView } from '../../components/media/MediaView';
-import { useConnState, useMatchData, useMedia, useNow, useSocket, useTournament, useViewer, useWildcard } from '../../lib/hooks';
+import { useAudience, useAudPrivate, useConnState, useMatchData, useMedia, useNow, useSocket, useTournament, useViewer, useWildcard } from '../../lib/hooks';
 import type { Socket } from '../../lib/socket';
 import { ModuleView, Seg, type Ack, type Ctx } from './modules';
 import { Inspector } from './Inspector';
@@ -95,6 +96,17 @@ export function Producer({ onLogout, dock }: { onLogout: () => void; dock?: stri
   const tournament = useTournament(sock);
   const bnl = useMatchData(sock);
   const wc = useWildcard(sock);
+  const aud = useAudience(sock);
+  const audPriv = useAudPrivate(sock);
+  // Audience commands go to the vote service through the server; the answer comes back as aud-ack.
+  const audWait = useRef(new Map<string, (e: string | null) => void>());
+  useEffect(() => sock.on(m => { if (m.t === 'aud-ack') { audWait.current.get(m.id)?.(m.ok ? null : m.error ?? 'Failed'); audWait.current.delete(m.id); } }), [sock]);
+  const audOp = useCallback((op: AudOp, label: string) => new Promise<string | null>(res => {
+    const id = Math.random().toString(36).slice(2);
+    const t = setTimeout(() => { audWait.current.delete(id); res('No answer from the server'); }, 8000);
+    audWait.current.set(id, e => { clearTimeout(t); if (e) console.warn(`[aud] ${label}: ${e}`); res(e); });
+    sock.send({ t: 'aud', id, op });
+  }), [sock]);
   const media = useMedia(sock);
   const now = useNow(skew, 250);
   const rtt = useRtt(sock);
@@ -131,7 +143,7 @@ export function Producer({ onLogout, dock }: { onLogout: () => void; dock?: stri
   const { run, busy, log } = useCommands(sock, eng?.version);
   const gInst = sel.startsWith('g:') ? st?.graphics?.find(g => g.id === sel.slice(2)) : undefined;
   const gPkg = gInst ? pkgById(gInst.pkg) : undefined;
-  const src = (gPkg?.obsKey ? REGISTRY.find(s => s.obsKey === gPkg.obsKey) : undefined) ?? sourceById(sel) ?? REGISTRY[0];
+  const src = (gPkg?.category === 'Audience' ? AUD_SOURCES[gPkg.renderer] : undefined) ?? (gPkg?.obsKey ? REGISTRY.find(s => s.obsKey === gPkg.obsKey) : undefined) ?? sourceById(sel) ?? REGISTRY[0];
 
   // Draft = preview scene/show + staged desk/booth + prepared live data. Live = exactly what the sources show.
   const draft = useMemo(() => {
@@ -193,8 +205,8 @@ export function Producer({ onLogout, dock }: { onLogout: () => void; dock?: stri
   const selObs = gInst ? obsSceneOfGfx(gInst, st) : obsSceneOfSource(src, st);
   const showDraft = view === 'draft';
   const scene = showDraft ? draft.scene : st.live, show = showDraft ? draft.show : st.showLive, wcv = showDraft ? draft.wc : wc;
-  const ctx: Ctx = { st, eng, wc: wc.state, pv: draft.wc.state, run, prepare, src, now, media: media?.media ?? null, mediaSkew: media?.skew ?? 0 };
-  const layout = studioFor(st.studio, src.id);
+  const ctx: Ctx = { st, eng, wc: wc.state, pv: draft.wc.state, run, prepare, src, now, media: media?.media ?? null, mediaSkew: media?.skew ?? 0, aud: { aud, priv: audPriv, op: audOp } };
+  const layout = src.id.startsWith('aud-') ? { modules: src.modules, pinned: [] as typeof src.modules } : studioFor(st.studio, src.id);
   const mods = [...layout.pinned, ...layout.modules.filter(m => !layout.pinned.includes(m))];
   const selConns = gInst ? (st.outputs.find(o => o.route === `g/${gInst.id}`)?.count ?? 0) : outputs(src.route);
   const selDraft = gInst ? !!gInst.draft : eng.dirty;
@@ -213,7 +225,7 @@ export function Producer({ onLogout, dock }: { onLogout: () => void; dock?: stri
       <div data-console-canvas className="absolute origin-top-left overflow-hidden font-['Inter'] text-white antialiased" style={{ width: W, height: H, left: fit.x, top: fit.y, transform: `scale(${fit.s})`, background: C.bg }}>
         {/* ===== 1920×1080: the selected graphic, exactly as its source renders it (nothing painted over it) ===== */}
         <div className="absolute left-0 top-0 overflow-hidden" style={{ width: 1920, height: 1080, background: 'repeating-conic-gradient(#151517 0% 25%, #101012 0% 50%) 50% / 40px 40px' }} data-preview={gInst ? `g:${gInst.id}` : src.id} data-preview-view={view}>
-          {gInst && <GraphicHost key={gInst.id} inst={gInst} preview forceShow={showDraft} cfgOverride={showDraft ? gInst.draft : null} d={{ scene: st.live, show: st.showLive, wc, now, tournament, bnl, viewer, monitor: true }} />}
+          {gInst && <GraphicHost key={gInst.id} inst={gInst} preview forceShow={showDraft} cfgOverride={showDraft ? gInst.draft : null} d={{ scene: st.live, show: st.showLive, wc, aud, now, tournament, bnl, viewer, monitor: true }} />}
           {!gInst && src.screen && <ScreenView key={src.screen} id={src.screen} scene={{ ...scene, screen: src.screen }} show={show} now={now} tournament={tournament} viewer={viewer} monitor bnl={bnl} wc={wcv} />}
           {!gInst && src.view === 'scoreboard' && <Scoreboard show={show} />}
           {!gInst && src.view === 'standings' && <WcBracket wc={wcv.state} part={2} />}
@@ -276,7 +288,7 @@ export function Producer({ onLogout, dock }: { onLogout: () => void; dock?: stri
             </>}
             {mode === 'live' ? (
               <div className="flex min-h-0 min-w-0 flex-col" style={{ background: C.panel }}>
-                {gInst && <Inspector g={gInst} st={st} eng={eng} wc={wc.state} pv={draft.wc.state} run={run} ctxBase={{ st, eng, wc: wc.state, pv: draft.wc.state, run, prepare, now, media: media?.media ?? null, mediaSkew: media?.skew ?? 0 }} />}
+                {gInst && <Inspector g={gInst} st={st} eng={eng} wc={wc.state} pv={draft.wc.state} run={run} ctxBase={{ st, eng, wc: wc.state, pv: draft.wc.state, run, prepare, now, media: media?.media ?? null, mediaSkew: media?.skew ?? 0, aud: { aud, priv: audPriv, op: audOp } }} />}
                 {!gInst && (
                   <div className="flex min-h-0 flex-1 flex-col" data-scene-panel={src.id}>
                     <PanelHead label="Scene controls" info={<>{src.name} · <span className="font-mono">{src.route}</span>{src.note ? ` · ${src.note}` : ''}</>}>
