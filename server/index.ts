@@ -24,6 +24,10 @@ app.use(media());
 app.use(pluginDownload());
 
 app.get('/api/health', (_req, res) => res.json({ ok: true, uptime: process.uptime() }));
+// Which build is actually running: check this before testing anything on a deployed instance.
+// RENDER_GIT_COMMIT / RENDER_GIT_BRANCH are set by Render for Git-backed deploys (absent locally).
+const RELEASE = '2.2.5', BOOTED = new Date().toISOString();
+app.get('/api/version', (_req, res) => { res.setHeader('Cache-Control', 'no-store'); res.json({ release: RELEASE, commit: process.env.RENDER_GIT_COMMIT ?? null, branch: process.env.RENDER_GIT_BRANCH ?? null, service: process.env.RENDER_SERVICE_NAME ?? null, booted: BOOTED }); });
 
 app.get('/api/session', (req, res) => { const role = roleFrom(req); res.json({ authed: role === 'producer', role }); });
 
