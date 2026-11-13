@@ -4,11 +4,11 @@
  * the published reveal step, community splits only once a match is locked, MVP winners only from the result frozen
  * when voting closed. Anything not ready draws nothing rather than a guess.
  */
-import type { ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import type { GfxInstance } from '../../shared/gfx';
-import { communityPick, pcts, teamRoster, type AudPoll } from '../../shared/audience';
+import { communityPick, pcts, teamRoster, type AudPlayer, type AudPoll } from '../../shared/audience';
 import { matchName, wcResolve } from '../../shared/wildcard';
-import { teamLogo } from '../../shared/major';
+import { normHandle, teamLogo } from '../../shared/major';
 import { BgVideo } from '../components/Brand';
 import { Qr } from '../components/Qr';
 import type { GfxData } from './Graphic';
@@ -103,14 +103,92 @@ function mvpResult(p: AudPoll | undefined) {
   return { total: p.frozen.total, rows: out, top };
 }
 
+// Portraits: the Studio asset library's photo for the player (same association as the player showcase), preloaded
+// and measured before the reveal plays so it never pops in half-loaded.
+interface PInfo { url: string; w: number; h: number; cutout: boolean }
+const pcache = new Map<string, Promise<PInfo | null>>(), pdone = new Map<string, PInfo | null>();
+function preload(url: string): Promise<PInfo | null> {
+  let p = pcache.get(url);
+  if (!p) {
+    p = new Promise<PInfo | null>(res => {
+      const im = new Image();
+      im.decoding = 'async';
+      im.onload = async () => {
+        try { await im.decode(); } catch { /* already decoded */ }
+        // Cut-out = transparent border (a portrait with its background removed); otherwise it is framed.
+        let cutout = false;
+        try {
+          const c = document.createElement('canvas'), n = 48; c.width = n; c.height = n;
+          const g = c.getContext('2d', { willReadFrequently: true })!; g.drawImage(im, 0, 0, n, n);
+          const px = g.getImageData(0, 0, n, n).data; let clear = 0, edge = 0;
+          for (let i = 0; i < n; i++) for (const [x, y] of [[i, 0], [0, i], [n - 1, i]]) { edge++; if (px[(y * n + x) * 4 + 3] < 24) clear++; }
+          cutout = clear / edge > 0.6;
+        } catch { /* cross-origin: framed */ }
+        const info = { url, w: im.naturalWidth, h: im.naturalHeight, cutout };
+        pdone.set(url, info); res(info);
+      };
+      im.onerror = () => { pdone.set(url, null); res(null); };
+      im.src = url;
+    });
+    pcache.set(url, p);
+  }
+  return p;
+}
+function usePortraits(urls: string[]) {
+  const [, bump] = useState(0);
+  const [late, setLate] = useState(false);
+  const key = urls.join('|');
+  useEffect(() => {
+    let on = true;
+    setLate(false);
+    Promise.all(urls.map(preload)).then(() => on && bump(n => n + 1));
+    const t = setTimeout(() => on && setLate(true), 1500); // a portrait that never answers: play with the fallback
+    return () => { on = false; clearTimeout(t); };
+  }, [key]); // eslint-disable-line react-hooks/exhaustive-deps
+  return { ready: late || urls.every(u => pdone.has(u)), info: (u: string | null) => (u ? pdone.get(u) ?? null : null) };
+}
+const portraitUrl = (d: GfxData, handle: string) => d.wc?.state.showcase.photos[normHandle(handle)] || '';
+
+/** Never enlarged more than 1.25×: a smaller picture is drawn smaller (bottom-anchored), not stretched. */
+const MAX_UP = 1.25;
+function Portrait({ info, team, box, mirror, frameW = 640 }: { info: PInfo | null; team: string; box: { w: number; h: number }; mirror?: boolean; frameW?: number }) {
+  // Fallback: the team mark, kept small enough that today's 64 px logos are not blown up (larger once the official
+  // vector logos are approved), under the outlined MVP.
+  if (!info) return <div className="mv-fb" style={{ width: box.w, height: box.h }}><Logo team={team} size={Math.min(160, box.w * 0.25)} /><div className="mv-fbx">MVP</div></div>;
+  if (info.cutout) {
+    const s = Math.min(box.h / info.h, box.w / info.w, MAX_UP);
+    return <img className="mv-cut" src={info.url} alt="" style={{ width: info.w * s, height: info.h * s, transform: mirror ? 'scaleX(-1)' : undefined }} />;
+  }
+  // Framed 3:4, cropped from the top (faces stay in), never enlarged past the limit.
+  const fw = Math.min(box.w, box.h * 0.75, frameW), fh = fw / 0.75;
+  const s = Math.min(1, (MAX_UP * info.w) / fw, (MAX_UP * info.h) / fh);
+  return <div className="mv-frame" style={{ width: fw * s, height: fh * s }}><img src={info.url} alt="" /></div>;
+}
+
+function deskMvp(d: GfxData, matchId: string, roster: AudPlayer[]) {
+  const picks = Object.values(d.aud?.staffMvp[matchId] ?? {});
+  if (!picks.length) return null;
+  const tally = new Map<string, number>();
+  for (const p of picks) tally.set(p.player, (tally.get(p.player) ?? 0) + 1);
+  const [player, n] = [...tally].sort((a, b) => b[1] - a[1])[0];
+  return { player, n, of: picks.length, team: roster.find(p => p.handle === player)?.team ?? '', reason: picks.find(p => p.player === player && p.reason)?.reason ?? '' };
+}
+
 const mvp: R = ({ cfg, d }) => {
   const m = matchOf(cfg, d);
-  if (!m || !m.winner) return null;
   const step = String(cfg.step || 'voting');
-  const poll = d.aud?.polls.filter(p => p.match === m.id).pop();
+  const poll = m ? d.aud?.polls.filter(p => p.match === m.id).pop() : undefined;
+  const roster = m ? [...teamRoster(m.a), ...teamRoster(m.b)] : [];
+  const res = mvpResult(poll);
+  const desk = m ? deskMvp(d, m.id, roster) : null;
+  // Everything this graphic could reveal is preloaded while it is on screen (the voting step included).
+  const urls = [...new Set(roster.map(p => portraitUrl(d, p.handle)).filter(Boolean))];
+  const pr = usePortraits(urls);
+  if (!m || !m.winner) return null;
   const result = `${m.a} ${m.s1}–${m.s2} ${m.b}`;
+  const label = m.label;
   if (step === 'voting') {
-    const players = poll?.players.length ? poll.players : [...teamRoster(m.a), ...teamRoster(m.b)];
+    const players = poll?.players.length ? poll.players : roster;
     const qr = d.aud?.qr.find(q => q.id === 'vote');
     const open = poll?.status === 'open';
     return (
@@ -118,12 +196,16 @@ const mvp: R = ({ cfg, d }) => {
         <BgVideo /><div className="aud-dim" />
         <Head kick={`Community MVP · ${result}`} title="Vote for the MVP" />
         <div className="aud-left mv">
-          {players.slice(0, 4).map((p, i) => (
-            <div className={'pc' + (p.team === m.b ? ' b' : '')} key={p.handle} style={{ animationDelay: `${i * 70}ms` }}>
-              <div className="num">{String(i + 1).padStart(2, '0')}</div><Logo team={p.team} size={70} /><div className="sil" />
-              <b>{p.handle}</b><small>{p.team}</small><div className="tm" />
-            </div>
-          ))}
+          {players.slice(0, 4).map((p, i) => {
+            const info = pr.info(portraitUrl(d, p.handle));
+            return (
+              <div className={'pc' + (p.team === m.b ? ' b' : '')} key={p.handle} style={{ animationDelay: `${i * 70}ms` }}>
+                <div className="num">{String(i + 1).padStart(2, '0')}</div><Logo team={p.team} size={70} />
+                {info ? <img className={info.cutout ? 'pc-cut' : 'pc-photo'} src={info.url} alt="" /> : <div className="sil" />}
+                <b>{p.handle}</b><small>{p.team}</small><div className="tm" />
+              </div>
+            );
+          })}
         </div>
         {qr && <div className="qrbox"><Qr url={qr.url} size={300} /><b>Scan to vote</b><span>{qr.url.replace(/^https:\/\//, '')}</span></div>}
         <div className="status"><div className={'live' + (open ? '' : ' off')}><i />{open ? 'VOTING OPEN' : poll?.status === 'closed' || poll?.status === 'revealed' ? 'VOTING CLOSED' : 'VOTING OPENS SOON'}</div>
@@ -131,44 +213,66 @@ const mvp: R = ({ cfg, d }) => {
       </div>
     );
   }
-  const res = mvpResult(poll);
-  if (!res || !res.top.length) return null; // never a guess: nothing until the result is frozen
-  const win = res.top[0];
-  if (step === 'winner') {
+  // The reveal waits for its portraits (they were preloaded during the voting step; 1.5 s cap, then the fallback).
+  const wait = !pr.ready;
+  const hero = (who: { handle: string; team: string }, badges: ReactNode, body: ReactNode, tint?: 'desk') => {
+    const info = pr.info(portraitUrl(d, who.handle));
     return (
-      <div className="aud">
-        <BgVideo /><div className="aud-dim" />
-        <div className="win">
-          <div className="glow" />
-          <Head kick={`Community MVP · ${result}`} sub={`Voted by ${res.total.toLocaleString('en-US')} viewers`} />
-          <div className="name">{res.top.map(t => t.handle).join(' & ')}</div>
-          <div className="wtm"><Logo team={win.team} size={56} /><b>{win.team}</b></div>
-          <div className="share"><div className="lbl"><span>Share of the vote</span><b>{win.pct}%</b></div><div className="bar"><i style={{ ['--w' as string]: `${win.pct}%` }} /></div></div>
-          <div className="rest">{res.rows.filter(r => !res.top.includes(r)).slice(0, 3).map(r => <div key={r.handle}><b>{r.handle}</b><span>{r.pct}%</span></div>)}</div>
+      <div className={'aud mvx' + (tint ? ' mvx-desk' : '') + (wait ? ' mvx-wait' : '')} data-mvp-portrait={info ? (info.cutout ? 'cutout' : 'framed') : 'fallback'}>
+        <BgVideo /><div className="mvx-dim" />
+        <div className="mvx-glow" />
+        <div className="mvx-ghost">MVP</div>
+        <div className="mvx-pic"><Portrait info={info} team={who.team} box={{ w: 760, h: 980 }} /></div>
+        <div className="mvx-L">
+          <div className="mvx-badges">{badges}</div>
+          <div className="mvx-name">{who.handle}</div>
+          <div className="mvx-tm"><Logo team={who.team} size={54} /><b>{who.team}</b></div>
+          {body}
         </div>
       </div>
     );
+  };
+  if (step === 'winner') {
+    if (!res || !res.top.length) return null; // never a guess: nothing until the result is frozen
+    const win = res.top[0];
+    return hero(win, <div className="mvx-badge"><small>Community</small>MVP</div>, <>
+      <div className="mvx-res">{label} · <b>{result}</b></div>
+      <div className="mvx-share"><div className="lbl"><span>Community vote · {res.total.toLocaleString('en-US')} votes</span><b>{win.pct}%</b></div><div className="bar"><i style={{ ['--w' as string]: `${win.pct}%` }} /></div></div>
+      <div className="mvx-rest">{res.rows.filter(r => !res.top.includes(r)).slice(0, 3).map(r => <div key={r.handle}><b>{r.handle}</b><span>{r.pct}%</span></div>)}</div>
+    </>);
   }
-  // compare: community vs desk
-  const picks = Object.values(d.aud?.staffMvp[m.id] ?? {});
-  if (!picks.length) return null;
-  const tally = new Map<string, number>();
-  for (const p of picks) tally.set(p.player, (tally.get(p.player) ?? 0) + 1);
-  const [deskPlayer, deskN] = [...tally].sort((a, b) => b[1] - a[1])[0];
-  const deskTeam = [...teamRoster(m.a), ...teamRoster(m.b)].find(p => p.handle === deskPlayer)?.team ?? '';
-  const reason = picks.find(p => p.player === deskPlayer && p.reason)?.reason;
-  const agree = res.top.some(t => t.handle === deskPlayer);
+  if (step === 'desk') {
+    if (!desk) return null;
+    return hero({ handle: desk.player, team: desk.team }, <div className="mvx-badge desk"><small>Analyst</small>MVP</div>, <>
+      <div className="mvx-res">{label} · <b>{result}</b></div>
+      {desk.reason && <div className="mvx-quote">“{desk.reason}”</div>}
+      <div className="mvx-quote-by">Picked by {desk.n} of {desk.of} analysts</div>
+    </>, 'desk');
+  }
+  // compare: one portrait when they agree, both side by side when they differ
+  if (!res || !res.top.length || !desk) return null;
+  const win = res.top[0];
+  if (res.top.some(t => t.handle === desk.player)) {
+    return hero(win, <><div className="mvx-badge"><small>Community</small>MVP</div><div className="mvx-badge desk"><small>Analyst</small>MVP</div></>, <>
+      <div className="mvx-res">Community and analysts agree · <b>{result}</b></div>
+      <div className="mvx-share"><div className="lbl"><span>Community {win.pct}% · Analysts {desk.n} of {desk.of}</span><b>{desk.n === desk.of ? 'Unanimous' : 'They agree'}</b></div><div className="bar"><i style={{ ['--w' as string]: `${win.pct}%` }} /></div></div>
+    </>);
+  }
+  const half = (side: 'l' | 'r', who: { handle: string; team: string }, tag: string, line: string) => (
+    <div className={`mvc-half ${side}`}>
+      <div className="mvc-glow" />
+      <div className="mvc-pic"><Portrait info={pr.info(portraitUrl(d, who.handle))} team={who.team} box={{ w: 640, h: 830 }} mirror={side === 'r'} frameW={460} /></div>
+      <div className="mvc-plate"><span className="who">{tag}</span><div className="n">{who.handle}</div><div className="m"><Logo team={who.team} size={40} />{who.team}<span> · {line}</span></div></div>
+    </div>
+  );
   return (
-    <div className="aud">
-      <BgVideo /><div className="aud-dim" />
-      <Head kick={`MVP · ${result}`} title="Community vs Desk" />
-      <div className="cmp">
-        <div className="h l"><div className="who kick">Community MVP</div><div className="bigp">{win.pct}%<small>of {res.total.toLocaleString('en-US')} votes</small></div>
-          <div className="nm">{res.top.map(t => t.handle).join(' & ')}</div><div className="tmn"><Logo team={win.team} size={46} />{win.team}</div></div>
-        <div className="h r"><div className="who kick">Desk MVP</div><div className="bigp">{deskN}/{picks.length}<small>desk votes</small></div>
-          <div className="nm">{deskPlayer}</div><div className="tmn"><Logo team={deskTeam} size={46} />{deskTeam}</div>{reason && <div className="why">“{reason}”</div>}</div>
-      </div>
-      <div className="agree">{agree ? 'They agree' : 'Split decision'}{!agree && deskTeam === win.team && <span>Same team, different player</span>}</div>
+    <div className={'aud mvc' + (wait ? ' mvx-wait' : '')}>
+      <BgVideo /><div className="mvx-dim" />
+      {half('l', win, 'Community MVP', `${win.pct}% of ${res.total.toLocaleString('en-US')} votes`)}
+      {half('r', { handle: desk.player, team: desk.team }, 'Analyst MVP', `${desk.n} of ${desk.of} analysts`)}
+      <div className="mvc-div" />
+      <div className="mvc-head"><div className="kick">MVP · {result}</div><div className="t">Community vs Analysts</div></div>
+      <div className="mvc-vs">Split<small>{desk.team === win.team ? 'Same team, different player' : 'Different teams'}</small></div>
     </div>
   );
 };

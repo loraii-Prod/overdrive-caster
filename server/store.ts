@@ -18,6 +18,8 @@ import { majorSheet, sanitizeSheet, type SheetState } from '../shared/sheet';
 import { MAJOR_TICKER, WC_BRACKET, WILDCARD_SHEET_ID, defaultWildcard, sanitizeWildcard, type WildcardState } from '../shared/wildcard';
 import { emptyTwitchStore, sanitizeTwitchStore, type TwitchStore } from './twitch';
 import { emptyAudStore, sanitizeAudStore, type AudStore } from './audience';
+import { onSaved } from './durable';
+import { emptyAssets, sanitizeAssets, type AssetsStore } from './assets';
 
 export interface Persisted {
   /** 2.0: 10 permanent talent profiles and who sits in which position. */
@@ -65,6 +67,8 @@ export interface Persisted {
   twitch: TwitchStore;
   /** Audience interaction (Pick'ems + Community MVP): producer-side state; votes live in the vote service. */
   audience: AudStore;
+  /** Asset registry (portraits, logos, media, music): durable copies live in the storage bucket. */
+  assets: AssetsStore;
   /** Game feed for casters (stream server WHEP + caster login). */
   gameFeed: GameFeedSettings;
   /** Events (productions). The active one's data lives in the top-level fields. */
@@ -127,6 +131,7 @@ function fresh(): Persisted {
     wildcard: defaultWildcard(true),
     twitch: emptyTwitchStore(),
     audience: emptyAudStore(),
+    assets: emptyAssets(),
     gameFeed: defaultGameFeed(),
     events: [{ id: 'overdrive', name: 'Overdrive Grand League', createdAt: Date.now() }],
     activeEvent: 'overdrive',
@@ -206,6 +211,7 @@ function load(): Persisted {
       wildcard: sanitizeWildcard(raw.wildcard, true),
       twitch: sanitizeTwitchStore(raw.twitch),
       audience: sanitizeAudStore(raw.audience),
+      assets: sanitizeAssets(raw.assets),
       gameFeed: sanitizeGameFeed(raw.gameFeed),
       events: Array.isArray(raw.events) && raw.events.length ? raw.events.map((e: any) => ({ id: String(e.id).replace(/[^\w-]/g, '').slice(0, 40), name: String(e.name ?? 'Event').slice(0, 60), createdAt: Number(e.createdAt) || Date.now() })) : base.events,
       activeEvent: typeof raw.activeEvent === 'string' ? raw.activeEvent : base.activeEvent,
@@ -227,15 +233,20 @@ function load(): Persisted {
 export const db: Persisted = load();
 
 let timer: NodeJS.Timeout | null = null;
+let frozen = false;
+/** Stop writing (a restored state is about to be loaded by a restart: the old in-memory one must not overwrite it). */
+export function freeze() { frozen = true; if (timer) { clearTimeout(timer); timer = null; } }
 
 /** Atomic write (tmp + rename) so a crash mid-write never corrupts the live config. */
 export function flush() {
   if (timer) { clearTimeout(timer); timer = null; }
+  if (frozen) return;
   const now = Date.now();
   for (const [t, s] of Object.entries(db.sessions)) if (s.exp < now) delete db.sessions[t];
-  const tmp = FILE() + '.tmp';
-  fs.writeFileSync(tmp, JSON.stringify(db, null, 2));
+  const tmp = FILE() + '.tmp', json = JSON.stringify(db, null, 2);
+  fs.writeFileSync(tmp, json);
   fs.renameSync(tmp, FILE());
+  onSaved(json); // durable copy (database mirror / snapshots), never blocks the local save
 }
 
 export function save() {

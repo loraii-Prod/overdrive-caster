@@ -241,7 +241,7 @@ async def main():
         frozen = json.loads(sql(f"select frozen from polls where id='{poll['id']}'"))
         check('10 the frozen result counts every vote once (60)', frozen['total'] == 60 and frozen['counts']['GranaDy'] == 27, frozen)
         publish('mvp', {'step': 'winner'}); await src.wait_for_timeout(2600); await shot('mvp_2_winner')
-        check('10 winner reveal: GranaDy, 45%', 'GRANADY' in (await src.inner_text('.win .name')).upper() and '45%' in await src.inner_text('.win .share'))
+        check('10 winner reveal: GranaDy, 45%', 'GRANADY' in (await src.inner_text('.mvx-name')).upper() and '45%' in await src.inner_text('.mvx-share'))
         await asyncio.sleep(2.5)
         check('10 taking the reveal made it public on the page', any(p['status'] == 'revealed' and p['frozen']['total'] == 60 for p in Viewer(None).get('/v1/state')['polls']))
 
@@ -250,8 +250,8 @@ async def main():
         await ws_op(prod, {'k': 'staff-mvp', 'match': 'R1_UB1', 'slot': 5, 'player': 'Massa'})
         check('11 a desk MVP outside the match is refused', await ws_op(prod, {'k': 'staff-mvp', 'match': 'R1_UB1', 'slot': 1, 'player': 'Whizzy'}) is not None)
         publish('mvp', {'step': 'compare'}); await src.wait_for_timeout(2200); await shot('mvp_3_compare')
-        t = await src.inner_text('.agree')
-        check('11 comparison: split decision, same team', 'SPLIT DECISION' in t.upper() and 'SAME TEAM' in t.upper(), t)
+        t = await src.inner_text('.mvc-vs')
+        check('11 comparison: split, same team', 'SPLIT' in t.upper() and 'SAME TEAM' in t.upper(), t)
 
         # QR
         publish('qr', {'qr': 'vote', 'position': 'lower-third'}); engine({'c': 'gfx-anim', 'id': 'qr', 'action': 'in'})
@@ -274,7 +274,7 @@ async def main():
         check('outage: the producer sees "voting offline"', pv and pv['online'] is False and pv['error'], pv and pv['error'])
         check('outage: the last confirmed results are kept', pv['summary'] and pv['summary']['polls'][-1]['frozen']['total'] == 60)
         await src.reload(); await src.wait_for_timeout(2500); await shot('outage_mvp_compare')
-        check('outage: graphics keep rendering the confirmed result', 'SPLIT DECISION' in (await src.inner_text('.agree')).upper())
+        check('outage: graphics keep rendering the confirmed result', 'SPLIT' in (await src.inner_text('.mvc-vs')).upper())
         r0 = engine({'c': 'gfx-set', 'id': 'pickem', 'patch': {'step': 'd1'}})
         check('outage: producer controls stay responsive', r0.get('ok') is True, r0)
         engine({'c': 'gfx-revert', 'id': 'pickem'})
@@ -287,7 +287,7 @@ async def main():
         # production restarts: both services
         stop('bcast'); stop('vote'); start_vote(); start_bcast(); await asyncio.sleep(4)
         await src.goto(B + '/g/mvp'); await src.wait_for_timeout(2500)
-        check('restart: graphics come back with the same confirmed result', 'SPLIT DECISION' in (await src.inner_text('.agree')).upper())
+        check('restart: graphics come back with the same confirmed result', 'SPLIT' in (await src.inner_text('.mvc-vs')).upper())
         check('restart: frozen result unchanged in the database', json.loads(sql(f"select frozen from polls where id='{poll['id']}'"))['hash'] == frozen['hash'])
         check('restart: viewer sessions survive (still signed in)', Viewer.__new__(Viewer) is not None and voters[0].get('/v1/me')['me']['name'] == 'v000')
         check('audit trail has every producer action', all(a in sql('select string_agg(distinct action, \',\') from audit') for a in ['match-lock', 'match-result', 'mvp-prepare', 'mvp-open', 'mvp-close', 'mvp-reveal', 'community-reveal']), sql('select string_agg(distinct action, \',\') from audit'))

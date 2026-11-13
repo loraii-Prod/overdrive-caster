@@ -13,6 +13,7 @@ import type { ClientMsg } from '../shared/protocol';
 import type { LayoutMode, Scene, ScreenId } from '../shared/types';
 import { resolve, upcoming, results, champion, isTeam, type TournamentOp } from '../shared/tournament';
 import { isWcId } from '../shared/wildcard';
+import { fromStorage, register, registered, unregister, validate, type AssetRole } from './assets';
 
 interface Api { engine: (cmd: ProducerCmd, source?: 'manual' | 'auto') => Promise<{ ok: boolean; version: number; error?: string; note?: string }>; act: (m: ClientMsg) => void; tournamentOp: (op: TournamentOp) => void; spectate: (name: string, login: string) => void; state: () => unknown }
 
@@ -224,14 +225,18 @@ export function uploads() {
   const dir = path.join(config.dataDir, 'uploads');
   fs.mkdirSync(dir, { recursive: true });
   const r = express.Router();
-  r.post('/api/upload', express.raw({ type: Object.keys(MIME), limit: '250mb' }), (req, res) => {
+  r.post('/api/upload', express.raw({ type: Object.keys(MIME), limit: '250mb' }), async (req, res) => {
     if (!isAdmin(req)) return res.status(401).json({ error: 'not signed in' });
-    const ext = MIME[String(req.headers['content-type']).split(';')[0]];
-    if (!ext || !Buffer.isBuffer(req.body) || !req.body.length) return res.status(400).json({ error: 'send a PNG, JPG, WebP, GIF or SVG image, or an MP4/WebM video' });
-    if (!ext.match(/mp4|webm/) && req.body.length > 8 * 1024 * 1024) return res.status(413).json({ error: 'images up to 8 MB' });
-    const name = `${crypto.randomBytes(9).toString('base64url')}.${ext}`;
+    if (!MIME[String(req.headers['content-type']).split(';')[0]] || !Buffer.isBuffer(req.body) || !req.body.length) return res.status(400).json({ error: 'send a PNG, JPG, WebP, GIF or SVG image, or an MP4/WebM video' });
+    // The file's own bytes decide its type (not the header): role = what the upload screen says it is for.
+    const role = (['portrait', 'logo', 'map', 'image'].includes(String(req.query.role)) ? String(req.query.role) : 'image') as AssetRole;
+    const v = validate(req.body, role === 'image' && /^video\//.test(String(req.headers['content-type'])) ? 'video' : role);
+    if ('error' in v) return res.status(v.error.includes('up to') ? 413 : 400).json({ error: v.error });
+    const name = `${crypto.randomBytes(9).toString('base64url')}.${v.ext}`;
     fs.writeFileSync(path.join(dir, name), req.body);
-    res.json({ url: `/uploads/${name}` });
+    const ref = typeof req.query.ref === 'string' ? req.query.ref.slice(0, 60) : null;
+    const rec = await register(`/uploads/${name}`, req.body, v.kind === 'video' ? 'video' : role, ref);
+    res.json({ url: `/uploads/${name}`, stored: rec.stored, w: rec.w, h: rec.h, alpha: rec.alpha });
   });
   r.use('/uploads', express.static(dir, {
     maxAge: '365d',
@@ -239,6 +244,7 @@ export function uploads() {
     // Uploaded SVGs are only ever images: no scripts, even if opened directly.
     setHeaders: res => res.setHeader('Content-Security-Policy', "default-src 'none'; img-src 'self' data:; style-src 'unsafe-inline'; sandbox"),
   }));
+  r.use('/uploads', fromStorage('/uploads'));
   return r;
 }
 
@@ -262,11 +268,14 @@ export function music() {
     let folder: string = s, files = read(root, s);
     const legacy = LEGACY_FOLDER[s];
     if (!files.length && legacy) { const old = read(root, legacy); if (old.length) { folder = legacy; files = old; } }
+    // Files only in storage (this disk was wiped by a deploy) are listed too.
+    const pre = `${prefix()}/${folder}/`, stored = registered(pre).map(a => decodeURIComponent(a.path.slice(pre.length))).filter(f => !f.includes('/') && AUDIO_EXT.test(f));
+    files = [...new Set([...files, ...stored])].sort();
     return [s, files.map(f => ({ name: f.replace(AUDIO_EXT, '').replace(/^[A-Za-z0-9_-]{6}_/, ''), url: `${prefix()}/${folder}/${encodeURIComponent(f)}`, shared: folder !== s }))];
   })); };
   const r = express.Router();
   r.get('/api/music', (_req, res) => { res.setHeader('Cache-Control', 'no-store'); res.json({ sections: list(), folder: rootOf() }); });
-  r.post('/api/music/:section', express.raw({ type: () => true, limit: '60mb' }), (req, res) => {
+  r.post('/api/music/:section', express.raw({ type: () => true, limit: '60mb' }), async (req, res) => {
     if (!isAuthed(req)) return res.status(401).json({ error: 'not signed in' });
     const s = String(req.params.section) as MusicSection;
     if (!MUSIC_SECTIONS.includes(s)) return res.status(400).json({ error: 'unknown section' });
@@ -275,8 +284,12 @@ export function music() {
     const ext = AUDIO[type] ?? (AUDIO_EXT.exec(orig)?.[1]?.toLowerCase());
     if (!ext || !Buffer.isBuffer(req.body) || !req.body.length) return res.status(400).json({ error: 'send an MP3, OGG, WAV, FLAC or M4A file' });
     const base = (orig.replace(AUDIO_EXT, '') || 'track').trim();
+    const v = validate(req.body, 'music');
+    if ('error' in v) return res.status(v.error.includes('up to') ? 413 : 400).json({ error: v.error });
     const name = `${crypto.randomBytes(4).toString('base64url').replace(/[^A-Za-z0-9]/g, 'x').slice(0, 6).padEnd(6, 'x')}_${base}.${ext}`;
+    ensure(rootOf()); // a new event's folders may not exist yet
     fs.writeFileSync(path.join(rootOf(), s, name), req.body);
+    await register(`${prefix()}/${s}/${encodeURIComponent(name)}`, req.body, 'music', s);
     res.json({ sections: list() });
   });
   r.delete('/api/music/:section/:file', (req, res) => {
@@ -285,9 +298,11 @@ export function music() {
     const f = path.basename(String(req.params.file));
     if (!MUSIC_FOLDERS.includes(s) || !AUDIO_EXT.test(f)) return res.status(400).end();
     try { fs.unlinkSync(path.join(rootOf(), s, f)); } catch {}
+    unregister(`${prefix()}/${s}/${encodeURIComponent(f)}`);
     res.json({ sections: list() });
   });
   r.use('/music', express.static(base, { maxAge: '1h', setHeaders: res => res.setHeader('Content-Security-Policy', "default-src 'none'; sandbox") }));
+  r.use('/music', fromStorage('/music'));
   return r;
 }
 
@@ -299,14 +314,21 @@ export function media() {
   const r = express.Router();
   const dir = path.join(config.dataDir, 'media');
   fs.mkdirSync(dir, { recursive: true });
-  const list = () => fs.readdirSync(dir).filter(f => MEDIA_EXT.test(f)).sort().map(f => ({ url: `/media/${encodeURIComponent(f)}`, name: mediaName(f), size: fs.statSync(path.join(dir, f)).size }));
+  const list = () => {
+    const local = fs.readdirSync(dir).filter(f => MEDIA_EXT.test(f));
+    const stored = registered('/media/').map(a => ({ f: decodeURIComponent(a.path.slice(7)), size: a.size })).filter(x => !local.includes(x.f) && MEDIA_EXT.test(x.f));
+    return [...local.map(f => ({ f, size: fs.statSync(path.join(dir, f)).size })), ...stored].sort((a, b) => a.f.localeCompare(b.f)).map(({ f, size }) => ({ url: `/media/${encodeURIComponent(f)}`, name: mediaName(f), size }));
+  };
   r.get('/api/media', (req, res) => { if (!isAuthed(req)) return res.status(401).json({ error: 'sign in' }); res.setHeader('Cache-Control', 'no-store'); res.json({ items: list() }); });
-  r.post('/api/media', express.raw({ type: () => true, limit: '1gb' }), (req, res) => {
+  r.post('/api/media', express.raw({ type: () => true, limit: '1gb' }), async (req, res) => {
     if (!isAuthed(req)) return res.status(401).json({ error: 'sign in' });
     const raw = path.basename(decodeURIComponent(String(req.header('X-Filename') ?? ''))).replace(/[^\w .()-]/g, '').slice(-120);
     if (!MEDIA_EXT.test(raw) || !Buffer.isBuffer(req.body) || !req.body.length) return res.status(400).json({ error: 'Send a video, audio or image file (mp4, webm, mov, mp3, wav, png, jpg…)' });
+    const v = validate(req.body, 'media');
+    if ('error' in v) return res.status(v.error.includes('up to') ? 413 : 400).json({ error: v.error });
     const name = `${crypto.randomBytes(4).toString('base64url').slice(0, 6)}_${raw}`;
     fs.writeFileSync(path.join(dir, name), req.body);
+    await register(`/media/${encodeURIComponent(name)}`, req.body, 'media');
     res.json({ ok: true, items: list() });
   });
   r.delete('/api/media/:file', (req, res) => {
@@ -314,8 +336,10 @@ export function media() {
     const f = path.basename(String(req.params.file));
     if (!MEDIA_EXT.test(f)) return res.status(400).end();
     try { fs.unlinkSync(path.join(dir, f)); } catch {}
+    unregister(`/media/${encodeURIComponent(f)}`);
     res.json({ ok: true, items: list() });
   });
   r.use('/media', express.static(dir, { maxAge: '1h', setHeaders: res => res.setHeader('Content-Security-Policy', "default-src 'none'; sandbox") }));
+  r.use('/media', fromStorage('/media'));
   return r;
 }

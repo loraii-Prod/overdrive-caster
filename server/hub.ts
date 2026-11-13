@@ -12,6 +12,8 @@ import { ensureStreamIds, matchPlayer, sanitizePlayers, sanitizeStories, STORY_L
 import { db, newKey, sanitizeFollow, save } from './store';
 import { iceServers } from './turn';
 import { Audience } from './audience';
+import { tag } from './assets';
+import { playerIdOf } from '../shared/playerIds';
 import { Twitch } from './twitch';
 import { ObsBridge } from './obs';
 import { createObsSetup } from './obsSetup';
@@ -365,7 +367,7 @@ export function createHub(server: Server) {
       case 'map-photo': {
         if (!majorMap(op.id)) return;
         const ph = { ...wc.mapPhotos };
-        if (op.url) ph[op.id] = op.url; else delete ph[op.id];
+        if (op.url) { ph[op.id] = op.url; tag(op.url, 'map', op.id); } else delete ph[op.id];
         wc.mapPhotos = sanitizeWildcard({ ...wc, mapPhotos: ph }).mapPhotos;
         break;
       }
@@ -434,7 +436,7 @@ export function createHub(server: Server) {
         const key = String(op.player ?? '').toLowerCase().replace(/[^a-z0-9]/g, '');
         if (!key) return;
         const photos = { ...wc.showcase.photos };
-        if (op.url) photos[key] = op.url; else delete photos[key];
+        if (op.url) { photos[key] = op.url; tag(op.url, 'portrait', playerIdOf(key)); } else delete photos[key];
         wc.showcase = sanitizeShowcase({ ...wc.showcase, photos });
         break;
       }

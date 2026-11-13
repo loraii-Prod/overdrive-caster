@@ -128,7 +128,7 @@ export function MvpModule({ x, a }: { x: Ctx; a: AudCtx }) {
             {roster.map(p => <Chip key={p.handle} on={cur === p.handle} onClick={() => a.op({ k: 'staff-mvp', match: id, slot: s, player: cur === p.handle ? null : p.handle }, `${name} MVP ${p.handle}`)}>{p.handle}</Chip>)}</div>); })}
         <Tag>Graphic (prepare, then Publish)</Tag>
         <Steps x={x} gfx="mvp" match={id} value="" disabled={!a.priv?.online && !frozen ? 'Voting offline: the winner can only be shown from a frozen result.' : undefined}
-          steps={[['voting', 'Voting open'], ['winner', 'Winner reveal', !frozen], ['compare', 'Community vs desk', !frozen || !Object.keys(staff).length]]} />
+          steps={[['voting', 'Voting open'], ['winner', 'Community MVP', !frozen], ['desk', 'Analyst MVP', !Object.keys(staff).length], ['compare', 'Community vs Analysts', !frozen || !Object.keys(staff).length]]} />
         {!frozen && <div className="text-[11px] text-white/45">The winner steps unlock once voting is closed. Closing never shows anything on air.</div>}
       </>}
     </>

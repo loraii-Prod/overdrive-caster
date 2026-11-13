@@ -15,6 +15,7 @@ import { PackageLibrary } from './Inspector';
 import { obsSceneOfGfx } from './Library';
 import { ObsSetupPanel } from './ObsSetup';
 import { B, C, LABEL, VisBadge } from './ws';
+import { AssetLibrary, Recovery } from './StorageStudio';
 
 type Run = (c: ProducerCmd, l: string) => Promise<Ack>;
 
@@ -183,6 +184,7 @@ function AssetsPanel({ x }: { x: Ctx }) {
         <div className={`${LABEL} mb-1 text-[12.5px] text-white/80`}>Package assets</div>
         {PACKAGES.map(p => <div key={p.id} className="border-t border-white/[0.06] py-1"><b>{p.name}</b> <span className="text-white/40">v{p.version}</span><div className="font-mono text-[11px] text-white/50">{p.assets.join(' · ') || 'no files (rendered from data)'}</div></div>)}
         <p className="mt-2 text-white/40">Approved Overdrive Major frames, loops and stinger are part of the build (public/brand/overdrive) and are not edited here.</p>
+        <AssetLibrary wc={x.wc} wcOp={op => fetch('/api/v1/msg', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ t: 'wc', op }) })} />
       </div>
       <div className="flex min-h-0 flex-1"><ModuleView id="media" x={x} pinned={false} /></div>
     </div>
@@ -230,6 +232,7 @@ function ShowFilePanel({ st, run }: { st: ControllerState; run: Run }) {
       <div className="flex gap-1"><Btn onClick={exportShow}>Export show…</Btn><Btn onClick={() => file.current?.click()}>Import show…</Btn></div>
       <input ref={file} type="file" accept="application/json" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) importShow(f); e.target.value = ''; }} />
       {msg && <div style={{ color: msg.startsWith('Import failed') ? WARN : PVW }}>{msg}</div>}
+      <Recovery />
     </div>
   );
 }

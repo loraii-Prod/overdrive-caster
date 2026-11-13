@@ -190,7 +190,7 @@ PACKAGES.push(
     resolution: [1920, 1080],
     props: [
       { key: 'match', label: 'Match', type: 'select', default: '', group: 'Content', options: MATCH_OPTS },
-      { key: 'step', label: 'Show', type: 'select', default: 'voting', group: 'Reveal', options: [{ value: 'voting', label: 'Voting open' }, { value: 'winner', label: 'Winner reveal' }, { value: 'compare', label: 'Community vs desk' }] },
+      { key: 'step', label: 'Show', type: 'select', default: 'voting', group: 'Reveal', options: [{ value: 'voting', label: 'Voting open' }, { value: 'winner', label: 'Community MVP reveal' }, { value: 'desk', label: 'Analyst MVP reveal' }, { value: 'compare', label: 'Community vs Analysts' }] },
     ],
     bindings: [{ kind: 'audience', label: 'Community MVP', module: 'mvp' }, { kind: 'audience', label: 'QR', module: 'qr' }],
     animations: IN_OUT, assets: ['/brand/overdrive/loop.webm'], commands: [], permissions: ['match-data'],

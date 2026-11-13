@@ -1,3 +1,4 @@
+import { playerIdOf } from '../../../shared/playerIds';
 import { useEffect, useState, type ReactNode } from 'react';
 import type { ClientMsg, QuickOp } from '../../../shared/protocol';
 import type { Caster, Show } from '../../../shared/types';
@@ -304,7 +305,7 @@ function MapsCard({ s, op }: { s: WildcardState; op: (o: WcOp) => void }) {
     if (!file) return;
     setBusy(id); setErr('');
     try {
-      const r = await fetch('/api/upload', { method: 'POST', headers: { 'Content-Type': file.type }, body: file });
+      const r = await fetch('/api/upload?role=map', { method: 'POST', headers: { 'Content-Type': file.type }, body: file });
       const j = await r.json().catch(() => ({}));
       if (!r.ok || !j.url) throw new Error(j.error ?? `Upload failed (${r.status})`);
       op({ k: 'map-photo', id, url: j.url });
@@ -345,7 +346,7 @@ function ShowcaseCard({ s, op, now }: { s: WildcardState; op: (o: WcOp) => void;
     if (!file) return;
     setBusy(handle); setErr('');
     try {
-      const r = await fetch('/api/upload', { method: 'POST', headers: { 'Content-Type': file.type }, body: file });
+      const r = await fetch(`/api/upload?role=portrait&ref=${encodeURIComponent(playerIdOf(handle) ?? '')}`, { method: 'POST', headers: { 'Content-Type': file.type }, body: file });
       const j = await r.json().catch(() => ({}));
       if (!r.ok || !j.url) throw new Error(j.error ?? `Upload failed (${r.status})`);
       op({ k: 'photo', player: handle, url: j.url });
