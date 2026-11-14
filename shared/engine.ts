@@ -56,7 +56,7 @@ export type ProducerCmd =
   | { c: 'op-quick'; op: import('./protocol').QuickOp }
   // ---- Talent (10 profiles) and positions
   | { c: 'seat'; seat: number; talent: string | null }
-  | { c: 'talent-edit'; id: string; name?: string; role?: 'caster' | 'analyst'; mode?: 'webrtc' | 'vdo' }
+  | { c: 'talent-edit'; id: string; name?: string; role?: 'caster' | 'analyst'; mode?: 'webrtc' | 'vdo'; camQuality?: import('./talent').CamQuality }
   | { c: 'talent-regen'; id: string }
   | { c: 'camera'; seat: number; on: boolean }
   | { c: 'feed-resync'; seat: number }

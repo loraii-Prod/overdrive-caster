@@ -3,6 +3,8 @@
  * talent profiles, data bindings, control-module layouts for scene sources, assets and the show file.
  * Everything here is an acknowledged engine command (shared by every operator); nothing here airs.
  */
+import { vdoCasterPushUrl } from '../../../shared/players';
+import type { CamQuality } from '../../../shared/talent';
 import { useRef, useState } from 'react';
 import type { ControllerState } from '../../../shared/types';
 import type { ProducerCmd } from '../../../shared/engine';
@@ -23,7 +25,7 @@ export function TalentDashboard({ st, run }: { st: ControllerState; run: (c: Pro
   const talent = st.talent ?? [];
   const [names, setNames] = useState<Record<string, string>>({});
   const link = (id: string, key: string) => `${location.origin}/talent/${id}?key=${encodeURIComponent(key)}`;
-  const vdoLink = (vdoId: string) => `https://vdo.ninja/?push=${vdoId}${st.showLive.vdo.password ? `&password=${encodeURIComponent(st.showLive.vdo.password)}` : ''}`;
+  const vdoLink = (t: { vdoId: string; name: string; camQuality?: CamQuality }) => vdoCasterPushUrl(t.vdoId, t.name, st.showLive.vdo.password, st.showLive.vdo.room, t.camQuality);
   const missing = talent.filter(t => !t.name.trim()).length;
   return (
     <div className="flex min-h-0 flex-1 flex-col" data-talent-dashboard>
@@ -34,7 +36,7 @@ export function TalentDashboard({ st, run }: { st: ControllerState; run: (c: Pro
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto">
         <table className="w-full text-[12px]">
-          <thead className="sticky top-0 bg-[#111113] text-left text-[10px] uppercase tracking-[0.12em] text-white/40"><tr><th className="px-2 py-1">ID</th><th>Name</th><th>Role</th><th>Camera via</th><th>Status</th><th>Position</th><th>Links</th></tr></thead>
+          <thead className="sticky top-0 bg-[#111113] text-left text-[10px] uppercase tracking-[0.12em] text-white/40"><tr><th className="px-2 py-1">ID</th><th>Name</th><th>Role</th><th>Camera via</th><th title="Camera resolution asked from this person: 720p30 (default, light) or 1080p30 (sharper on 4K shows, about twice the upload). They don't need a new link; a VDO.Ninja caster reopens theirs.">Camera</th><th>Status</th><th>Position</th><th>Links</th></tr></thead>
           <tbody>
             {talent.map(t => (
               <tr key={t.id} data-talent={t.id} className="border-t border-white/[0.06]">
@@ -47,6 +49,7 @@ export function TalentDashboard({ st, run }: { st: ControllerState; run: (c: Pro
                 </div></td>
                 <td><Seg value={t.role} options={[['caster', 'Caster'], ['analyst', 'Analyst']]} onChange={v => run({ c: 'talent-edit', id: t.id, role: v as 'caster' | 'analyst' }, `${t.id} role ${v}`)} /></td>
                 <td><Seg value={t.mode} options={[['webrtc', 'App'], ['vdo', 'VDO.Ninja']]} onChange={v => run({ c: 'talent-edit', id: t.id, mode: v as 'webrtc' | 'vdo' }, `${t.id} camera via ${v}`)} /></td>
+                <td><Seg value={t.camQuality ?? '720p'} options={[['720p', '720p'], ['1080p', '1080p']]} onChange={v => run({ c: 'talent-edit', id: t.id, camQuality: v as CamQuality }, `${t.id} camera ${v}`)} /></td>
                 <td className="whitespace-nowrap">{t.mode === 'vdo' ? <span className="text-white/60">VDO push</span> : t.publishing ? <span style={{ color: PVW }}>● {t.hasAudio ? 'cam + mic' : 'cam'}</span> : t.online ? <span style={{ color: WARN }}>● no camera</span> : <span className="text-white/35">● offline</span>}</td>
                 <td>
                   <select aria-label={`Position of ${t.id}`} value={t.seat ?? ''} onChange={e => run(e.target.value ? { c: 'seat', seat: Number(e.target.value), talent: t.id } : { c: 'seat', seat: t.seat!, talent: null }, e.target.value ? `${talentLabel(t)} → ${SEAT_LABELS[Number(e.target.value) as Seat]}` : `${talentLabel(t)} off position`)}
@@ -56,7 +59,7 @@ export function TalentDashboard({ st, run }: { st: ControllerState; run: (c: Pro
                 </td>
                 <td className="whitespace-nowrap pr-2">
                   <button type="button" className="mr-1 underline" onClick={() => navigator.clipboard?.writeText(link(t.id, t.key))} title={link(t.id, t.key)}>Copy link</button>
-                  <button type="button" className="mr-1 text-white/60 underline" onClick={() => navigator.clipboard?.writeText(vdoLink(t.vdoId))} title="Their personal VDO.Ninja push link (for the VDO.Ninja option)">VDO link</button>
+                  <button type="button" className="mr-1 text-white/60 underline" onClick={() => navigator.clipboard?.writeText(vdoLink(t))} title="Their personal VDO.Ninja push link (for the VDO.Ninja option)">VDO link</button>
                   <Tiny title="New link (the old one stops working)" onClick={() => run({ c: 'talent-regen', id: t.id }, `New link for ${t.id}`)}>↻</Tiny>
                 </td>
               </tr>
@@ -210,7 +213,7 @@ function ShowFilePanel({ st, run }: { st: ControllerState; run: Run }) {
       let n = 0, fail = 0;
       const ok = (a: Ack) => (a.ok ? n++ : fail++);
       for (const [scene, v] of Object.entries((d.studio?.scenes ?? {}) as Record<string, { modules: string[]; pinned: string[] }>)) ok(await run({ c: 'studio-set', scene, modules: v.modules, pinned: v.pinned }, `Import layout ${scene}`));
-      for (const t of d.talent ?? []) ok(await run({ c: 'talent-edit', id: t.id, name: t.name, role: t.role, mode: t.mode }, `Import ${t.id}`));
+      for (const t of d.talent ?? []) ok(await run({ c: 'talent-edit', id: t.id, name: t.name, role: t.role, mode: t.mode, ...(t.camQuality ? { camQuality: t.camQuality } : {}) }, `Import ${t.id}`));
       for (const [seat, id] of Object.entries(d.seats ?? {})) ok(await run({ c: 'seat', seat: Number(seat), talent: (id as string) || null }, `Import position ${seat}`));
       if (d.media?.playlist) { ok(await run({ c: 'media-set', playlist: d.media.playlist }, 'Import playlist')); ok(await run({ c: 'media-opts', auto: d.media.auto, loop: d.media.loop, volume: d.media.volume }, 'Import media options')); }
       // Graphics: configs come in as DRAFTS (review, then publish); missing extra instances are created.

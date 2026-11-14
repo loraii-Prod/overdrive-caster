@@ -124,7 +124,7 @@ export type ServerMsg =
   /** A map was won or a match ended (gameplay popups). Only sent live, never replayed on connect. */
   | { t: 'wc-pop'; pop: WcPop }
   | { t: 'twitch'; tw: TwitchPublic }
-  | { t: 'caster-info'; name: string; role: string; cameraVisible: boolean; /** 2.0 talent page: their current position (null = not seated) */ seat?: number | null; /** Camera sent through VDO.Ninja: the push stream ID and the VDO password (only to this caster). */ vdo: { id: string; password: string; room: string } | null; /** Names of everyone in the show (for the picks on the caster page). */ talent?: { id: number; name: string }[] }
+  | { t: 'caster-info'; /** Camera resolution the producer set for this person (720p default). */ camQuality?: import('./talent').CamQuality; name: string; role: string; cameraVisible: boolean; /** 2.0 talent page: their current position (null = not seated) */ seat?: number | null; /** Camera sent through VDO.Ninja: the push stream ID and the VDO password (only to this caster). */ vdo: { id: string; password: string; room: string } | null; /** Names of everyone in the show (for the picks on the caster page). */ talent?: { id: number; name: string }[] }
   | { t: 'rtc-viewer-join'; viewerId: string; req: WatchRequest }
   | { t: 'rtc-viewer-leave'; viewerId: string }
   | { t: 'rtc-signal'; from: string; slot: CasterId; data: RtcSignal }

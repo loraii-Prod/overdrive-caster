@@ -95,7 +95,7 @@ export function CasterCard({ caster, onChange, status, contributeUrl, audioUrl, 
                   Not on air yet: OBS still uses the {liveVdo.id !== src.vdo ? 'old VDO.Ninja link' : 'old VDO.Ninja password'}, so this feed stays black until you press TAKE LIVE.
                 </p>
               )}
-              <CopyField value={vdoCasterPushUrl(src.vdo, c.name, vdoPassword)} label="Camera + mic link for the caster (VDO.Ninja)" />
+              <CopyField value={vdoCasterPushUrl(src.vdo, c.name, vdoPassword, '', src.quality)} label="Camera + mic link for the caster (VDO.Ninja)" />
               <p className="text-[11px] leading-relaxed text-white/40">
                 Send it to {c.name || 'the caster'}: they open it, allow camera and mic, done. Video shows in their tile; their mic plays through /output/audio/{c.id} (the “Overdrive Caster {c.id} audio” source in OBS).
               </p>

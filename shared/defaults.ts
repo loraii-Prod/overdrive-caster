@@ -150,6 +150,7 @@ export function sanitizeCaster(v: any, id: CasterId): Caster {
       obsScene: str(src.obsScene, 128),
       obsSource: str(src.obsSource, 128),
       vdo: typeof src.vdo === 'string' ? src.vdo.replace(/[^A-Za-z0-9_]/g, '').slice(0, 40) : '',
+      ...(src.quality === '1080p' ? { quality: '1080p' as const } : {}),
     },
   };
 }

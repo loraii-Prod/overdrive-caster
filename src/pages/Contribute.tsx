@@ -1,3 +1,4 @@
+import { CAM_QUALITIES, type CamQuality } from '../../shared/talent';
 import { GameFeed } from '../components/GameFeed';
 import { VdoSender } from '../components/VdoSender';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -15,8 +16,8 @@ const store = {
 };
 
 const QUALITIES = {
-  '720': { width: 1280, height: 720 },
-  '1080': { width: 1920, height: 1080 },
+  '720': CAM_QUALITIES['720p'],
+  '1080': CAM_QUALITIES['1080p'],
 } as const;
 
 /** /contribute/:slot?key=… — a remote caster sends their webcam (and optional mic). */
@@ -34,14 +35,18 @@ export function Contribute() {
 
   const ros = useRos(sock);
   const now = useNow(ros?.skew ?? 0, 500);
-  const [info, setInfo] = useState<{ name: string; role: string; cameraVisible: boolean; vdo: { id: string; password: string; room: string } | null; talent: { id: number; name: string }[]; seat?: number | null } | null>(null);
+  const [info, setInfo] = useState<{ camQuality?: CamQuality; name: string; role: string; cameraVisible: boolean; vdo: { id: string; password: string; room: string } | null; talent: { id: number; name: string }[]; seat?: number | null } | null>(null);
   const slot = slotOf(info?.seat);
   const [error, setError] = useState('');
   const [devices, setDevices] = useState<MediaDeviceInfo[]>([]);
   const [camId, setCamId] = useState(store.get('overdrive.cam'));
   const [micId, setMicId] = useState(store.get('overdrive.mic'));
   const [micOn, setMicOn] = useState(store.get('overdrive.micOn') === '1');
-  const [quality, setQuality] = useState<keyof typeof QUALITIES>((store.get('overdrive.q') as '720') || '720');
+  // Camera resolution: set by the producer per person (Studio → Talent → Camera). Old fixed slot links without a
+  // producer setting keep the caster's own choice (720p by default).
+  const [localQuality, setQuality] = useState<keyof typeof QUALITIES>((store.get('overdrive.q') as '720') || '720');
+  const quality: keyof typeof QUALITIES = info?.camQuality ? (info.camQuality === '1080p' ? '1080' : '720') : localQuality;
+  useEffect(() => { pub.maxBitrate = QUALITIES[quality].bitrate; }, [pub, quality]);
   const [started, setStarted] = useState(false);
   const [viewers, setViewers] = useState(0);
   const streamRef = useRef<MediaStream | null>(null);
@@ -49,7 +54,7 @@ export function Contribute() {
 
   useEffect(() => { pub.onViewers = setViewers; }, [pub]);
   useEffect(() => sock.on(m => {
-    if (m.t === 'caster-info') setInfo({ name: m.name, role: m.role, cameraVisible: m.cameraVisible, vdo: m.vdo ?? null, talent: m.talent ?? [], seat: m.seat });
+    if (m.t === 'caster-info') setInfo({ camQuality: m.camQuality, name: m.name, role: m.role, cameraVisible: m.cameraVisible, vdo: m.vdo ?? null, talent: m.talent ?? [], seat: m.seat });
     if (m.t === 'error') setError(m.message);
     if (m.t === 'welcome') setError('');
   }), [sock]);
@@ -63,7 +68,7 @@ export function Contribute() {
     try {
       const q = QUALITIES[quality];
       const next = await navigator.mediaDevices.getUserMedia({
-        video: { deviceId: camId ? { ideal: camId } : undefined, width: { ideal: q.width }, height: { ideal: q.height }, frameRate: { ideal: 30 } },
+        video: { deviceId: camId ? { ideal: camId } : undefined, width: { ideal: q.width }, height: { ideal: q.height }, frameRate: { ideal: q.fps } },
         audio: micOn ? { deviceId: micId ? { ideal: micId } : undefined, echoCancellation: true, noiseSuppression: true, autoGainControl: false } : false,
       });
       const v = next.getVideoTracks()[0];
@@ -90,11 +95,28 @@ export function Contribute() {
     setStarted(false);
   }
 
-  // Re-acquire when the user changes device/quality/mic while live.
+  // Re-acquire when the user changes device/mic while live.
   useEffect(() => {
-    store.set('overdrive.cam', camId); store.set('overdrive.mic', micId); store.set('overdrive.micOn', micOn ? '1' : '0'); store.set('overdrive.q', quality);
+    store.set('overdrive.cam', camId); store.set('overdrive.mic', micId); store.set('overdrive.micOn', micOn ? '1' : '0'); store.set('overdrive.q', localQuality);
     if (started) acquire();
-  }, [camId, micId, micOn, quality]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [camId, micId, micOn]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Quality change while live (producer switches 720p ↔ 1080p): reconfigure the running camera in place, so the feed
+  // never drops on air. A second getUserMedia while the old track is still open would get the camera at its CURRENT
+  // resolution (the capture is shared), so only if the camera cannot do it in place is it released and reopened.
+  useEffect(() => {
+    store.set('overdrive.q', localQuality);
+    const track = streamRef.current?.getVideoTracks()[0];
+    if (!started || !track) return;
+    const q = QUALITIES[quality];
+    (async () => {
+      try { await track.applyConstraints({ width: { ideal: q.width }, height: { ideal: q.height }, frameRate: { ideal: q.fps } }); } catch { /* reopen below */ }
+      const got = track.getSettings();
+      if (got.width === q.width && got.height === q.height) return;
+      streamRef.current?.getVideoTracks().forEach(t => { t.onended = null; t.stop(); });
+      await acquire();
+    })();
+  }, [quality]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     refreshDevices();
@@ -126,7 +148,7 @@ export function Contribute() {
           </div>
         )}
 
-        {info?.vdo ? <VdoSender vdo={info.vdo} name={info.name} onAir={!!info.cameraVisible} /> : <>
+        {info?.vdo ? <VdoSender vdo={info.vdo} name={info.name} onAir={!!info.cameraVisible} quality={info.camQuality} /> : <>
         <div className="relative mb-6 aspect-video overflow-hidden rounded-lg border border-white/10 bg-[#1a1a1a]">
           <video ref={previewRef} muted playsInline autoPlay className="h-full w-full -scale-x-100 object-cover" />
           {!started && <div className="absolute inset-0 grid place-items-center text-sm text-white/50">Camera preview</div>}
@@ -144,10 +166,12 @@ export function Contribute() {
             </select>
           </Field>
           <Field label="Resolution">
-            <select className="input" value={quality} onChange={e => setQuality(e.target.value as '720')}>
-              <option value="720">720p (recommended)</option>
-              <option value="1080">1080p</option>
-            </select>
+            {info?.camQuality
+              ? <div className="input flex items-center" data-cam-quality={info.camQuality} title="Set by the producer">{CAM_QUALITIES[info.camQuality].label.replace(' (default)', '')} · set by the producer</div>
+              : <select className="input" value={quality} onChange={e => setQuality(e.target.value as '720')}>
+                  <option value="720">720p (recommended)</option>
+                  <option value="1080">1080p</option>
+                </select>}
           </Field>
           <Field label="Microphone">
             <select className="input" value={micId} disabled={!micOn} onChange={e => setMicId(e.target.value)}>

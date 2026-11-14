@@ -1,3 +1,4 @@
+import { CAM_QUALITIES, DEFAULT_CAM_QUALITY, camQualityOf, type CamQuality } from './talent';
 // Player database + curated stories (fun facts, rivalries…) for spotlight graphics.
 // Filled from the event's Google Sheet or the player table in the controller.
 
@@ -131,10 +132,10 @@ export function vdoPushUrl(p: Player, password = ''): string {
   return `${VDO_HOST}?push=${p.vdo}&webcam&label=${encodeURIComponent(p.name)}${password ? `&password=${encodeURIComponent(password)}` : ''}`;
 }
 /** Camera + mic link for a caster (they open it, pick devices, press Start). */
-export function vdoCasterPushUrl(id: string, name: string, password = '', room = ''): string {
+export function vdoCasterPushUrl(id: string, name: string, password = '', room = '', quality: CamQuality = DEFAULT_CAM_QUALITY): string {
   // In a room: the talent see and hear each other (lighter video between guests: roombitrate), OBS views stay full quality.
   const r = room ? `&room=${encodeURIComponent(room)}&roombitrate=500` : '&autostart';
-  return `${VDO_HOST}?push=${id}&webcam&label=${encodeURIComponent(name || 'Caster')}&quality=1${r}${password ? `&password=${encodeURIComponent(password)}` : ''}`;
+  return `${VDO_HOST}?push=${id}&webcam&label=${encodeURIComponent(name || 'Caster')}${CAM_QUALITIES[camQualityOf(quality)].vdoPush}${r}${password ? `&password=${encodeURIComponent(password)}` : ''}`;
 }
 export const newCasterStreamId = (slot: number) => `bnlcast${slot}_${Math.random().toString(36).slice(2, 8)}`;
 

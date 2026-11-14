@@ -48,7 +48,7 @@ export interface EngineDeps {
   pushGfx(): void;
   /** Talent / positions (hub owns the camera routing). Return an error message or null. */
   setSeat(seat: number, talent: string | null): string | null;
-  editTalent(id: string, patch: { name?: string; role?: 'caster' | 'analyst'; mode?: 'webrtc' | 'vdo' }): string | null;
+  editTalent(id: string, patch: { name?: string; role?: 'caster' | 'analyst'; mode?: 'webrtc' | 'vdo'; camQuality?: import('../shared/talent').CamQuality }): string | null;
   regenTalent(id: string): string | null;
   resyncSeat(seat: number): string | null;
   /** OBS: switch Program scene with the given transition (undefined = OBS's current one). */
@@ -363,7 +363,7 @@ export function createEngine(d: EngineDeps) {
       }
       // ------------------------------------------------------------- talent
       case 'seat': { const e = d.setSeat(Number(cmd.seat), cmd.talent ?? null); if (e) return fail(e); break; }
-      case 'talent-edit': { const e = d.editTalent(String(cmd.id), { name: cmd.name, role: cmd.role, mode: cmd.mode }); if (e) return fail(e); break; }
+      case 'talent-edit': { const e = d.editTalent(String(cmd.id), { name: cmd.name, role: cmd.role, mode: cmd.mode, camQuality: cmd.camQuality }); if (e) return fail(e); break; }
       case 'talent-regen': { const e = d.regenTalent(String(cmd.id)); if (e) return fail(e); note = 'New link: the old one no longer works'; break; }
       case 'feed-resync': { const e = d.resyncSeat(Number(cmd.seat)); if (e) return fail(e); note = 'Feed renegotiated (talent did not have to do anything)'; break; }
       // ------------------------------------------------------------- OBS

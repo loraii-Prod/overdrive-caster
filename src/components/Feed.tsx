@@ -4,6 +4,7 @@ import type { RtcViewer } from '../lib/rtcViewer';
 import { IdentityCard } from './IdentityCard';
 import { useVdo } from '../lib/vdo';
 import { vdoViewUrl } from '../../shared/players';
+import { CAM_QUALITIES, camQualityOf } from '../../shared/talent';
 
 /**
  * Camera feed with a branded card underneath. The video fades in only once
@@ -48,7 +49,8 @@ export function Feed({ caster, viewer, size, showName, monitor }: {
   if (type === 'vdo') {
     // OBS outputs get the full feed; the controller's Program monitor a small, low-bitrate one.
     const live = !!caster.source.vdo && (monitor ? !!vdo.monitorFeeds : vdo.embeds);
-    const params = monitor ? '&cleanoutput&noaudio&cover&scale=33&bitrate=400' : '&cleanoutput&noaudio&cover';
+    // A 1080p caster (producer setting) is requested at a higher bitrate; 720p stays VDO.Ninja's default.
+    const params = monitor ? '&cleanoutput&noaudio&cover&scale=33&bitrate=400' : `&cleanoutput&noaudio&cover${CAM_QUALITIES[camQualityOf(caster.source.quality)].vdoView}`;
     return (
       <>
         <IdentityCard caster={caster} size={size} showName={false} />

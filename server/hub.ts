@@ -1,3 +1,4 @@
+import type { CamQuality } from '../shared/talent';
 import { createPerf, type Perf } from './perf';
 import { SEATS, SEAT_LABELS, seatOf, talentLabel, type Seat } from '../shared/talent';
 import { createEngine, type Engine } from './engine';
@@ -174,7 +175,7 @@ export function createHub(server: Server) {
     const c = db.live.casters[slot - 1];
     const tile = compose(db.live, undefined, db.showLive.theme).tiles.find(t => t.casterId === slot);
     const vdo = c.source.type === 'vdo' && c.source.vdo ? { id: c.source.vdo, password: db.showLive.vdo.password, room: db.showLive.vdo.room } : null;
-    return { t: 'caster-info', name: c.name, role: c.role, cameraVisible: !!tile && tile.kind === 'video' && (c.source.type === 'webrtc' || !!vdo), vdo, talent: db.live.casters.filter(x => x.enabled).map(x => ({ id: x.id, name: x.name })) };
+    return { t: 'caster-info', camQuality: c.source.quality ?? '720p', name: c.name, role: c.role, cameraVisible: !!tile && tile.kind === 'video' && (c.source.type === 'webrtc' || !!vdo), vdo, talent: db.live.casters.filter(x => x.enabled).map(x => ({ id: x.id, name: x.name })) };
   }
 
   const liveMsg = (): ServerMsg => ({ t: 'live', scene: db.live, show: db.showLive, version: db.liveVersion, now: Date.now(), transition: db.liveTransition });
@@ -624,7 +625,7 @@ export function createHub(server: Server) {
     const seat = seatOfTalent(id);
     const base = seat ? (casterInfo(seat) as Extract<ServerMsg, { t: 'caster-info' }>) : null;
     const vdo = t.mode === 'vdo' ? { id: t.vdoId, password: db.showLive.vdo.password, room: db.showLive.vdo.room } : null;
-    return { t: 'caster-info', name: talentLabel(t), role: seat ? SEAT_LABELS[seat as Seat] : 'Not in a position', cameraVisible: !!base?.cameraVisible, vdo, talent: base?.talent ?? [], seat };
+    return { t: 'caster-info', camQuality: t.camQuality, name: talentLabel(t), role: seat ? SEAT_LABELS[seat as Seat] : 'Not in a position', cameraVisible: !!base?.cameraVisible, vdo, talent: base?.talent ?? [], seat };
   }
   const sendTalentInfo = (id: string) => { const pid = talentPubs.get(id); if (pid) send(clients.get(pid), talentInfo(id)); };
 
@@ -664,7 +665,9 @@ export function createHub(server: Server) {
     const t = db.talent.find(p => p.id === db.seats[seat]);
     const fix = (sc: Scene): Scene => ({ ...sc, casters: sc.casters.map(c => {
       if (c.id !== seat) return c;
-      const src = c.source.type === 'webrtc' || c.source.type === 'vdo' ? { ...c.source, type: (t?.mode === 'vdo' ? 'vdo' : 'webrtc') as typeof c.source.type, vdo: t?.mode === 'vdo' ? t.vdoId : c.source.vdo } : c.source;
+      const base = c.source.type === 'webrtc' || c.source.type === 'vdo' ? { ...c.source, type: (t?.mode === 'vdo' ? 'vdo' : 'webrtc') as typeof c.source.type, vdo: t?.mode === 'vdo' ? t.vdoId : c.source.vdo } : c.source;
+      const { quality: _q, ...rest } = base;
+      const src = t?.camQuality === '1080p' && (base.type === 'webrtc' || base.type === 'vdo') ? { ...rest, quality: '1080p' as const } : rest;
       // A seated talent is in the show (their camera is requested by every source); an empty position is not.
       return { ...c, enabled: !!t, name: t ? talentLabel(t) : DEFAULT_SEAT_NAMES[seat], source: src };
     }) });
@@ -688,13 +691,14 @@ export function createHub(server: Server) {
     return null;
   }
 
-  function editTalent(id: string, patch: { name?: string; role?: 'caster' | 'analyst'; mode?: 'webrtc' | 'vdo' }): string | null {
+  function editTalent(id: string, patch: { name?: string; role?: 'caster' | 'analyst'; mode?: 'webrtc' | 'vdo'; camQuality?: CamQuality }): string | null {
     const i = db.talent.findIndex(p => p.id === id);
     if (i < 0) return 'Unknown talent';
     const t = { ...db.talent[i] };
     if (typeof patch.name === 'string') t.name = patch.name.trim().slice(0, 40);
     if (patch.role === 'caster' || patch.role === 'analyst') t.role = patch.role;
     if (patch.mode === 'webrtc' || patch.mode === 'vdo') t.mode = patch.mode;
+    if (patch.camQuality === '720p' || patch.camQuality === '1080p') t.camQuality = patch.camQuality;
     db.talent = db.talent.map((p, j) => (j === i ? t : p));
     const seat = seatOfTalent(id);
     if (seat) { const before = pubOf(seat); applySeat(seat as Seat); reroute(seat, before); broadcastLive(); }

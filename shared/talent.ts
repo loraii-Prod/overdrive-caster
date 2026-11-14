@@ -21,7 +21,22 @@ export interface TalentProfile {
   key: string;
   /** Personal VDO.Ninja stream ID. */
   vdoId: string;
+  /** Camera resolution the producer wants from this person (both camera paths). 720p is the stable default. */
+  camQuality: CamQuality;
 }
+
+/**
+ * Caster camera quality. 720p30 is the default (light on the talent's CPU and upload). 1080p30 is the sharper option
+ * for 4K shows: it doubles the pixels and roughly doubles the bitrate. A camera feed is never native 4K: the graphics
+ * around it are.
+ */
+export type CamQuality = '720p' | '1080p';
+export const CAM_QUALITIES: Record<CamQuality, { label: string; width: number; height: number; fps: number; /** WebRTC send bitrate */ bitrate: number; /** VDO.Ninja push parameters */ vdoPush: string; /** VDO.Ninja view parameters (OBS outputs) */ vdoView: string }> = {
+  '720p': { label: '720p30 (default)', width: 1280, height: 720, fps: 30, bitrate: 3_000_000, vdoPush: '&quality=1', vdoView: '' },
+  '1080p': { label: '1080p30', width: 1920, height: 1080, fps: 30, bitrate: 6_000_000, vdoPush: '&quality=0&maxframerate=30', vdoView: '&bitrate=6000' },
+};
+export const DEFAULT_CAM_QUALITY: CamQuality = '720p';
+export const camQualityOf = (v: unknown): CamQuality => (v === '1080p' ? '1080p' : DEFAULT_CAM_QUALITY);
 
 export const TALENT_COUNT = 10;
 export const SEATS = [1, 2, 3, 4, 5, 6] as const;
@@ -52,6 +67,7 @@ export function sanitizeTalent(v: unknown, mkKey: () => string, mkVdo: () => str
       mode: x.mode === 'vdo' ? 'vdo' : 'webrtc',
       key: typeof x.key === 'string' && x.key.length >= 16 ? x.key : mkKey(),
       vdoId: typeof x.vdoId === 'string' && /^[A-Za-z0-9_]{6,40}$/.test(x.vdoId) ? x.vdoId : mkVdo(),
+      camQuality: camQualityOf(x.camQuality),
     };
   });
 }

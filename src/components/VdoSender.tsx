@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { vdoCasterPushUrl } from '../../shared/players';
+import type { CamQuality } from '../../shared/talent';
 
 /**
  * The caster's camera sent through VDO.Ninja, inside the caster page: a normal VDO.Ninja push link
@@ -7,12 +8,12 @@ import { vdoCasterPushUrl } from '../../shared/players';
  * the ON AIR tally from the producer, mic mute and camera off (VDO.Ninja IFRAME API), reconnect,
  * and "open in its own tab" if the browser blocks the camera inside the page.
  */
-export function VdoSender({ vdo, name, onAir }: { vdo: { id: string; password: string; room?: string }; name: string; onAir: boolean }) {
+export function VdoSender({ vdo, name, onAir, quality }: { vdo: { id: string; password: string; room?: string }; name: string; onAir: boolean; quality?: CamQuality }) {
   const frame = useRef<HTMLIFrameElement>(null);
   const [mic, setMic] = useState(true), [cam, setCam] = useState(true);
   const [viewers, setViewers] = useState(0);
   const room = vdo.room || '';
-  const src = vdoCasterPushUrl(vdo.id, name, vdo.password, room);
+  const src = vdoCasterPushUrl(vdo.id, name, vdo.password, room, quality);
   const [spk, setSpk] = useState(true), [vol, setVol] = useState(1);
   const send = (m: Record<string, unknown>) => frame.current?.contentWindow?.postMessage(m, '*');
 

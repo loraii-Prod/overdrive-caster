@@ -18,6 +18,8 @@ export interface CameraSource {
   obsSource: string;
   /** VDO.Ninja stream ID (type 'vdo'). */
   vdo: string;
+  /** Camera quality of the talent seated here (from their profile): '720p' (default) or '1080p'. */
+  quality?: import('./talent').CamQuality;
 }
 
 /** What happens to a caster whose camera is OFF. */

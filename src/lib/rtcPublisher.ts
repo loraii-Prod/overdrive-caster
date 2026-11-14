@@ -23,6 +23,8 @@ export class RtcPublisher {
   private pendingJoins = new Map<string, WatchRequest>();
   private off: () => void;
   onViewers?: (n: number) => void;
+  /** Full-quality send bitrate (bps): 3 Mbps for 720p, 6 Mbps for 1080p (producer's setting for this talent). */
+  maxBitrate = 3_000_000;
 
   constructor(private sock: Socket) {
     this.off = sock.on(m => {
@@ -89,7 +91,7 @@ export class RtcPublisher {
     if (req.video && v) {
       const enc: RTCRtpEncodingParameters = req.quality === 'lq'
         ? { maxBitrate: 350_000, scaleResolutionDownBy: 3, maxFramerate: 24 }
-        : { maxBitrate: 3_000_000, maxFramerate: 30 };
+        : { maxBitrate: this.maxBitrate, maxFramerate: 30 };
       pc.addTransceiver(v, { direction: 'sendonly', streams: [this.stream], sendEncodings: [enc] });
     }
     if (req.audio && a) {
