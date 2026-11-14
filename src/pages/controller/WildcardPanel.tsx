@@ -216,7 +216,7 @@ function Inner({ state: s, send, quick, live, now, sheet, origin, keyQ, outputs,
       <MapsCard s={s} op={op} />
       <ShowcaseCard s={s} op={op} now={now} />
 
-      <Card title="Major OBS sources" note="1920 × 1080 · not needed with /output/program">
+      <Card title="Major OBS sources" note="Full canvas (size from Studio → OBS Setup → Output) · not needed with /output/program">
         <div className="grid grid-cols-2 gap-x-5 gap-y-3">
           {[
             ['major', 'Bracket (part on air · ?part=1 or ?part=2 pins one)'],

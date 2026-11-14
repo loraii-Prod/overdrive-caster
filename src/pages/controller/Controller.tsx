@@ -1,4 +1,5 @@
 import { feedPerf } from '../../lib/perfStore';
+import { sourceSizeLabel } from '../../../shared/layout';
 import type { TransitionKind } from '../../../shared/engine';
 import { GameFeedSettingsCard } from './GameFeedSettings';
 import { boothScene } from '../../components/wildcard/Desk';
@@ -557,7 +558,7 @@ export function Controller({ onLogout, dockOnly = false, dockAll = false }: { on
                     ))}
                   </div>
                 </Block>
-                <Block title="Single overlays" note="Picture only · 1920 × 1080">
+                <Block title="Single overlays" note={`Picture only · ${sourceSizeLabel(st.obsSetup?.options.profile)}`}>
                   <div className="divide-y divide-white/[0.06]">
                     {OUTPUT_ROUTES.filter(r => r.route !== 'program').map(({ route, label }) => (
                       <LinkRow key={route} label={label} path={`/output/${route}`} origin={origin} keyQ={keyQ} token={st.apiToken} count={st.outputs.find(o => o.route === route)?.count ?? 0} clean />
@@ -575,9 +576,9 @@ export function Controller({ onLogout, dockOnly = false, dockAll = false }: { on
                 <Block title="Branding theme" note="Goes to preview · TAKE LIVE to switch">
                   <Segmented value={showPreview.theme} onChange={v => showProps.set({ theme: v })} options={THEMES.map(t => ({ value: t.id, label: t.label }))} />
                 </Block>
-                <Block title="OBS browser sources" note={stripUrls ? '1920 × 1480 · crop bottom 400 · controls via Interact' : '1920 × 1080'}>
+                <Block title="OBS browser sources" note={stripUrls ? `${sourceSizeLabel(st.obsSetup?.options.profile, true)} · controls via Interact` : sourceSizeLabel(st.obsSetup?.options.profile)}>
                   <div className="mb-3">
-                    <Switch on={stripUrls} onChange={setStripUrls} label="With controls underneath (source 1920 × 1480, Crop Bottom 400 in OBS, click them with right-click → Interact)" />
+                    <Switch on={stripUrls} onChange={setStripUrls} label={`With controls underneath (source ${sourceSizeLabel(st.obsSetup?.options.profile, true).replace(' · crop bottom', ', Crop Bottom')} in OBS, click them with right-click → Interact)`} />
                   </div>
                   <div className="grid grid-cols-2 gap-x-5 gap-y-3">
                     {OUTPUT_ROUTES.map(({ route, label }) => {

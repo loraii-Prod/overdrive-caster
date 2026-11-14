@@ -92,7 +92,7 @@ export function BrandPanel({ show, set }: { show: Show; set: (p: Partial<Show>) 
             <UploadButton accept="video/mp4,video/webm,image/png,image/jpeg,image/webp" label="Upload" role="background" onUrl={(u, type) => up({ bg: u, bgKind: type.startsWith('video') ? 'video' : 'image' })} />
             {b.bg && <button type="button" className="btn-xs" onClick={() => up({ bg: '', bgKind: '' })}>Clear</button>}
           </div>
-          <div className="mt-1 text-[10.5px] text-white/35">1920×1080 MP4 (H.264, loop, up to 250 MB) or image.</div>
+          <div className="mt-1 text-[10.5px] text-white/35">MP4 (H.264, loop, up to 250 MB) or image: 3840×2160 for 4K output, 1920×1080 for 1080p.</div>
         </div>
       </div>
       <div className="flex flex-wrap items-end gap-5">

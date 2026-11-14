@@ -40,7 +40,7 @@ export function ObsPanel({ st, send }: { st: ControllerState; send: (m: any) => 
       <div className="rounded-md border border-white/10 bg-white/[0.02] p-3">
         <div className="text-[13px] font-semibold">Import the Overdrive setup into OBS</div>
         <p className="mt-1 text-[12px] leading-relaxed text-white/50">
-          Creates one scene per legacy screen (Overdrive · Starting soon, Overdrive · Casters, Overdrive · Gameplay, …), each with its own 1920×1080 browser source pointed at that screen, and links them so GO / TAKE LIVE also switches OBS. Safe to run again: nothing is deleted, existing scenes are reused, building never switches OBS. For every output (graphics-engine instances included), a preview of the changes, per-scene repair and verify: Producer → Studio → OBS Setup.
+          Creates one scene per legacy screen (Overdrive · Starting soon, Overdrive · Casters, Overdrive · Gameplay, …), each with its own full-canvas browser source (sized by Studio → OBS Setup → Output: 4K or 1080p) pointed at that screen, and links them so GO / TAKE LIVE also switches OBS. Safe to run again: nothing is deleted, existing scenes are reused, building never switches OBS. For every output (graphics-engine instances included), a preview of the changes, per-scene repair and verify: Producer → Studio → OBS Setup.
         </p>
         <div className="mt-3 flex flex-wrap items-center gap-x-6 gap-y-2">
           <Switch on={game} onChange={setGame} label="Game capture under the gameplay overlay" />

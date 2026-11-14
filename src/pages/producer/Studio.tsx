@@ -4,6 +4,7 @@
  * Everything here is an acknowledged engine command (shared by every operator); nothing here airs.
  */
 import { vdoCasterPushUrl } from '../../../shared/players';
+import { sourceSizeLabel } from '../../../shared/layout';
 import type { CamQuality } from '../../../shared/talent';
 import { useRef, useState } from 'react';
 import type { ControllerState } from '../../../shared/types';
@@ -113,7 +114,7 @@ function InstancesPanel({ st, run, onSelect, sel }: { st: ControllerState; run: 
   return (
     <div className="flex min-h-0 flex-1 flex-col" data-instances>
       <div className="flex h-[30px] flex-none items-center gap-2 border-b px-2.5 text-[11.5px]" style={{ borderColor: C.line }}>
-        <span className="text-white/50">Each graphic is its own OBS Browser Source (1920×1080). Map it to the OBS scene that holds it: tallies and the explicit OBS switch use this.</span>
+        <span className="text-white/50">Each graphic is its own OBS Browser Source ({sourceSizeLabel(st.obsSetup?.options.profile)}). Map it to the OBS scene that holds it: tallies and the explicit OBS switch use this.</span>
         <B h={22} onClick={() => navigator.clipboard?.writeText(gs.map(g => `${g.name}\t${url(g)}`).join('\n'))}>Copy all URLs</B>
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto">

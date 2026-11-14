@@ -124,6 +124,8 @@ export class ObsBridge {
     this.lastTheme = theme;
     if (!this.status.connected) return;
     const comp = compose(scene, undefined, theme);
+    // Re-read the canvas: it may have been switched (e.g. 1080p → 4K in OBS → Settings → Video) while connected.
+    try { const v = await this.obs.call('GetVideoSettings'); if (v.baseWidth && v.baseHeight) this.base = { w: v.baseWidth, h: v.baseHeight }; } catch { /* keep the last known size */ }
     const sx = this.base.w / CANVAS.w, sy = this.base.h / CANVAS.h;
     const errors: string[] = [];
     for (const c of scene.casters) {

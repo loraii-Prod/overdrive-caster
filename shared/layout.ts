@@ -16,6 +16,11 @@ export const OUTPUT_PROFILES: Record<OutputProfileId, OutputProfile> = {
 /** Existing setups keep 1080p until the producer switches. */
 export const DEFAULT_PROFILE: OutputProfileId = 'fhd';
 export const profileOf = (id: unknown): OutputProfile => OUTPUT_PROFILES[id === 'uhd' ? 'uhd' : 'fhd'];
+/** "3840 × 2160 (4K)" / "1920 × 1080" for a picture source; controls pages: logical 1920×1480 at the profile scale. */
+export function sourceSizeLabel(id: unknown, controls = false): string {
+  const p = profileOf(id), k = p.scale;
+  return controls ? `${1920 * k} × ${1480 * k} · crop bottom ${400 * k}` : `${p.w} × ${p.h}${p.id === 'uhd' ? ' (4K)' : ''}`;
+}
 /** Device size of a picture of `logical` size (e.g. a 1920×1080 graphic) under a profile. */
 export const deviceSize = (logical: { w: number; h: number }, p: OutputProfile) => ({ w: Math.round(logical.w * p.scale), h: Math.round(logical.h * p.scale) });
 
