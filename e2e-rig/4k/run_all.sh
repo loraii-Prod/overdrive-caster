@@ -4,7 +4,7 @@
 # Prints one line per suite and exits 1 if any suite fails. Logs in /tmp/4k/run/.
 cd "$(dirname "$0")/../.." || exit 1
 R=$(pwd); L=/tmp/4k/run; mkdir -p $L; FAIL=0
-stop_all() { pkill -f "node dist/server""\.js" 2>/dev/null; pkill -f "mockObsServer""\.ts" 2>/dev/null; sleep 1; }
+stop_all() { pkill -f "node dist/server""\.js" 2>/dev/null; pkill -f "node dist/vote""\.js" 2>/dev/null; pkill -f "mockObsServer""\.ts" 2>/dev/null; sleep 1; }
 fresh() { stop_all; rm -rf "$1"; mkdir -p "$1"; (PORT=8787 DATA_DIR="$1" CONTROLLER_PASSWORD=testpw ADMIN_PASSWORD=adminpw nohup node dist/server.js > "$L/server.log" 2>&1 < /dev/null &)
   for i in $(seq 1 60); do curl -sf localhost:8787/api/health >/dev/null && break; sleep 0.25; done; }
 run() { local name=$1; shift; local out="$L/$name.log"; "$@" < /dev/null > "$out" 2>&1; local rc=$?
@@ -30,6 +30,15 @@ stop_all; run off-air-pausing python3 e2e-rig/4k/suspend_e2e.py
 stop_all; run obs-4k-canvas python3 e2e-rig/4k/obs4k_e2e.py
 stop_all; run asset-replacements python3 e2e-rig/4k/replace_e2e.py
 stop_all; run perf-bench python3 e2e-rig/4k/perf_bench.py --json /tmp/4k/perf-rc.json
+echo "== bracket + audience (2.0 polish)"
+bash e2e-rig/4k/fixture.sh "$R" >/dev/null 2>&1; run bracket-transitions env OD_STATE=/tmp/od4k/state.json python3 e2e-rig/bracket/bracket_e2e.py /tmp/4k/bracket
+bash e2e-rig/4k/fixture.sh "$R" >/dev/null 2>&1; run bracket-sheet-sizes python3 e2e-rig/bracket/sheet_e2e.py /tmp/4k/bracket
+if pg_isready -q -h 127.0.0.1 -p 5433; then
+  stop_all; run audience-workflow python3 e2e-rig/audience/aud_e2e.py
+  stop_all; run mvp-render python3 e2e-rig/audience/mvp_render.py
+  stop_all; run mvp-modes python3 e2e-rig/audience/mvp_modes_e2e.py
+  stop_all; run durable-storage python3 e2e-rig/persist/persist_e2e.py
+else echo "skip  audience suites (no Postgres on 127.0.0.1:5433)"; fi
 echo "== existing suites"
 fresh /tmp/oddata; run broadcast-workflow-e2e_ws python3 e2e-rig/2.1/e2e_ws.py
 fresh /tmp/oddata; run camera-sync python3 e2e-rig/cams/camsync.py regress

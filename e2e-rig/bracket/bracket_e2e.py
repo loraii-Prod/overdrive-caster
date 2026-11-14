@@ -19,8 +19,10 @@ GEOM = """() => { const pg = n => document.querySelector(`.wc-page[data-page="${
   return { title: h && h.textContent, hdr: h && box(h), vis: [1,2].map(n => pg(n) && getComputedStyle(pg(n)).visibility),
     cards: [1,2].map(n => Array.from(pg(n).querySelectorAll('.match')).map(m => [m.dataset.match, ...box(m)])),
     anims: document.getAnimations().filter(a => a.constructor.name === 'Animation').length } }"""
+# Only the page-transition animations (Web Animations + the title crossfade); finished CSS entrance animations are left alone.
+WAAPI = "document.getAnimations().filter(a => a.constructor.name === 'Animation' || /^wc-t(in|out)$/.test(a.animationName || ''))"
 async def frozen(p, t):
-    await p.evaluate(f"() => document.getAnimations().forEach(a => {{ a.pause(); a.currentTime = {t}; }})")
+    await p.evaluate(f"() => {WAAPI}.forEach(a => {{ a.pause(); a.currentTime = {t}; }})")
     await p.wait_for_timeout(60)
 async def catch(p, n=1):
     for _ in range(200):
@@ -37,7 +39,7 @@ async def main():
         p = await page()
         g1 = await p.evaluate(GEOM)
         ok('static page 1: only page 1 visible', g1['vis'] == ['visible', 'hidden'], g1['vis'])
-        await p.screenshot(path=f'{OUT}/page1.png')
+        await p.screenshot(path=f'{OUT}/page1.png'); await p.screenshot(path=f'{OUT}/a-page1.png', omit_background=True)
         # ---- Preview/TAKE isolation
         v0 = state()['air']; wc({'k': 'cue', 'part': 2}); await p.wait_for_timeout(700)
         s = state(); g = await p.evaluate(GEOM)
@@ -47,9 +49,9 @@ async def main():
         ok('TAKE starts a transition', caught)
         mids = {}
         for t in (0, 100, 200, 300, 420, 560):
-            await frozen(p, t); mids[t] = await p.evaluate(GEOM); await p.screenshot(path=f'{OUT}/mid-{t:03d}.png')
-        await p.evaluate("() => document.getAnimations().forEach(a => a.play())"); await p.wait_for_timeout(900)
-        g2 = await p.evaluate(GEOM); await p.screenshot(path=f'{OUT}/page2.png')
+            await frozen(p, t); mids[t] = await p.evaluate(GEOM); await p.screenshot(path=f'{OUT}/mid-{t:03d}.png'); await p.screenshot(path=f'{OUT}/a-mid-{t:03d}.png', omit_background=True)
+        await p.evaluate(f"() => {WAAPI}.forEach(a => a.play())"); await p.wait_for_timeout(900)
+        g2 = await p.evaluate(GEOM); await p.screenshot(path=f'{OUT}/page2.png'); await p.screenshot(path=f'{OUT}/a-page2.png', omit_background=True)
         ok('after TAKE: page 2 on Program', state()['air'] == 2 and g2['vis'] == ['hidden', 'visible'], g2['vis'])
         ok('transition settles (no animations left)', g2['anims'] == 0, g2['anims'])
         ok('frame stable: title box identical on both pages', g1['hdr'][:2] == g2['hdr'][:2], f"{g1['hdr']} {g2['hdr']}")
@@ -85,7 +87,7 @@ async def main():
             if (!hit(a) || !hit(b)) bad.push(path.getAttribute('d')); }
           return { n: pg.querySelectorAll('svg.conn path').length, bad } }""")
         ok('connectors: every line starts/ends at a card edge centre (±1px)', al['n'] > 0 and not al['bad'], al)
-        await p.screenshot(path=f'{OUT}/page1-lines.png')
+        await p.screenshot(path=f'{OUT}/page1-lines.png'); await p.screenshot(path=f'{OUT}/a-page1-lines.png', omit_background=True)
         wc({'k': 'opts', 'patch': {'lines': False}})
         # ---- long names & missing logos (rendered in a throwaway page with patched data)
         ln = await p.evaluate("""() => { const n = document.querySelector('.wc-page[data-page="1"] .row .name');
@@ -102,8 +104,8 @@ async def main():
         im4 = Image.open(f'{OUT}/page1-4k.png'); ok('4K: native 3840×2160 render', im4.size == (3840, 2160), im4.size)
         wc({'k': 'cue', 'part': 2}); wc({'k': 'take'}); ok('4K: transition runs', await catch(p4))
         await frozen(p4, 300); await p4.screenshot(path=f'{OUT}/mid-300-4k.png')
-        await p4.evaluate("() => document.getAnimations().forEach(a => a.play())"); await p4.wait_for_timeout(900)
-        await p4.screenshot(path=f'{OUT}/page2-4k.png'); await p4.context.close()
+        await p4.evaluate(f"() => {WAAPI}.forEach(a => a.play())"); await p4.wait_for_timeout(900)
+        await p4.screenshot(path=f'{OUT}/page2-4k.png'); await p4.screenshot(path=f'{OUT}/a-page2-4k.png', omit_background=True); await p4.context.close()
         # ---- reduced motion: instant switch
         c = await br.new_context(viewport={'width': 1920, 'height': 1080}, reduced_motion='reduce'); pr = await c.new_page()
         await pr.goto('http://localhost:8787/output/major'); await pr.wait_for_timeout(2500)

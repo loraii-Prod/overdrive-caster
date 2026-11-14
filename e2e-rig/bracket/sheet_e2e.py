@@ -57,14 +57,14 @@ async def main():
             restart(sheet(n, dbl), 'full')
             p = await (await br.new_context(viewport={'width': 1920, 'height': 1080})).new_page()
             await p.goto('http://localhost:8787/output/bracket'); await p.wait_for_timeout(2500)
-            g = await p.evaluate(GEOM); await p.screenshot(path=f'{OUT}/sheet-{name}-p1.png')
+            g = await p.evaluate(GEOM); await p.screenshot(path=f'{OUT}/sheet-{name}-p1.png', omit_background=True)
             ok(f'{name}: sheet bracket renders', g['has'], g.get('vis'))
             if not g['has']: continue
             ok(f'{name}: one card size on page 1', len(g['sizes'][0]) == 1, g['sizes'][0])
             ok(f'{name}: no card off-screen', sum(g['over']) == 0, g['over'])
             # page flip (auto every 10 s)
             if g['vis'][1] is not None:
-                await p.wait_for_timeout(9200); g2 = await p.evaluate(GEOM); await p.screenshot(path=f'{OUT}/sheet-{name}-p2.png')
+                await p.wait_for_timeout(9200); g2 = await p.evaluate(GEOM); await p.screenshot(path=f'{OUT}/sheet-{name}-p2.png', omit_background=True)
                 ok(f'{name}: page 2 after auto flip, frame stable', g2['vis'] == ['hidden', 'visible'] and g2['title'] == g['title'], g2['vis'])
                 ok(f'{name}: one card size on page 2', len([s for s in g2['sizes'][1]]) <= 2, g2['sizes'][1])
                 ok(f'{name}: flip settles', g2['anims'] == 0, g2['anims'])

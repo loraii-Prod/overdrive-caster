@@ -1,0 +1,40 @@
+== build
+== unit
+ok    unit-assets4k  (11 passed, 0 failed)
+ok    unit-camQuality  (7 passed, 0 failed)
+ok    unit-dataset  (25 passed, 0 failed)
+ok    unit-engine  (91 passed, 0 failed)
+ok    unit-obsSetup  (76 passed, 0 failed)
+== 4K suites
+ok    vis-capture  (0 PASS lines, 0 FAIL lines)
+FAIL  vis-1080-and-4k-vs-original  (59 PASS lines, 1 FAIL lines)  → /tmp/4k/run/vis-1080-and-4k-vs-original.log
+ok    vis-layout-equivalence  (33 PASS lines, 0 FAIL lines)
+ok    output-basics  (11 passed, 0 failed)
+ok    gpu-artifacts  (9 passed, 0 failed)
+ok    scene-audit-30  (33/33 scenes pass)
+ok    transient-sizes  (0 PASS lines, 0 FAIL lines)
+ok    asset-report  (0 PASS lines, 0 FAIL lines)
+ok    camera-quality  (11 passed, 0 failed)
+ok    rerender  (4 passed, 0 failed)
+ok    off-air-pausing  (16 passed, 0 failed)
+ok    obs-4k-canvas  (8 passed, 0 failed)
+ok    asset-replacements  (7 passed, 0 failed)
+ok    perf-bench  (0 PASS lines, 0 FAIL lines)
+== bracket + audience (2.0 polish)
+ok    bracket-transitions  (21 PASS lines, 0 FAIL lines)
+ok    bracket-sheet-sizes  (24 PASS lines, 0 FAIL lines)
+ok    audience-workflow  (71 passed, 0 failed)
+ok    mvp-render  (14 passed, 0 failed)
+ok    mvp-modes  (52 PASS lines, 0 FAIL lines)
+ok    durable-storage  (43 passed, 0 failed)
+== existing suites
+ok    broadcast-workflow-e2e_ws  (23 passed, 0 failed)
+ok    camera-sync  (29 passed, 0 failed)
+ok    obs-ui  (22 passed, 0 failed)
+ok    obs-docks  (21 passed, 0 failed)
+
+SOME SUITES FAILED
+
+Note on the one FAIL above: fhd output_screen_warmup differs only in the warm-up showcase's clock-driven
+player counter ("4 / 16 · next WHIZZY" vs "15 / 16 · next BINKSS"), a scene this work does not touch.
+Re-run of the capture + compare on the same build: 60/60 PASS (vis.py compare base rc2 both).
