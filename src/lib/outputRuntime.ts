@@ -16,6 +16,9 @@ import type { OutputPerf } from '../../shared/protocol';
 
 let suspended = false;
 const pausedByUs = new Set<HTMLVideoElement>();
+const resumeSubs = new Set<() => void>();
+/** Called when the page wakes (e.g. clocks catch up at once). */
+export function onResume(f: () => void) { resumeSubs.add(f); return () => { resumeSubs.delete(f); }; }
 
 /** Looping/background file videos only: never live camera streams, never anything marked data-od-nosuspend. */
 const pausable = (v: HTMLVideoElement) => !v.srcObject && !v.closest('[data-od-nosuspend]') && (v.loop || v.closest('[data-od-bg]') !== null);
@@ -29,6 +32,7 @@ export function setSuspended(on: boolean) {
   } else {
     for (const v of pausedByUs) if (v.isConnected) v.play().catch(() => {});
     pausedByUs.clear();
+    resumeSubs.forEach(f => f());
   }
 }
 export const isSuspended = () => suspended;

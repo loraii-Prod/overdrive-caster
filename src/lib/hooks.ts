@@ -1,4 +1,4 @@
-import { attachOutputRuntime } from './outputRuntime';
+import { attachOutputRuntime, isSuspended, onResume } from './outputRuntime';
 import type { TransitionKind } from '../../shared/engine';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Socket, type ConnState } from './socket';
@@ -41,8 +41,11 @@ export function useNow(skew: number, ms = 250) {
   const [now, setNow] = useState(() => Date.now() + skew);
   useEffect(() => {
     setNow(Date.now() + skew);
-    const t = setInterval(() => setNow(Date.now() + skew), ms);
-    return () => clearInterval(t);
+    // An output paused off air (outputRuntime) skips the ticks: nobody sees its clocks. It catches up the moment
+    // it wakes (onResume), before OBS shows a frame of it.
+    const t = setInterval(() => { if (!isSuspended()) setNow(Date.now() + skew); }, ms);
+    const off = onResume(() => setNow(Date.now() + skew));
+    return () => { clearInterval(t); off(); };
   }, [skew, ms]);
   return now;
 }

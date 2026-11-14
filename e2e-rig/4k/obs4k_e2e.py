@@ -42,7 +42,12 @@ def cam_tr():
     st = mock('/state'); sc = next(s for s in st['scenes'] if s['name'] == 'Cams')
     it = next(i for i in sc['items'] if i['source'] == 'Cam 1'); return it.get('transform', {}), it.get('enabled')
 
+def _free_port():
+    """Stop any Overdrive server left on :8787 by another test (it would answer our health check)."""
+    subprocess.run(['pkill', '-f', 'node dist/' + 'server.js']); time.sleep(1)
+
 async def main():
+    _free_port()
     shutil.rmtree(D, ignore_errors=True)
     start('mock', ['npx', 'tsx', 'e2e-rig/obs/mockObsServer.ts', str(MP), 'obspw']); wait(M + '/state')
     urllib.request.urlopen(M + '/add-scene?scene=Cams'); urllib.request.urlopen(M + '/add-browser?scene=Cams&name=Cam%201')

@@ -43,7 +43,12 @@ async def wait_for(page, cond, timeout=8.0):
         await asyncio.sleep(0.05)
     return await page.evaluate(STATE), None
 
+def _free_port():
+    """Stop any Overdrive server left on :8787 by another test (it would answer our health check)."""
+    subprocess.run(['pkill', '-f', 'node dist/' + 'server.js']); time.sleep(1)
+
 async def main():
+    _free_port()
     shutil.rmtree(D, ignore_errors=True)
     start_mock(); start_server(); stop('srv')
     s = json.load(open(f'{D}/state.json')); s['obsUrl'] = f'ws://127.0.0.1:{MP}'; s['obsPassword'] = 'obspw'; json.dump(s, open(f'{D}/state.json', 'w'))
