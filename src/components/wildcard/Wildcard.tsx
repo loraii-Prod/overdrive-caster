@@ -1,5 +1,6 @@
-import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import './wildcard.css';
+import { usePageFlip } from '../../lib/pageFlip';
 import {
   GRAND_FINAL, STARTING_SOON, WC_IDS, WC_PARTS, realTeam, WC_QUALIFIERS, WC_TEAMS, WINS_NEEDED, castId, colTime, countdownText, doneList, matchName, matchStart,
   nextFrom, nextMatchId, wcLayout, wcLogo, wcResolve, type WcPop, type WcResolved, type WildcardState,
@@ -107,13 +108,7 @@ export function WcStage({ wc, part, enter = false, pin, frame = true }: { wc: Wi
   );
 }
 
-const reducedMotion = () => typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
-
-/** Page-transition timing (ms). Out: columns leave left→right; In: columns arrive with a stagger. Total ≈ 560 ms. */
-export const WC_PAGE_T = { out: 220, outStagger: 30, inAt: 160, in: 260, inStagger: 40, shift: 64 };
-const pieces = (el: HTMLElement | null) => (el ? Array.from(el.querySelectorAll<HTMLElement>('[data-c]')) : []);
-/** Freeze a piece where it is right now (so an interrupted transition continues from there, never jumps). */
-const settle = (el: HTMLElement) => { for (const a of el.getAnimations()) { try { a.commitStyles(); } catch { /* not rendered */ } a.cancel(); } };
+export { PAGE_T as WC_PAGE_T } from '../../lib/pageFlip';
 
 /**
  * The bracket as it goes on air. Both pages stay mounted (logos decoded, nothing re-laid out on a
@@ -122,59 +117,22 @@ const settle = (el: HTMLElement) => { for (const a of el.getAnimations()) { try 
  * every card is at that moment, so rapid changes never overlap, stack or blank the frame.
  */
 export function WcBracket({ wc, part, pin }: { wc: WildcardState; part: 1 | 2; pin?: string | null }) {
-  const refs = { 1: useRef<HTMLDivElement>(null), 2: useRef<HTMLDivElement>(null) };
-  const [shown, setShown] = useState<{ 1: boolean; 2: boolean }>({ 1: part === 1, 2: part === 2 });
-  const [title, setTitle] = useState<{ cur: 1 | 2; prev: 1 | 2 | null; n: number }>({ cur: part, prev: null, n: 0 });
-  const first = useRef(part), gen = useRef(0), last = useRef(part), shownRef = useRef(shown);
-  const show = (v: { 1: boolean; 2: boolean }) => { shownRef.current = v; setShown(v); };
-  useLayoutEffect(() => {
-    const from = last.current;
-    if (part === from) return;
-    last.current = part;
-    const g = ++gen.current;
-    setTitle(t => ({ cur: part, prev: t.cur, n: t.n + 1 }));
-    const out = pieces(refs[from].current), inn = pieces(refs[part].current);
-    const T = WC_PAGE_T, dir = part > from ? -1 : 1; // Part 2 comes in from the right, Part 1 from the left
-    const wasHidden = !shownRef.current[part];
-    show({ 1: true, 2: true });
-    if (!inn.length || !inn[0].animate || reducedMotion()) {
-      for (const el of [...out, ...inn]) { settle(el); el.style.opacity = ''; el.style.translate = ''; }
-      show({ 1: part === 1, 2: part === 2 });
-      setTitle(t => ({ ...t, prev: null }));
-      return;
-    }
-    const c = (el: HTMLElement) => Number(el.dataset.c) || 0;
-    for (const el of out) {
-      settle(el);
-      el.animate([{ opacity: 0, translate: `${dir * T.shift}px 0` }], { duration: T.out, delay: c(el) * T.outStagger, easing: 'cubic-bezier(.4,0,1,1)', fill: 'forwards' });
-    }
-    const ends: Promise<unknown>[] = [];
-    for (const el of inn) {
-      settle(el);
-      if (wasHidden) { el.style.opacity = '0'; el.style.translate = `${-dir * T.shift}px 0`; }
-      const a = el.animate([{ opacity: 1, translate: '0 0' }], { duration: T.in, delay: T.inAt + c(el) * T.inStagger, easing: 'cubic-bezier(0,0,.2,1)', fill: 'forwards' });
-      ends.push(a.finished.catch(() => null));
-    }
-    Promise.all(ends).then(() => {
-      if (g !== gen.current) return; // a newer change took over
-      for (const el of inn) { settle(el); el.style.opacity = ''; el.style.translate = ''; }
-      for (const el of out) { settle(el); el.style.opacity = '0'; }
-      show({ 1: part === 1, 2: part === 2 });
-      setTitle(t => ({ ...t, prev: null }));
-    });
-  }, [part]); // eslint-disable-line react-hooks/exhaustive-deps
-  const o = wc.opts, layer = (p: 1 | 2) => (
-    <div ref={refs[p]} data-page={p} className="wc-page" aria-hidden={p !== part}
-      style={{ position: 'absolute', inset: 0, visibility: shown[p] ? 'visible' : 'hidden' }}>
+  const first = useRef(part);
+  const { refs, shown, prev } = usePageFlip(2, part - 1);
+  const [tn, setTn] = useState(0), lastPart = useRef(part);
+  if (lastPart.current !== part) { lastPart.current = part; setTn(n => n + 1); }
+  const o = wc.opts, from = prev != null ? ((prev + 1) as 1 | 2) : null;
+  const layer = (p: 1 | 2) => (
+    <div ref={refs[p - 1]} data-page={p} className="wc-page" aria-hidden={p !== part} style={{ position: 'absolute', inset: 0, visibility: shown[p - 1] ? 'visible' : 'hidden' }}>
       <WcStage wc={wc} part={p} enter={p === first.current} pin={pin} frame={false} />
     </div>
   );
   return (
     <div className="wc" data-part={part}>
-      <div className={cls('stage', 'mj', 'frame', `p${title.cur}`, o.bg && 'bg', !o.title && 'hide-title', first.current === part && title.n === 0 && 'enter')}>
+      <div className={cls('stage', 'mj', 'frame', `p${part}`, o.bg && 'bg', !o.title && 'hide-title', tn === 0 && 'enter')}>
         <div className="hdr">
-          {title.prev != null && <h1 key={`o${title.n}`} className="t-out">{WC_PARTS[title.prev].title}</h1>}
-          <h1 key={`i${title.n}`} className={title.n ? 't-in' : ''}>{WC_PARTS[title.cur].title}</h1>
+          {from != null && <h1 key={`o${tn}`} className="t-out">{WC_PARTS[from].title}</h1>}
+          <h1 key={`i${tn}`} className={tn ? 't-in' : ''}>{WC_PARTS[part].title}</h1>
         </div>
         <div className="dash" />
       </div>

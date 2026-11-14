@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { usePageFlip } from '../../lib/pageFlip';
 import { AnimatePresence, motion } from 'motion/react';
 import type { SheetMatch, SheetState, SheetTeam } from '../../../shared/sheet';
 import type { Show } from '../../../shared/types';
@@ -19,10 +20,10 @@ function Row({ name, score, win, lose, team, h }: { name: string; score: string;
   );
 }
 
-function Box({ m, teams, x, y, w, h, live, i, compact = false }: { m: SheetMatch; teams: Map<string, SheetTeam>; x: number; y: number; w: number; h: number; live: boolean; i: number; compact?: boolean }) {
+function Box({ m, teams, x, y, w, h, live, i, c, compact = false }: { m: SheetMatch; teams: Map<string, SheetTeam>; x: number; y: number; w: number; h: number; live: boolean; i: number; c: number; compact?: boolean }) {
   const w1 = done(m) && m.winner === m.t1.id, w2 = done(m) && m.winner === m.t2.id;
   return (
-    <motion.div className="absolute" style={{ left: x, top: y, width: w }} initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.35, delay: 0.05 + i * 0.015, ease: EASE }}>
+    <motion.div data-c={c} data-match={m.id} className="absolute" style={{ left: x, top: y, width: w }} initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.35, delay: 0.05 + i * 0.015, ease: EASE }}>
       {!compact && <div className="flex h-[18px] items-center justify-between font-['Montserrat'] text-[12px] font-bold uppercase tracking-[0.08em] text-white/50">
         <span>{m.bracket.replace('_', ' ')}{m.bo ? ` · BO${m.bo}` : ''}</span>
         <span className={live ? 'text-[var(--accent)]' : ''}>{live ? '● LIVE' : done(m) ? 'FINAL' : m.time}</span>
@@ -36,18 +37,21 @@ function Box({ m, teams, x, y, w, h, live, i, compact = false }: { m: SheetMatch
   );
 }
 
-/** A full-height column layout for one bracket side (used by both pages below). */
+/**
+ * A full-height column layout for one bracket side. Every card on a page has the same size (row
+ * height and compact mode are decided once, from the busiest column), so rounds line up and a
+ * column with fewer matches never gets bigger cards than its neighbours.
+ */
 function sideLayout(cols: SheetMatch[][], teams: Map<string, SheetTeam>, top: number, height: number, x0: number, width: number, featured: string | null, n0: number) {
   const maxRows = Math.max(1, ...cols.map(c => c.length));
-  const rowH = Math.min(30, Math.floor((height / maxRows - 22) / 2));
+  const slotMin = height / maxRows, compact = slotMin < 74;
+  const rh = compact ? Math.max(14, Math.min(26, Math.floor((slotMin - 8) / 2))) : Math.min(30, Math.floor((slotMin - 22) / 2));
+  const boxH = (compact ? 0 : 18) + rh * 2 + 1;
   const cw = width / Math.max(1, cols.length);
   const bw = Math.min(320, cw - 24);
   return cols.flatMap((c, ci) => c.map((m, k) => {
     const slot = height / c.length;
-    const compact = slot < 74;
-    const rh = compact ? Math.min(26, Math.floor((slot - 8) / 2)) : rowH;
-    const boxH = (compact ? 0 : 18) + rh * 2 + 1;
-    return <Box key={m.id} m={m} teams={teams} x={x0 + ci * cw} y={top + k * slot + (slot - boxH) / 2} w={bw} h={rh} live={featured === m.id} i={n0 + ci * 8 + k} compact={compact} />;
+    return <Box key={m.id} m={m} teams={teams} x={x0 + ci * cw} y={Math.round(top + k * slot + (slot - boxH) / 2)} w={bw} h={rh} live={featured === m.id} i={n0 + ci * 8 + k} c={ci} compact={compact} />;
   }));
 }
 
@@ -58,11 +62,6 @@ const SECTION_TAG = "font-['Montserrat'] font-extrabold italic uppercase absolut
 function UpperPage({ upper, teams, sheet, show }: { upper: SheetMatch[][]; teams: Map<string, SheetTeam>; sheet: SheetState; show: Show }) {
   return (
     <div className="absolute inset-0">
-      <div className="absolute left-[60px] top-[52px]">
-        <div className="font-['Montserrat'] text-[20px] font-extrabold italic uppercase text-white/60">{show.tournament}</div>
-        <div className={PAGE_TITLE}>{sheet.title || 'BRACKET'}</div>
-      </div>
-      <div className={SECTION_TAG}>UPPER BRACKET</div>
       {sideLayout(upper, teams, 170, 860, 60, 1920 - 120, sheet.featured, 0)}
     </div>
   );
@@ -75,14 +74,9 @@ function LowerPage({ upper, lower, finals, qualSlots, qualified, teams, sheet, s
   const sideCol = finals.length || qualSlots.length ? 320 : 0;
   return (
     <div className="absolute inset-0">
-      <div className="absolute left-[60px] top-[52px]">
-        <div className="font-['Montserrat'] text-[20px] font-extrabold italic uppercase text-white/60">{show.tournament}</div>
-        <div className={PAGE_TITLE}>{sheet.title || 'BRACKET'}</div>
-      </div>
-      <div className={SECTION_TAG}>LOWER BRACKET</div>
       {sideLayout(lower, teams, 170, 860, 60, 1920 - 120 - sideCol, sheet.featured, 40)}
       {qualSlots.length > 0 && (
-        <div className="absolute" style={{ left: 1920 - 60 - 300, top: 160, width: 300 }}>
+        <div data-c={lower.length} className="absolute" style={{ left: 1920 - 60 - 300, top: 160, width: 300 }}>
           <div className={`${NAME} text-[16px] text-[var(--accent)]`}>QUALIFIED</div>
           <div className={`${NAME} mb-3 text-[24px] leading-tight text-white`}>{sheet.title ? 'TO THE MAJOR' : 'NEXT STAGE'}</div>
           {qualified.map((t, i) => (
@@ -95,10 +89,10 @@ function LowerPage({ upper, lower, finals, qualSlots, qualified, teams, sheet, s
         </div>
       )}
       {finals.length > 0 && (
-        <div className="absolute" style={{ left: 1920 - 60 - 300, top: 160, width: 300 }}>
+        <div data-c={lower.length} className="absolute" style={{ left: 1920 - 60 - 300, top: 160, width: 300 }}>
           <div className={`${NAME} text-[16px] text-[var(--accent)]`}>GRAND FINAL</div>
           <div className="mt-3">
-            {finals.map((m, i) => <Box key={m.id} m={m} teams={teams} x={0} y={i * 96} w={300} h={30} live={sheet.featured === m.id} i={80 + i} />)}
+            {finals.map((m, i) => <Box key={m.id} m={m} teams={teams} x={0} y={34 + i * 96} w={300} h={30} live={sheet.featured === m.id} i={80 + i} c={0} />)}
           </div>
         </div>
       )}
@@ -147,15 +141,29 @@ export function SheetBracket({ sheet, show }: { sheet: SheetState; show: Show })
   }, [pinned, pages]);
   const page = pinned ?? auto;
 
+  return <SheetPages page={page} pages={pages} pinned={pinned} hasLowerPage={hasLowerPage} sheet={sheet} show={show}
+    upperEl={<UpperPage upper={upper} teams={teams} sheet={sheet} show={show} />}
+    lowerEl={<LowerPage upper={upper} lower={lower} finals={finals} qualSlots={qualSlots} qualified={qualified} teams={teams} sheet={sheet} show={show} />} />;
+}
+
+/** Stable frame (tournament + title stay put, section tag crossfades) over two always-mounted pages. */
+function SheetPages({ page, pages, pinned, hasLowerPage, sheet, show, upperEl, lowerEl }: { page: number; pages: number; pinned: number | null; hasLowerPage: boolean; sheet: SheetState; show: Show; upperEl: React.ReactNode; lowerEl: React.ReactNode }) {
+  const { refs, shown } = usePageFlip(2, page);
+  const tags = ['UPPER BRACKET', 'LOWER BRACKET'];
   return (
-    <div className="absolute inset-0">
-      <AnimatePresence mode="wait">
-        <motion.div key={page} className="absolute inset-0" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.4, ease: EASE }}>
-          {page === 0
-            ? <UpperPage upper={upper} teams={teams} sheet={sheet} show={show} />
-            : <LowerPage upper={upper} lower={lower} finals={finals} qualSlots={qualSlots} qualified={qualified} teams={teams} sheet={sheet} show={show} />}
-        </motion.div>
-      </AnimatePresence>
+    <div className="absolute inset-0" data-sheet-bracket data-page-on={page}>
+      <div className="absolute left-[60px] top-[52px]">
+        <div className="font-['Montserrat'] text-[20px] font-extrabold italic uppercase text-white/60">{show.tournament}</div>
+        <div className={PAGE_TITLE}>{sheet.title || 'BRACKET'}</div>
+      </div>
+      <div className={SECTION_TAG}>
+        <AnimatePresence initial={false}>
+          <motion.span key={page} className="absolute left-0 top-0 whitespace-nowrap" initial={{ opacity: 0, x: 16 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -16 }} transition={{ duration: 0.25, ease: EASE }}>{tags[page]}</motion.span>
+        </AnimatePresence>
+      </div>
+      {[upperEl, hasLowerPage ? lowerEl : null].map((el, i) => (
+        <div key={i} ref={refs[i]} data-page={i + 1} className="absolute inset-0" aria-hidden={i !== page} style={{ visibility: shown[i] ? 'visible' : 'hidden', contain: 'layout paint' }}>{el}</div>
+      ))}
       {pinned == null && <PageDots n={pages} i={page} />}
     </div>
   );
