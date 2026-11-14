@@ -22,4 +22,9 @@ export const config = {
   turnCredential: env.TURN_CREDENTIAL ?? '',
   obsUrl: env.OBS_WS_URL ?? '',
   obsPassword: env.OBS_WS_PASSWORD ?? '',
+  /** Vote service (Pick'ems + Community MVP), reached over Render's private network, e.g. http://overdrive-vote:10000. */
+  voteUrl: (env.VOTE_URL ?? '').replace(/\/$/, ''),
+  voteSecret: env.VOTE_SECRET ?? '',
+  /** Public address of the voting page (what QR codes point to), e.g. https://overdrive-vote.onrender.com/vote. */
+  votePublicUrl: env.VOTE_PUBLIC_URL ?? '',
 };

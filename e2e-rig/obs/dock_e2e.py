@@ -77,10 +77,10 @@ async def main():
         check("Open Individual Controller opens that scene's controller", await pop.get_attribute("[data-preview]", "data-preview") == "g:analyst-desk")
         await main_.click("[data-act='docks']"); await main_.wait_for_selector("[data-docks-dialog]")
         n = await main_.locator("[data-dock-row]").count()
-        check("OBS Docks dialog: a dock per built scene + Follow OBS", n == 15, f"{n} docks")
+        check("OBS Docks dialog: a dock per built scene + Follow OBS", n == 18, f"{n} docks")  # 2.3: + 3 audience graphics
         async with main_.expect_download() as di: await main_.click("[data-docks-ps1]")
         d = await di.value; txt = open(await d.path(), encoding="utf-8", newline="").read()
-        check("Windows installer download contains every dock URL", txt.count("/producer/scene/") == 15 and "\r\n" in txt, f"{txt.count('/producer/scene/')} urls")
+        check("Windows installer download contains every dock URL", txt.count("/producer/scene/") == 18 and "\r\n" in txt, f"{txt.count('/producer/scene/')} urls")
         await main_.screenshot(path="/tmp/docks-dialog.png")
         await main_.click("[data-docks-close]")
         # 7 a controller page used as a broadcast source is flagged

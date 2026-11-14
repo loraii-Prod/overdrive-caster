@@ -15,6 +15,8 @@ import { MODULES, type ModuleId, type SourceDef } from '../../../shared/registry
 import { SEAT_LABELS, talentLabel, type Seat } from '../../../shared/talent';
 import { mediaName, type MediaState } from '../../../shared/media';
 import { sectionFor, DEFAULT_LEVELS } from '../../../shared/music';
+import { MvpModule, PickemsModule, QrModule } from './audienceModules';
+import { uploadWarning } from '../../components/StorageBanner';
 
 export const PGM = '#e5484d', PVW = '#2fbf71', WARN = '#f5a524';
 export type Ack = { ok: boolean; error?: string; note?: string; version: number };
@@ -23,6 +25,7 @@ export type Run = (cmd: ProducerCmd, label: string) => Promise<Ack>;
 export interface Ctx {
   st: ControllerState; eng: EngineState; wc: WildcardState; pv: WildcardState; run: Run; prepare: boolean;
   src: SourceDef; now: number; media: MediaState | null; mediaSkew: number;
+  aud?: import('./audienceModules').AudCtx;
 }
 
 /** Live data: straight to the sources, or into the draft when "Prepare live data" is on. */
@@ -49,6 +52,9 @@ export function ModuleView({ id, x, pinned }: { id: ModuleId; x: Ctx; pinned: bo
       case 'interview': return <InterviewModule x={x} />;
       case 'intro': return <IntroModule x={x} />;
       case 'showcase': return <ShowcaseModule x={x} />;
+      case 'pickems': return x.aud ? <PickemsModule x={x} a={x.aud} /> : null;
+      case 'mvp': return x.aud ? <MvpModule x={x} a={x.aud} /> : null;
+      case 'qr': return x.aud ? <QrModule x={x} a={x.aud} /> : null;
     }
   })();
   return (
@@ -189,7 +195,7 @@ export function MatchModule({ x }: { x: Ctx }) {
 export function PredictionsModule({ x }: { x: Ctx }) {
   const { at } = useTalent(x);
   const it = x.pv.intro;
-  const people: number[] = x.src.screen === 'analysis' ? [...(x.eng.stage.desk.guest ? [x.eng.stage.desk.guest] : []), 4, 5] : [1, 2, 3].filter(s => at(s) || x.st.preview.casters[s - 1]?.enabled);
+  const people: number[] = x.src.screen === 'analysis' ? [...(x.eng.stage.desk.guest ? [x.eng.stage.desk.guest] : []), 4, 5] : x.src.id === 'aud-pickem' ? [1, 2, 3, 4, 5].filter(s => at(s) || x.st.preview.casters[s - 1]?.enabled) : [1, 2, 3].filter(s => at(s) || x.st.preview.casters[s - 1]?.enabled);
   if (!it.a || !it.b) return <div className="text-[12px] text-white/50">Cast a match first (Match manager): predictions are for the cast match.</div>;
   const name = (s: number) => (at(s) ? talentLabel(at(s)) : x.st.preview.casters[s - 1]?.name ?? `Slot ${s}`);
   return (
@@ -251,7 +257,7 @@ function MediaModule({ x }: { x: Ctx }) {
   const upload = async (f: File) => {
     setErr('');
     const r = await fetch('/api/media', { method: 'POST', headers: { 'X-Filename': encodeURIComponent(f.name) }, body: f });
-    if (!r.ok) setErr((await r.json().catch(() => ({}))).error ?? `Upload failed (${r.status})`); else setLib((await r.json()).items);
+    if (!r.ok) setErr((await r.json().catch(() => ({}))).error ?? `Upload failed (${r.status})`); else { const j = await r.json(); setLib(j.items); setErr(uploadWarning(j)); }
   };
   const pos = m && m.status === 'playing' && m.startedAt ? (x.now - m.startedAt) / 1000 : m ? m.pausedMs / 1000 : 0;
   const fmt = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;

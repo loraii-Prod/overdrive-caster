@@ -5,10 +5,11 @@
   "type": "module",
   "description": "Overdrive — web broadcast caster system",
   "scripts": {
-    "dev": "node scripts/embed-plugin.mjs && concurrently -k -n server,client \"tsx watch server/index.ts\" \"vite\"",
-    "build": "npm install --include=dev --no-audit --no-fund && node scripts/embed-plugin.mjs && node scripts/uhd-manifest.mjs && tsc -p tsconfig.json --noEmit && vite build && esbuild server/index.ts --bundle --platform=node --format=esm --packages=external --outfile=dist/server.js",
+    "dev": "node scripts/embed-plugin.mjs && concurrently -k -n server,client \"tsx watch server/main.ts\" \"vite\"",
+    "build": "npm install --include=dev --no-audit --no-fund && node scripts/embed-plugin.mjs && node scripts/uhd-manifest.mjs && tsc -p tsconfig.json --noEmit && vite build && esbuild server/main.ts --bundle --platform=node --format=esm --packages=external --outfile=dist/server.js && esbuild vote/server.ts --bundle --platform=node --format=esm --packages=external --outfile=dist/vote.js",
     "start": "node dist/server.js",
-    "typecheck": "tsc -p tsconfig.json --noEmit"
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "start:vote": "node dist/vote.js"
   },
   "engines": {
     "node": ">=20"
@@ -16,9 +17,12 @@
   "dependencies": {
     "@fontsource/montserrat": "^5.3.0",
     "@fontsource/russo-one": "^5.3.0",
+    "aws4fetch": "^1.0.20",
     "cookie": "^2.0.2",
     "express": "^5.3.0",
     "obs-websocket-js": "^5.0.8",
+    "pg": "^8.23.1",
+    "qrcode": "^1.5.4",
     "ws": "^8.22.1"
   },
   "devDependencies": {
@@ -30,6 +34,8 @@
     "@types/cookie": "^0.6.0",
     "@types/express": "^5.0.6",
     "@types/node": "^26.6.6",
+    "@types/pg": "^8.23.1",
+    "@types/qrcode": "^1.5.6",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "@types/ws": "^8.18.2",
@@ -40,6 +46,7 @@
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
     "react-router-dom": "^7.18.5",
+    "s3rver": "^3.7.1",
     "tailwindcss": "^4.3.5",
     "tsx": "^4.23.15",
     "typescript": "^7.0.2",

@@ -13,6 +13,9 @@ import { applyOp, isTeam, resolve, type TournamentOp } from '../shared/tournamen
 import { ensureStreamIds, matchPlayer, sanitizePlayers, sanitizeStories, STORY_LABELS } from '../shared/players';
 import { db, newKey, sanitizeFollow, save } from './store';
 import { iceServers } from './turn';
+import { Audience } from './audience';
+import { tag } from './assets';
+import { playerIdOf } from '../shared/playerIds';
 import { Twitch } from './twitch';
 import { ObsBridge } from './obs';
 import { createObsSetup } from './obsSetup';
@@ -96,6 +99,13 @@ export function createHub(server: Server) {
     report: r => each(c => c.role === 'controller', { t: 'perf', perf: r }),
   });
   const tw = new Twitch(db.twitch, save, () => pushState(), () => each(c => c.role === 'output' || c.role === 'controller' || c.role === 'crew', { t: 'twitch', tw: tw.pub }));
+  // Audience interaction: the vote service is reached in the background; its outages never block this server.
+  const aud = new Audience(db.audience, save, () => db.wildcard, () => pushAud());
+  function pushAud() {
+    each(c => c.role === 'output' || c.role === 'controller' || c.role === 'crew', { t: 'aud', aud: aud.pub() });
+    each(c => c.role === 'controller', { t: 'aud-private', aud: aud.priv() });
+  }
+  aud.start();
 
   // ---------- helpers ----------
   const send = (c: Client | undefined, m: ServerMsg) => {
@@ -368,7 +378,7 @@ export function createHub(server: Server) {
       case 'map-photo': {
         if (!majorMap(op.id)) return;
         const ph = { ...wc.mapPhotos };
-        if (op.url) ph[op.id] = op.url; else delete ph[op.id];
+        if (op.url) { ph[op.id] = op.url; tag(op.url, 'map', op.id); } else delete ph[op.id];
         wc.mapPhotos = sanitizeWildcard({ ...wc, mapPhotos: ph }).mapPhotos;
         break;
       }
@@ -437,7 +447,7 @@ export function createHub(server: Server) {
         const key = String(op.player ?? '').toLowerCase().replace(/[^a-z0-9]/g, '');
         if (!key) return;
         const photos = { ...wc.showcase.photos };
-        if (op.url) photos[key] = op.url; else delete photos[key];
+        if (op.url) { photos[key] = op.url; tag(op.url, 'portrait', playerIdOf(key)); } else delete photos[key];
         wc.showcase = sanitizeShowcase({ ...wc.showcase, photos });
         break;
       }
@@ -803,6 +813,8 @@ export function createHub(server: Server) {
     if (c.role === 'controller') send(c, { t: 'state', state: controllerState() });
     if (c.role !== 'contributor') { send(c, { t: 'tournament', tournament: db.tournament }); send(c, matchDataMsg()); }
     if (wcAudience(c)) { send(c, wcMsg()); send(c, { t: 'twitch', tw: tw.pub }); }
+    if (c.role === 'output' || c.role === 'controller' || c.role === 'crew') send(c, { t: 'aud', aud: aud.pub() });
+    if (c.role === 'controller') send(c, { t: 'aud-private', aud: aud.priv() });
     if (c.role === 'contributor') { if (c.talent) registerTalent(c); else registerPublisher(c, c.slot!); }
     pushState();
   }
@@ -844,6 +856,12 @@ export function createHub(server: Server) {
       engine.run(m.cmd, c.id, m.source === 'auto' ? 'auto' : 'manual', typeof m.base === 'number' ? m.base : undefined)
         .catch(e => ({ ok: false as const, version: 0, error: `Server error: ${(e as Error).message}` }))
         .then(r => send(c, { t: 'ack', id, ...r }));
+      return;
+    }
+    if (m.t === 'aud') {
+      const id = String(m.id ?? '');
+      if (!m.op || typeof m.op !== 'object') return send(c, { t: 'aud-ack', id, ok: false, error: 'Invalid command' });
+      aud.op(m.op).catch(e => String((e as Error).message)).then(error => send(c, { t: 'aud-ack', id, ok: !error, error: error ?? undefined }));
       return;
     }
     act(m);
@@ -1112,6 +1130,7 @@ export function createHub(server: Server) {
     pushState,
     pushMedia,
     pushGfx,
+    onGfxPublish: g => aud.onPublish(g),
     quick,
     setSeat,
     editTalent,

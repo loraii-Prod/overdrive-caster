@@ -4,3 +4,8 @@ data
 .env
 settings.bat
 __pycache__/
+asset-migration-report.md
+staging-expect.json
+od-backup*/
+od-live-*.tgz
+state.json

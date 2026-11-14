@@ -7,8 +7,11 @@ import express from 'express';
 import { config } from './config';
 import { announcePassword, checkPassword, COOKIE, cookieOptions, createSession, destroySession, loginAllowed, noteFailure, roleFrom, sessionFrom } from './auth';
 import { flush } from './store';
+import { shutdownPersist } from './durable';
 import { createHub } from './hub';
 import { controlApi, media, music, pluginDownload, uploads } from './api';
+import { assetsApi, importSeed, migrate } from './assets';
+import { persistApi } from './persistApi';
 
 const app = express();
 app.disable('x-powered-by');
@@ -19,11 +22,17 @@ const hub = createHub(server);
 app.use('/api/v1', controlApi(hub.api));
 app.use(gameFeed());
 app.use(uploads());
+app.use(assetsApi());
+app.use(persistApi());
 app.use(music());
 app.use(media());
 app.use(pluginDownload());
 
 app.get('/api/health', (_req, res) => res.json({ ok: true, uptime: process.uptime() }));
+// Which build is actually running: check this before testing anything on a deployed instance.
+// RENDER_GIT_COMMIT / RENDER_GIT_BRANCH are set by Render for Git-backed deploys (absent locally).
+const RELEASE = '2.3.0-audience', BOOTED = new Date().toISOString();
+app.get('/api/version', (_req, res) => { res.setHeader('Cache-Control', 'no-store'); res.json({ release: RELEASE, commit: process.env.RENDER_GIT_COMMIT ?? null, branch: process.env.RENDER_GIT_BRANCH ?? null, service: process.env.RENDER_SERVICE_NAME ?? null, booted: BOOTED }); });
 
 app.get('/api/session', (req, res) => { const role = roleFrom(req); res.json({ authed: role === 'producer', role }); });
 
@@ -78,9 +87,12 @@ server.listen(config.port, config.host, () => {
   console.log(`  control API /api/v1/…  (token shown in the controller → Integrations)`);
   if (!clientDir) console.log('  (no built client found – run `npm run dev` or `npm run build`)');
   announcePassword();
+  // Register files already on this disk and copy them to storage (idempotent; a wiped disk has nothing to do).
+  importSeed().then(() => migrate()).catch(e => console.error('[assets] migration failed:', e.message));
 });
 
-const shutdown = () => { try { flush(); } catch {} process.exit(0); };
+let closing = false;
+const shutdown = () => { if (closing) return; closing = true; try { flush(); } catch {} shutdownPersist().finally(() => process.exit(0)); };
 process.on('SIGINT', shutdown);
 process.on('SIGTERM', shutdown);
 process.on('uncaughtException', e => console.error('[uncaught]', e)); // never take the show down

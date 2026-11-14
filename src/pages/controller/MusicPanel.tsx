@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react';
+import { uploadWarning } from '../../components/StorageBanner';
 import type { ScreenId, Show } from '../../../shared/types';
 import type { QuickOp } from '../../../shared/protocol';
 import { MUSIC_LABELS, MUSIC_SECTIONS, MUSIC_STYLE, sectionFor, type MusicSection } from '../../../shared/music';
@@ -20,7 +21,7 @@ export function MusicPanel({ live, screen, quick, musicUrl, playing }: { live: S
       setBusy(`${s}:${f.name}`);
       const r = await fetch(`/api/music/${s}`, { method: 'POST', headers: { 'Content-Type': f.type || 'application/octet-stream', 'X-Filename': f.name.replace(/[^\w .()-]/g, '') }, body: f });
       const j = await r.json().catch(() => ({}));
-      if (!r.ok) setErr(j.error ?? 'Upload failed'); else setLib(j.sections);
+      if (!r.ok) setErr(j.error ?? 'Upload failed'); else { setLib(j.sections); if (uploadWarning(j)) setErr(`${f.name}: ${uploadWarning(j)}`); }
     }
     setBusy(null);
   };
