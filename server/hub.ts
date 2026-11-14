@@ -384,6 +384,9 @@ export function createHub(server: Server) {
       }
       case 'teams': wc.teams = sanitizeWildcard({ ...wc, teams: op.teams }).teams; wcChanged(); return;
       case 'air': wc.air = op.part === 2 ? 2 : 1; wcLastRotate = Date.now(); break;
+      case 'cue': if (wc.cue === (op.part === 2 ? 2 : 1)) return; wc.cue = op.part === 2 ? 2 : 1; break; // Preview only: Program untouched
+      case 'take': if (wc.air === wc.cue) return; wc.air = wc.cue; wcLastRotate = Date.now(); break; // a repeated TAKE is a no-op
+      case 'page-reset': wc.air = 1; wc.cue = 1; wcLastRotate = Date.now(); break;
       case 'opts':
         wc.opts = sanitizeWildcard({ ...wc, opts: { ...wc.opts, ...(op.patch ?? {}) } }).opts;
         if (op.patch && 'rotate' in op.patch) wcLastRotate = Date.now();

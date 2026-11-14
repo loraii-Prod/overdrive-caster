@@ -7,7 +7,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type { CasterId, ControllerState } from '../../../shared/types';
 import type { DraftCmd, EngineState, ProducerCmd } from '../../../shared/engine';
-import type { WildcardState, WcDeskPanel } from '../../../shared/wildcard';
+import type { WildcardState, WcDeskPanel, WcOp } from '../../../shared/wildcard';
 import { INTERVIEW_TITLES, matchName, realTeam, VETO_PRESETS, vetoRows, WC_IDS, wcResolve, GRAND_FINAL } from '../../../shared/wildcard';
 import { MAJOR_MAPS } from '../../../shared/maps';
 import { normHandle, teamPlayers } from '../../../shared/major';
@@ -335,12 +335,28 @@ function GraphicsModule({ x }: { x: Ctx }) {
   );
 }
 function BracketModule({ x }: { x: Ctx }) {
+  const w = x.wc, op = (o: WcOp, l: string) => x.run({ c: 'op-wc', op: o }, l);
+  const name = (p: 1 | 2) => (p === 1 ? 'Upper + GF' : 'Lower + standings');
   return (
     <>
-      <Tag live>On screen</Tag>
-      <Seg value={String(x.wc.air)} options={[['1', 'Upper + GF'], ['2', 'Lower + standings']]} onChange={v => x.run({ c: 'op-wc', op: { k: 'air', part: Number(v) as 1 | 2 } }, `Bracket part ${v}`)} />
-      <Chip on={x.wc.opts.rotate} onClick={() => x.run({ c: 'op-wc', op: { k: 'opts', patch: { rotate: !x.wc.opts.rotate } } }, 'Bracket auto switch')}>Auto switch halves</Chip>
-      <div className="text-[11px] text-white/45">Results come from the match scores (Match manager / Scoreboard) and the sheet sync.</div>
+      <div className="flex items-center gap-2 text-[11px]">
+        <span className="rounded bg-emerald-500/15 px-1.5 py-0.5 text-emerald-300" data-testid="br-preview">PREVIEW · {w.cue}/2 {name(w.cue)}</span>
+        <span className="rounded bg-red-500/15 px-1.5 py-0.5 text-red-300" data-testid="br-program">PROGRAM · {w.air}/2 {name(w.air)}</span>
+      </div>
+      <Tag>Preview page (does not touch Program)</Tag>
+      <div className="flex flex-wrap items-center gap-1">
+        <Btn disabled={w.cue === 1} onClick={() => op({ k: 'cue', part: 1 }, 'Bracket preview: previous page')}>◀ Prev</Btn>
+        <Seg value={String(w.cue)} options={[['1', '1 · Upper + GF'], ['2', '2 · Lower + standings']]} onChange={v => op({ k: 'cue', part: Number(v) as 1 | 2 }, `Bracket preview page ${v}`)} />
+        <Btn disabled={w.cue === 2} onClick={() => op({ k: 'cue', part: 2 }, 'Bracket preview: next page')}>Next ▶</Btn>
+      </div>
+      <div className="flex flex-wrap items-center gap-1">
+        <Btn active={w.cue !== w.air} disabled={w.cue === w.air} title={w.cue === w.air ? 'Preview already on Program' : `Put page ${w.cue} on Program`} onClick={() => op({ k: 'take' }, `Bracket TAKE page ${w.cue}`)}>TAKE page {w.cue}</Btn>
+        <Btn onClick={() => op({ k: 'page-reset' }, 'Bracket reset to page 1')} title="Page 1 on Program and in Preview">Reset to page 1</Btn>
+      </div>
+      <Tag live>Display</Tag>
+      <Chip on={w.opts.rotate} onClick={() => op({ k: 'opts', patch: { rotate: !w.opts.rotate } }, 'Bracket auto switch')}>Auto switch halves</Chip>
+      <Chip on={w.opts.lines} onClick={() => op({ k: 'opts', patch: { lines: !w.opts.lines } }, 'Bracket connector lines')}>Connector lines</Chip>
+      <div className="text-[11px] text-white/45">Preview shows the cued page in the producer canvas (Draft view). TAKE slides it onto Program. Results come from the match scores and the sheet sync.</div>
     </>
   );
 }

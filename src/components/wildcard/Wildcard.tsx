@@ -36,24 +36,48 @@ function Row({ name, score, r, hint, c, i }: { name: string | null; score: strin
     <div className={cls('row', r.winner === name ? 'win' : r.loser === name && 'lose')} style={v}>
       <span className="seed">{WC_TEAMS[name]?.seed ?? ''}</span>
       <span className="logo"><Img name={name} /></span>
-      <span className="name">{name}</span>
+      <span className={cls('name', name.length > 20 ? 'xl' : name.length > 15 && 'l')} title={name}>{name}</span>
       <span className="score"><i key={sc} className="pop">{sc}</i></span>
     </div>
   );
 }
 
-/** One part of the bracket (1 = upper, 2 = lower + the four qualified teams). */
-export function WcStage({ wc, part, enter = false, pin }: { wc: WildcardState; part: 1 | 2; enter?: boolean; pin?: string | null }) {
+/** Card height on the Major bracket (two 54 px rows, `.stage.mj .row`): connectors meet the card centre. */
+export const WC_CARD_H = 108;
+
+/** Elbow connectors between rounds, from the same layout the cards use (so they can never drift). */
+function Lines({ part, R }: { part: 1 | 2; R: Record<string, WcResolved> }) {
+  const P = WC_PARTS[part], pos = wcLayout(part), mid = WC_CARD_H / 2;
+  const segs: { d: string; c: number; done: boolean }[] = [];
+  P.cols.slice(1).forEach((col, ci) => {
+    const prev = P.cols[ci], pair = col.ids.length !== prev.ids.length;
+    col.ids.forEach((id, i) => {
+      const to = pos[id], from = pair ? [prev.ids[2 * i], prev.ids[2 * i + 1]] : [prev.ids[i]];
+      for (const f of from) {
+        const a = pos[f], x1 = a.x + a.w, y1 = a.y + mid, x2 = to.x, y2 = to.y + mid, xm = Math.round((x1 + x2) / 2);
+        segs.push({ d: `M${x1} ${y1}H${xm}V${y2}H${x2}`, c: ci + 1, done: !!R[f]?.winner });
+      }
+    });
+  });
+  return (
+    <svg className="conn" width={1920} height={1080} viewBox="0 0 1920 1080" aria-hidden>
+      {segs.map((g, i) => <path key={i} data-c={g.c} className={g.done ? 'done' : ''} d={g.d} />)}
+    </svg>
+  );
+}
+
+/** One part of the bracket (1 = upper, 2 = lower + the four qualified teams). `frame={false}` leaves the title to a stable frame. */
+export function WcStage({ wc, part, enter = false, pin, frame = true }: { wc: WildcardState; part: 1 | 2; enter?: boolean; pin?: string | null; frame?: boolean }) {
   const P = WC_PARTS[part], R = wcResolve(wc.matches, wc.teams), pos = wcLayout(part), o = wc.opts, cast = castId(wc, R, pin);
   const box = `rgba(33,26,24,${o.opacity / 100})`;
   return (
-    <div className={cls('stage', 'mj', `p${part}`, o.bg && 'bg', enter && 'enter', !o.title && 'hide-title', !o.times && 'hide-times', !o.seeds && 'hide-seeds')}
+    <div className={cls('stage', 'mj', `p${part}`, o.bg && frame && 'bg', enter && 'enter', !o.title && 'hide-title', !o.times && 'hide-times', !o.seeds && 'hide-seeds')}
       style={vars({ '--box': box, '--box-dim': box })}>
-      <div className="hdr"><h1>{P.title}</h1></div>
-      <div className="dash" />
-      {P.cols.map(col => <div key={col.name} className="colh" style={{ left: col.x, top: Math.min(...col.ids.map(id => pos[id].y)) - 40, width: col.w }}>{col.name}</div>)}
+      {frame && <><div className="hdr"><h1>{P.title}</h1></div><div className="dash" /></>}
+      {o.lines && <Lines part={part} R={R} />}
+      {P.cols.map((col, ci) => <div key={col.name} data-c={ci} className="colh" style={{ left: col.x, top: Math.min(...col.ids.map(id => pos[id].y)) - 40, width: col.w }}>{col.name}</div>)}
       {part === 2 && (
-        <div className="qcol" style={{ left: 1600, top: 290 }}>
+        <div className="qcol" data-c={P.cols.length} style={{ left: 1600, top: 290 }}>
           <div className="qt">Final standings</div>
           {([[GRAND_FINAL, 'winner', 'Grand final winner'], [GRAND_FINAL, 'loser', 'Grand final loser'], ['R4_LB1', 'loser', 'Lower final loser'], ['R3_LB1', 'loser', 'Lower semi-final loser']] as const).map(([id, k, open], i) => {
             const w = R[id][k];
@@ -68,7 +92,7 @@ export function WcStage({ wc, part, enter = false, pin }: { wc: WildcardState; p
         const live = st.live && !r.winner, onCast = cast === id;
         const t = colTime(wc, col.ids);
         return (
-          <div key={id} className={cls('match', col.major && 'major', live && 'is-live')} style={{ left: p.x, top: p.y, width: p.w }}>
+          <div key={id} data-c={p.c} data-match={id} className={cls('match', col.major && 'major', live && 'is-live', r.winner ? 'done' : !live && 'upcoming')} style={{ left: p.x, top: p.y, width: p.w }}>
             {(live || onCast) && (
               <span className={cls('live', onCast && 'oncast', !live && 'nolive')}>{live ? 'Live' : ''}{live && onCast ? ' · ' : ''}{onCast ? 'On cast' : ''}</span>
             )}
@@ -85,29 +109,76 @@ export function WcStage({ wc, part, enter = false, pin }: { wc: WildcardState; p
 
 const reducedMotion = () => typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
 
+/** Page-transition timing (ms). Out: columns leave left→right; In: columns arrive with a stagger. Total ≈ 560 ms. */
+export const WC_PAGE_T = { out: 220, outStagger: 30, inAt: 160, in: 260, inStagger: 40, shift: 64 };
+const pieces = (el: HTMLElement | null) => (el ? Array.from(el.querySelectorAll<HTMLElement>('[data-c]')) : []);
+/** Freeze a piece where it is right now (so an interrupted transition continues from there, never jumps). */
+const settle = (el: HTMLElement) => { for (const a of el.getAnimations()) { try { a.commitStyles(); } catch { /* not rendered */ } a.cancel(); } };
+
 /**
- * The bracket as it goes on air: follows the part on air (or `pin`), and slides the parts across
- * when it changes (Part 2 comes in from the right, Part 1 from the left), as the old overlay did.
+ * The bracket as it goes on air. Both pages stay mounted (logos decoded, nothing re-laid out on a
+ * page change); the title and frame stay put while the cards of the old page fade and slide out and
+ * the new page's columns arrive in a stagger. A change during a transition carries on from where
+ * every card is at that moment, so rapid changes never overlap, stack or blank the frame.
  */
 export function WcBracket({ wc, part, pin }: { wc: WildcardState; part: 1 | 2; pin?: string | null }) {
-  const [v, setV] = useState<{ cur: 1 | 2; prev: 1 | 2 | null; n: number }>({ cur: part, prev: null, n: 0 });
-  const curRef = useRef<HTMLDivElement>(null), prevRef = useRef<HTMLDivElement>(null);
-  useEffect(() => { if (part !== v.cur) setV(x => ({ cur: part, prev: x.cur, n: x.n + 1 })); }, [part]); // eslint-disable-line react-hooks/exhaustive-deps
+  const refs = { 1: useRef<HTMLDivElement>(null), 2: useRef<HTMLDivElement>(null) };
+  const [shown, setShown] = useState<{ 1: boolean; 2: boolean }>({ 1: part === 1, 2: part === 2 });
+  const [title, setTitle] = useState<{ cur: 1 | 2; prev: 1 | 2 | null; n: number }>({ cur: part, prev: null, n: 0 });
+  const first = useRef(part), gen = useRef(0), last = useRef(part), shownRef = useRef(shown);
+  const show = (v: { 1: boolean; 2: boolean }) => { shownRef.current = v; setShown(v); };
   useLayoutEffect(() => {
-    if (v.prev == null) return;
-    const a = prevRef.current, b = curRef.current;
-    if (!a || !b || !b.animate || reducedMotion()) { setV(x => ({ ...x, prev: null })); return; }
-    const dir = v.cur > v.prev ? -1 : 1, w = 1920;
-    const opts: KeyframeAnimationOptions = { duration: 750, easing: 'cubic-bezier(.65,0,.35,1)', fill: 'both' };
-    const out = a.animate([{ translate: '0 0' }, { translate: `${dir * w}px 0` }], opts);
-    const inn = b.animate([{ translate: `${-dir * w}px 0` }, { translate: '0 0' }], opts);
-    inn.onfinish = () => { out.cancel(); inn.cancel(); setV(x => ({ ...x, prev: null })); };
-    return () => { out.cancel(); inn.cancel(); };
-  }, [v.n]); // eslint-disable-line react-hooks/exhaustive-deps
+    const from = last.current;
+    if (part === from) return;
+    last.current = part;
+    const g = ++gen.current;
+    setTitle(t => ({ cur: part, prev: t.cur, n: t.n + 1 }));
+    const out = pieces(refs[from].current), inn = pieces(refs[part].current);
+    const T = WC_PAGE_T, dir = part > from ? -1 : 1; // Part 2 comes in from the right, Part 1 from the left
+    const wasHidden = !shownRef.current[part];
+    show({ 1: true, 2: true });
+    if (!inn.length || !inn[0].animate || reducedMotion()) {
+      for (const el of [...out, ...inn]) { settle(el); el.style.opacity = ''; el.style.translate = ''; }
+      show({ 1: part === 1, 2: part === 2 });
+      setTitle(t => ({ ...t, prev: null }));
+      return;
+    }
+    const c = (el: HTMLElement) => Number(el.dataset.c) || 0;
+    for (const el of out) {
+      settle(el);
+      el.animate([{ opacity: 0, translate: `${dir * T.shift}px 0` }], { duration: T.out, delay: c(el) * T.outStagger, easing: 'cubic-bezier(.4,0,1,1)', fill: 'forwards' });
+    }
+    const ends: Promise<unknown>[] = [];
+    for (const el of inn) {
+      settle(el);
+      if (wasHidden) { el.style.opacity = '0'; el.style.translate = `${-dir * T.shift}px 0`; }
+      const a = el.animate([{ opacity: 1, translate: '0 0' }], { duration: T.in, delay: T.inAt + c(el) * T.inStagger, easing: 'cubic-bezier(0,0,.2,1)', fill: 'forwards' });
+      ends.push(a.finished.catch(() => null));
+    }
+    Promise.all(ends).then(() => {
+      if (g !== gen.current) return; // a newer change took over
+      for (const el of inn) { settle(el); el.style.opacity = ''; el.style.translate = ''; }
+      for (const el of out) { settle(el); el.style.opacity = '0'; }
+      show({ 1: part === 1, 2: part === 2 });
+      setTitle(t => ({ ...t, prev: null }));
+    });
+  }, [part]); // eslint-disable-line react-hooks/exhaustive-deps
+  const o = wc.opts, layer = (p: 1 | 2) => (
+    <div ref={refs[p]} data-page={p} className="wc-page" aria-hidden={p !== part}
+      style={{ position: 'absolute', inset: 0, visibility: shown[p] ? 'visible' : 'hidden' }}>
+      <WcStage wc={wc} part={p} enter={p === first.current} pin={pin} frame={false} />
+    </div>
+  );
   return (
-    <div className="wc">
-      {v.prev != null && <div key={`s${v.n - 1}`} ref={prevRef} className="sliding" style={{ position: 'absolute', inset: 0, willChange: 'translate' }}><WcStage wc={wc} part={v.prev} enter={v.n - 1 === 0} pin={pin} /></div>}
-      <div key={`s${v.n}`} ref={curRef} style={{ position: 'absolute', inset: 0 }}><WcStage wc={wc} part={v.cur} enter={v.n === 0} pin={pin} /></div>
+    <div className="wc" data-part={part}>
+      <div className={cls('stage', 'mj', 'frame', `p${title.cur}`, o.bg && 'bg', !o.title && 'hide-title', first.current === part && title.n === 0 && 'enter')}>
+        <div className="hdr">
+          {title.prev != null && <h1 key={`o${title.n}`} className="t-out">{WC_PARTS[title.prev].title}</h1>}
+          <h1 key={`i${title.n}`} className={title.n ? 't-in' : ''}>{WC_PARTS[title.cur].title}</h1>
+        </div>
+        <div className="dash" />
+      </div>
+      {layer(1)}{layer(2)}
     </div>
   );
 }

@@ -130,6 +130,8 @@ export interface WcOpts {
   opacity: number;
   /** Auto switch between Part 1 and Part 2 every rotateSec seconds (run by the server). */
   rotate: boolean; rotateSec: number;
+  /** Connector lines between rounds (off = the approved line-free look). */
+  lines: boolean;
   /** Where the wildcard graphics replace the generic ones inside /output/program. */
   inBracket: boolean; inIntermission: boolean; inCasters: boolean; inGameplay: boolean;
   /** Major player showcase on the Warm-up screen. */
@@ -205,6 +207,8 @@ export interface WildcardState {
   opts: WcOpts;
   /** Part on air. */
   air: 1 | 2;
+  /** Part cued in the producer preview (never shown on Program until TAKE). */
+  cue: 1 | 2;
   /** Match the casters are covering (bracket id), or null. */
   cast: string | null;
   /** Take scores, live flags and times from the event's Google Sheet on every sync. */
@@ -243,12 +247,12 @@ export interface WildcardState {
   rev: number;
 }
 
-export const defaultWcOpts = (): WcOpts => ({ title: true, times: true, seeds: false, bg: false, opacity: 100, rotate: false, rotateSec: 20, inBracket: true, inIntermission: true, inCasters: false, inGameplay: true, inWarmup: true });
+export const defaultWcOpts = (): WcOpts => ({ title: true, times: true, seeds: false, bg: false, opacity: 100, rotate: false, rotateSec: 20, lines: false, inBracket: true, inIntermission: true, inCasters: false, inGameplay: true, inWarmup: true });
 
 export function defaultWildcard(enabled = false): WildcardState {
   const matches: Record<string, WcMatch> = {};
   for (const id of WC_IDS) matches[id] = { s1: '', s2: '', time: defaultTime(id), at: null, live: false };
-  return { enabled, pbs: {}, veto: defaultVeto(), interview: defaultInterview(), pickem: {}, champ: false, booth: [], map: { id: null, at: null }, mapPhotos: {}, bracket: WC_BRACKET, matches, teams: Array(8).fill(''), opts: defaultWcOpts(), air: 1, cast: null, sheetAuto: true, sheetSeen: {}, done: {}, showcase: defaultShowcase(), intro: defaultIntro(), desk: { panel: 'cams', player: null, slots: [], guest: null, strip: false, clock: false }, rev: 0 };
+  return { enabled, pbs: {}, veto: defaultVeto(), interview: defaultInterview(), pickem: {}, champ: false, booth: [], map: { id: null, at: null }, mapPhotos: {}, bracket: WC_BRACKET, matches, teams: Array(8).fill(''), opts: defaultWcOpts(), air: 1, cue: 1, cast: null, sheetAuto: true, sheetSeen: {}, done: {}, showcase: defaultShowcase(), intro: defaultIntro(), desk: { panel: 'cams', player: null, slots: [], guest: null, strip: false, clock: false }, rev: 0 };
 }
 
 const score = (v: unknown) => (typeof v === 'string' ? v.trim().toUpperCase().slice(0, 3) : typeof v === 'number' && Number.isFinite(v) ? String(Math.max(0, Math.round(v))) : '');
@@ -290,12 +294,13 @@ export function sanitizeWildcard(v: any, enabledDefault = false): WildcardState 
     enabled: typeof v.enabled === 'boolean' ? v.enabled : enabledDefault,
     matches,
     opts: {
-      title: b('title'), times: b('times'), seeds: b('seeds'), bg: b('bg'), rotate: b('rotate'),
+      title: b('title'), times: b('times'), seeds: b('seeds'), bg: b('bg'), rotate: b('rotate'), lines: b('lines'),
       opacity: Math.max(40, Math.min(100, Math.round(Number(o.opacity) || d.opts.opacity))),
       rotateSec: Math.max(5, Math.min(300, Math.round(Number(o.rotateSec) || d.opts.rotateSec))),
       inBracket: b('inBracket'), inIntermission: b('inIntermission'), inCasters: b('inCasters'), inGameplay: b('inGameplay'), inWarmup: b('inWarmup'),
     },
     air: v.air === 2 ? 2 : 1,
+    cue: v.cue === 2 ? 2 : v.cue === 1 ? 1 : v.air === 2 ? 2 : 1,
     veto: sanitizeVeto(v.veto),
     pbs: Object.fromEntries(Object.entries(v.pbs ?? {}).filter(([m, t]) => isMapId(m) && t && typeof t === 'object').map(([m, t]) => [m, Object.fromEntries(Object.entries(t as Record<string, any>).slice(0, 16).map(([team, pb]) => [team.slice(0, 60), sanitizePb(pb)]).filter(([, pb]) => pb))])),
     interview: sanitizeInterview(v.interview),
@@ -411,6 +416,10 @@ export type WcOp =
   | { k: 'live'; id: string; on?: boolean }
   | { k: 'time'; id: string; time: string }
   | { k: 'air'; part: 1 | 2 }
+  /** Producer page controls: cue a page in Preview, put the cued page on Program, back to page 1 on Program. */
+  | { k: 'cue'; part: 1 | 2 }
+  | { k: 'take' }
+  | { k: 'page-reset' }
   | { k: 'opts'; patch: Partial<WcOpts> }
   | { k: 'enabled'; on: boolean }
   | { k: 'cast'; id: string | null }

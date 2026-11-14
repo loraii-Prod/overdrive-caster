@@ -225,7 +225,6 @@
 .wc details.help code{background:#2A1812;padding:1px 6px;color:var(--ink)}
 .wc{--box:#211A18;--box-dim:#211A18;--text:#FFFFFF;--muted:#8E8580;--dim:#7C7470;--hot:#FF4A1C}
 .wc .stage .hdr{top:180px;left:60px}
-.wc .stage.p2 .hdr{top:200px}
 .wc .stage .hdr .kicker{display:none}
 .wc .stage .hdr h1{font-family:'WC Montserrat',sans-serif;font-weight:800;font-style:italic;font-size:22px;letter-spacing:.5px;color:var(--hot);text-shadow:none;margin:0}
 .wc .stage .hdr h1 em{color:var(--hot)}
@@ -792,3 +791,23 @@
 .wc.waiting .ws2.next > :nth-child(4){animation-delay:.51s}
 .wc .dk-panel > *{animation:wc-rise .5s .15s cubic-bezier(.2,.8,.2,1) both}
 @media (prefers-reduced-motion: reduce){.wc i.pop,.wc .mb h1,.wc .mb h2,.wc .mb-card,.wc .mb-empty,.wc.waiting .ws2.next > *,.wc .dk-panel > *{animation:none}}
+
+/* ---- bracket polish (stable frame, page transitions, connectors, long names, states) ---- */
+.wc .stage.frame{pointer-events:none}
+.wc .wc-page .stage{background:none}
+.wc .stage.frame .hdr h1{transition:none}
+.wc .stage.frame .hdr h1.t-out{position:absolute;left:0;top:0;animation:wc-tout .2s cubic-bezier(.4,0,1,1) both}
+.wc .stage.frame .hdr h1.t-in{animation:wc-tin .3s .16s cubic-bezier(0,0,.2,1) both}
+@keyframes wc-tout{to{opacity:0;translate:-24px 0}}
+@keyframes wc-tin{from{opacity:0;translate:24px 0}}
+.wc .stage.frame.p2 .hdr h1:not(.t-out){color:var(--hot)}
+.wc svg.conn{position:absolute;left:0;top:0;overflow:visible;fill:none;stroke:rgba(255,255,255,.16);stroke-width:2;shape-rendering:geometricPrecision}
+.wc svg.conn path{stroke-linejoin:miter}
+.wc svg.conn path.done{stroke:var(--hot);stroke-opacity:.75}
+.wc .stage.mj .row .name.l{font-size:21px;letter-spacing:-.4px}
+.wc .stage.mj .row .name.xl{font-size:18px;letter-spacing:-.5px}
+.wc .match.upcoming .row .score{color:rgba(255,255,255,.28)}
+.wc .match.done .row.win .score{color:var(--hot)}
+.wc .match.done .row.win{box-shadow:inset 4px 0 0 var(--hot)}
+.wc .wc-page{contain:layout paint}
+@media (prefers-reduced-motion: reduce){.wc .stage.frame .hdr h1.t-out{display:none}.wc .stage.frame .hdr h1.t-in{animation:none}}

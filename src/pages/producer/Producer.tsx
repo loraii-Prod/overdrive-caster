@@ -151,7 +151,7 @@ export function Producer({ onLogout, dock }: { onLogout: () => void; dock?: stri
   // Draft = preview scene/show + staged desk/booth + prepared live data. Live = exactly what the sources show.
   const draft = useMemo(() => {
     if (!wc || !eng || !st) return null;
-    const staged = { ...wc.state, booth: eng.stage.booth, desk: { ...wc.state.desk, ...eng.stage.desk } };
+    const staged = { ...wc.state, air: wc.state.cue, booth: eng.stage.booth, desk: { ...wc.state.desk, ...eng.stage.desk } };
     const d = applyDraft(staged, st.showPreview, eng.draft);
     return { wc: { ...wc, state: d.wc }, show: d.show, scene: st.preview };
   }, [wc, eng, st]);
