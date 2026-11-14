@@ -1,9 +1,11 @@
 /**
  * Studio Mode → OBS Setup: the OBS Scene Builder.
- * One OBS scene per Overdrive output, each with its own 1920×1080 browser source. Every button is an
+ * One OBS scene per Overdrive output, each with its own full-canvas browser source (output profile: 4K or 1080p). Every button is an
  * acknowledged engine command; Build / Repair always show the server's dry-run plan first and change OBS
  * only after Confirm. Nothing here switches the OBS Program or Preview scene.
  */
+import { OUTPUT_PROFILES, profileOf, type OutputProfileId } from '../../../shared/layout';
+import { usePerfReport } from '../../lib/perfStore';
 import { useEffect, useState } from 'react';
 import type { ControllerState } from '../../../shared/types';
 import type { ProducerCmd } from '../../../shared/engine';
@@ -29,6 +31,50 @@ const OP_LABEL: Record<string, string> = { 'create-scene': 'New scene', 'create-
 function Status({ s }: { s: TargetStatus }) {
   const v = STATUS[s];
   return <span title={v.hint} data-status={s} className="inline-flex h-[16px] items-center rounded-[2px] px-1 font-['Barlow_Condensed'] text-[10.5px] font-bold tracking-[0.06em]" style={{ color: v.color, border: `1px solid ${v.color}` }}>{v.label}</span>;
+}
+
+const HINT: Record<string, string | undefined> = {
+  suspendOffAir: 'Overdrive pages that OBS is not showing (not in Program, Preview or a projector) pause their videos and loops after 3 s, and resume the moment OBS shows them. Nothing is unloaded, so cuts and transitions are unchanged. Media playback and camera feeds never pause.',
+  perfMonitor: 'Every output reports its frame rate, slow frames and dropped video frames; OBS reports render and encoder stats. Leave off during shows unless you are measuring.',
+};
+
+/** Live performance table (OBS Setup → Performance monitor). */
+function PerfPanel() {
+  const r = usePerfReport();
+  if (!r || (!r.on && !r.suspendOffAir)) return null;
+  const o = r.obs;
+  const bad = (x: boolean) => (x ? { color: '#ffb3b5' } : undefined);
+  return (
+    <div className="flex-none border-b px-2.5 py-1.5 text-[11.5px]" style={{ borderColor: C.line }} data-perf-panel>
+      <div className="mb-1 flex flex-wrap items-center gap-x-4 gap-y-0.5 text-white/70">
+        <b className="text-white/85">Performance</b>
+        {o ? <>
+          <span style={bad(o.fps < 59)}>OBS {o.fps} fps</span>
+          <span style={bad(o.renderMs > 12)}>render {o.renderMs} ms/frame</span>
+          <span style={bad(o.renderSkipped > 0)}>render lag {o.renderSkipped}/{o.renderTotal} frames</span>
+          <span style={bad(o.outputSkipped > 0)}>encoder skipped {o.outputSkipped}/{o.outputTotal}</span>
+          <span>CPU {o.cpu}% · {o.memMB} MB</span>
+        </> : <span className="text-white/45">{r.on ? 'OBS stats appear when OBS is connected.' : 'Monitor off.'}</span>}
+        <span className="text-white/45">{r.suspendOffAir ? `off-air pausing on · ${Object.values(r.showing).filter(Boolean).length}/${Object.keys(r.showing).length} pages showing in OBS` : 'off-air pausing off'}</span>
+      </div>
+      {r.on && r.outputs.length > 0 && (
+        <table className="w-full text-left tabular-nums" data-perf-table>
+          <thead className="text-white/45"><tr><th className="font-normal">Page</th><th className="font-normal">Size</th><th className="font-normal">State</th><th className="font-normal">fps</th><th className="font-normal">p95 ms</th><th className="font-normal">slow frames</th><th className="font-normal">video drops</th><th className="font-normal">fonts</th></tr></thead>
+          <tbody>{r.outputs.map(p => (
+            <tr key={p.id} className="text-white/80">
+              <td className="font-mono">{p.route}</td>
+              <td>{p.w}×{p.h} ·{p.scale}× {p.raster}</td>
+              <td>{p.suspended ? 'paused (off air)' : r.showing[p.route] ? 'showing' : r.showing[p.route] === false ? 'off air' : 'not in OBS'}</td>
+              <td style={bad(!p.suspended && p.fps > 0 && p.fps < 55)}>{p.suspended ? '—' : p.fps}</td>
+              <td style={bad(!p.suspended && p.p95 > 20)}>{p.suspended ? '—' : p.p95}</td>
+              <td style={bad(p.long > 2)}>{p.long}</td>
+              <td style={bad(p.dropped > 0)}>{p.dropped}/{p.decoded}</td>
+              <td style={bad(!p.fontsReady)}>{p.fontsReady ? 'ok' : 'loading'}</td>
+            </tr>))}</tbody>
+        </table>
+      )}
+    </div>
+  );
 }
 
 export function ObsSetupPanel({ st, run }: { st: ControllerState; run: Run }) {
@@ -89,12 +135,20 @@ export function ObsSetupPanel({ st, run }: { st: ControllerState; run: Run }) {
             className="h-[22px] w-[230px] rounded-[2px] border border-white/15 bg-[#0b0b0c] px-1.5 font-mono text-[11px]" />
         </label>
         <span className="text-white/40" title={s?.baseReason}>{s?.options.baseUrl ? 'set by you' : `auto: ${s?.baseUrl ?? '…'}`} · {s?.baseReason}</span>
+        <label className="flex items-center gap-1 text-white/70" title="Size of every picture browser source Overdrive builds, and the OBS canvas it expects. Graphics are rendered natively at this size. Change OBS → Settings → Video to match, then Repair the scenes.">
+          Output
+          <select data-opt="profile" aria-label="Output resolution profile" disabled={busy} value={s?.options.profile ?? 'fhd'} onChange={e => opt({ profile: e.target.value as OutputProfileId }, 'Output profile')}
+            className="h-[22px] rounded border border-white/15 bg-[#1b1b1d] px-1 text-[12px] text-white">
+            {Object.values(OUTPUT_PROFILES).map(p => <option key={p.id} value={p.id}>{p.label}</option>)}
+          </select>
+        </label>
         <span className="ml-auto flex items-center gap-3">
-          {([['audio', 'Caster audio + music in every scene'], ['gameCapture', 'Game capture under gameplay'], ['legacy', 'Build All includes legacy duplicates']] as const).map(([k, l]) => (
-            <label key={k} className="flex items-center gap-1 text-white/70"><input type="checkbox" data-opt={k} checked={!!s?.options[k]} disabled={busy} onChange={e => opt({ [k]: e.target.checked }, l)} />{l}</label>
+          {([['suspendOffAir', 'Pause off-air sources'], ['perfMonitor', 'Performance monitor'], ['audio', 'Caster audio + music in every scene'], ['gameCapture', 'Game capture under gameplay'], ['legacy', 'Build All includes legacy duplicates']] as const).map(([k, l]) => (
+            <label key={k} className="flex items-center gap-1 text-white/70" title={HINT[k]}><input type="checkbox" data-opt={k} checked={!!s?.options[k]} disabled={busy} onChange={e => opt({ [k]: e.target.checked }, l)} />{l}</label>
           ))}
         </span>
       </div>
+      <PerfPanel />
       {(s?.controllerLeaks.length ?? 0) > 0 && (
         <div className="flex-none border-b px-2.5 py-1 text-[12px]" style={{ borderColor: C.line, background: 'rgba(229,72,77,.14)', color: '#ffb3b5' }} data-controller-leak>
           <b>On-air risk:</b> {s!.controllerLeaks.map(l => `“${l.input}”`).join(', ')} load{s!.controllerLeaks.length === 1 ? 's' : ''} an Overdrive controller page as an OBS browser source. Controllers belong in Docks, never in a scene: remove {s!.controllerLeaks.length === 1 ? 'it' : 'them'} in OBS (Overdrive never deletes OBS sources).
@@ -167,7 +221,7 @@ export function ObsSetupPanel({ st, run }: { st: ControllerState; run: Run }) {
               <Row k="OBS scene" v={cur.scene} />
               <Row k="Browser source" v={cur.input} />
               {cur.url && <Row k="URL" v={cur.url} mono />}
-              {cur.kind !== 'support' && <Row k="Size" v="1920×1080, full canvas" />}
+              {cur.kind !== 'support' && <Row k="Size" v={`${profileOf(s?.options.profile).w}×${profileOf(s?.options.profile).h}, full canvas (${profileOf(s?.options.profile).label}; designed on the 1920×1080 grid)`} />}
               {s?.map[cur.id] && <Row k="Mapping" v={`scene ${s.map[cur.id].sceneUuid?.slice(-8) ?? '—'} · source ${s.map[cur.id].inputUuid?.slice(-8) ?? '—'} · item ${s.map[cur.id].itemId ?? '—'}`} mono />}
               {cur.issues.length > 0 && <Section t="To fix">{cur.issues.map((x, i) => <li key={i}>{x}</li>)}</Section>}
               {cur.unmanaged.length > 0 && <Section t="Not managed by Overdrive (kept as is)">{cur.unmanaged.map((x, i) => <li key={i}>{x}</li>)}</Section>}

@@ -377,17 +377,17 @@ export function createObsSetup(d: ObsSetupDeps) {
       try {
         const st = await s.settingsOf(name); const r = typeof st.url === 'string' ? routeOf(st.url) : null;
         if (isControllerRoute(r)) leaks.push({ input: name, url: String(st.url) });
-        else if (nativeSizeOf(r)) pictures.push({ name, route: r!, st });
+        else if (nativeSizeOf(r, opts().profile)) pictures.push({ name, route: r!, st });
       } catch {}
     }
     // picture quality (read-only): OBS canvas/output, and every Overdrive picture source wherever it is used
-    quality = canvasQuality(s.canvas);
+    quality = canvasQuality(s.canvas, opts().profile);
     if (pictures.length) {
       const uses = new Map<string, { scene: string; transform: any }[]>();
       for (const scene of s.scenes.keys()) {
         try { for (const it of await s.itemsOf(scene)) if (pictures.some(p => p.name === it.sourceName)) { const l = uses.get(it.sourceName) ?? []; l.push({ scene, transform: it.sceneItemTransform }); uses.set(it.sourceName, l); } } catch {}
       }
-      for (const p of pictures) quality.push(...sourceQuality(p.name, p.route, p.st, uses.get(p.name) ?? []));
+      for (const p of pictures) quality.push(...sourceQuality(p.name, p.route, p.st, uses.get(p.name) ?? [], opts().profile));
     }
     // orphans: mapped outputs that no longer exist (never deleted from OBS)
     for (const [k, e] of Object.entries(d.store().map)) if (k !== 'support:audio' && !all.some(t => t.id === k)) reports.push({ id: k, name: `${k} (removed from Overdrive)`, kind: k.startsWith('g:') ? 'gfx' : 'source', scene: e.scene, input: e.input, url: e.url, status: 'unknown', issues: ['This output no longer exists in Overdrive. Its OBS scene is kept: delete it in OBS if you no longer need it.'], unmanaged: [], onAir: e.scene === s.program, inAll: false });
@@ -495,6 +495,9 @@ export function createObsSetup(d: ObsSetupDeps) {
       if (typeof o.audio === 'boolean') cur.audio = o.audio;
       if (typeof o.gameCapture === 'boolean') cur.gameCapture = o.gameCapture;
       if (typeof o.legacy === 'boolean') cur.legacy = o.legacy;
+      if (o.profile === 'uhd' || o.profile === 'fhd') cur.profile = o.profile;
+      if (typeof o.suspendOffAir === 'boolean') cur.suspendOffAir = o.suspendOffAir;
+      if (typeof o.perfMonitor === 'boolean') cur.perfMonitor = o.perfMonitor;
       if (typeof o.baseUrl === 'string') {
         const v = o.baseUrl.trim().replace(/\/$/, '');
         if (v && !/^https?:\/\/[^\s/?#]+$/i.test(v)) return 'The base URL must look like http://192.168.1.20:8787 (no path).';

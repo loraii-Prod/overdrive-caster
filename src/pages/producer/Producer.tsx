@@ -10,6 +10,7 @@
  *     STUDIO         Library · Studio tabs (packages, instances & OBS, talent, bindings, modules, assets, show) · Publish …
  * Selecting anything only changes this workspace: it never airs, never switches OBS, never animates.
  */
+import { feedPerf } from '../../lib/perfStore';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import type { CasterId, ControllerState, ScreenId } from '../../../shared/types';
 import { applyDraft, draftLabel, type EngineState, type ProducerCmd } from '../../../shared/engine';
@@ -88,6 +89,7 @@ const selOfTarget = (t: string) => (t.startsWith('g:') ? t : t.replace(/^s:/, ''
  */
 export function Producer({ onLogout, dock }: { onLogout: () => void; dock?: string }) {
   const sock = useSocket({ role: 'controller' });
+  useEffect(() => feedPerf(sock), [sock]);
   const conn = useConnState(sock);
   const [st, setSt] = useState<ControllerState | null>(null);
   const [skew, setSkew] = useState(0);

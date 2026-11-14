@@ -1,3 +1,4 @@
+import { createPerf, type Perf } from './perf';
 import { SEATS, SEAT_LABELS, seatOf, talentLabel, type Seat } from '../shared/talent';
 import { createEngine, type Engine } from './engine';
 import type { ProducerCmd, TransitionKind } from '../shared/engine';
@@ -49,7 +50,8 @@ export function createHub(server: Server) {
   const publishers = new Map<CasterId, string>();
 
   let stateTimer: NodeJS.Timeout | null = null;
-  const obs = new ObsBridge(() => pushState(), { url: db.obsUrl, password: db.obsPassword }, () => { void obsSetup.scan(); });
+  let perf: Perf | null = null; // assigned below; the OBS bridge may report changes while it is being constructed
+  const obs = new ObsBridge(() => { pushState(); perf?.kick(); }, { url: db.obsUrl, password: db.obsPassword }, () => { void obsSetup.scan(); perf?.kick(); });
   // OBS Scene Builder: one OBS scene per Overdrive output, over the same OBS connection. Never switches OBS.
   const obsSetup = createObsSetup({
     call: () => (obs.status.connected ? obs.request : null),
@@ -63,7 +65,7 @@ export function createHub(server: Server) {
     lanUrls: () => lanUrls(),
     publicUrl: () => publicOrigin(),
     save: () => save(),
-    onChange: () => pushState(),
+    onChange: () => { pushState(); perf?.kick(); },
     applyMapping: built => {
       let gfxChanged = false;
       const scenes = { ...db.showLive.obsScenes };
@@ -83,6 +85,14 @@ export function createHub(server: Server) {
       save();
       if (gfxChanged) pushGfx();
     },
+  });
+  // Off-air suspension + live performance monitor (both off until the producer enables them in OBS Setup).
+  perf = createPerf({
+    call: () => (obs.status.connected ? obs.request : null),
+    opts: () => db.obsSetup.options,
+    outputs: () => [...clients.values()].filter(c => c.role === 'output' && c.route).map(c => ({ id: c.id, route: c.route! })),
+    send: (id, msg) => send(clients.get(id), msg),
+    report: r => each(c => c.role === 'controller', { t: 'perf', perf: r }),
   });
   const tw = new Twitch(db.twitch, save, () => pushState(), () => each(c => c.role === 'output' || c.role === 'controller' || c.role === 'crew', { t: 'twitch', tw: tw.pub }));
 
@@ -784,6 +794,8 @@ export function createHub(server: Server) {
     if (c.role === 'controller' || c.role === 'contributor' || c.role === 'crew') send(c, { t: 'ros', ros: db.ros, now: Date.now() });
     if (c.role === 'contributor' && c.slot && !c.talent) send(c, casterInfo(c.slot));
     if (c.role === 'output' || c.role === 'controller') { send(c, mediaMsg()); send(c, gfxMsg()); }
+    if (c.role === 'output') perf?.joined();
+    if (c.role === 'controller' && perf) send(c, { t: 'perf', perf: perf.report() });
     if (c.role === 'controller') send(c, { t: 'state', state: controllerState() });
     if (c.role !== 'contributor') { send(c, { t: 'tournament', tournament: db.tournament }); send(c, matchDataMsg()); }
     if (wcAudience(c)) { send(c, wcMsg()); send(c, { t: 'twitch', tw: tw.pub }); }
@@ -808,6 +820,12 @@ export function createHub(server: Server) {
     }
 
     if (m.t === 'media-ended' && c.role === 'output') { engine?.mediaEnded(Number(m.seq)); return; }
+    if (m.t === 'out-perf' && c.role === 'output' && m.perf && typeof m.perf === 'object') {
+      const p = m.perf as unknown as Record<string, unknown>, n = (k: string) => (Number.isFinite(Number(p[k])) ? Number(p[k]) : 0);
+      perf?.sample(c.id, { route: String(c.route ?? p.route ?? '?').slice(0, 64), w: n('w'), h: n('h'), scale: n('scale'), raster: String(p.raster ?? '').slice(0, 12), suspended: p.suspended === true,
+        fps: n('fps'), p95: n('p95'), long: n('long'), videos: n('videos'), dropped: n('dropped'), decoded: n('decoded'), fontsReady: p.fontsReady !== false, ...(p.heapMB != null ? { heapMB: n('heapMB') } : {}) });
+      return;
+    }
     if (m.t === 'gfx-health' && c.role === 'output' && typeof m.id === 'string' && db.graphics.some(g => g.id === m.id)) {
       gfxHealth[m.id] = { ok: m.ok === true, error: typeof m.error === 'string' ? m.error.slice(0, 300) : undefined, at: Date.now() };
       return pushState();

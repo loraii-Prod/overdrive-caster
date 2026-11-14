@@ -30,7 +30,7 @@ export function MediaView({ media, skew, onEnded, preview = false }: { media: Me
   // Images have no end: they hold until the producer moves on (auto-advance applies to video/audio).
   const ended = () => { if (media && !preview) onEnded?.(media.seq); };
   if (!url) return <div className="absolute inset-0" />;
-  if (isVideo(url)) return <video key={url} ref={v} src={url} className="absolute inset-0 h-full w-full bg-black object-contain" playsInline onEnded={ended} />;
+  if (isVideo(url)) return <video key={url} ref={v} src={url} data-od-nosuspend className="absolute inset-0 h-full w-full bg-black object-contain" playsInline onEnded={ended} />;
   if (isAudio(url)) return (
     <div className="absolute inset-0 grid place-items-center">
       <audio key={url} ref={v} src={url} onEnded={ended} />

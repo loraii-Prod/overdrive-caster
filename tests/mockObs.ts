@@ -17,6 +17,13 @@ export class MockObs {
   program = 'Scene';
   preview = 'Scene';
   studioMode = false;
+  projected = new Set<string>();
+  /** Is source `n` drawn when scene `scene` is drawn (enabled items, nested scenes)? */
+  reaches(scene: string, n: string, seen = new Set<string>()): boolean {
+    if (scene === n) return true;
+    const sc = this.scenes.get(scene); if (!sc || seen.has(scene)) return false; seen.add(scene);
+    return sc.items.some(i => i.enabled !== false && (i.source === n || this.reaches(i.source, n, seen)));
+  }
   connected = true;
   log: { req: string; data?: any }[] = [];
   /** Fail a request (returns an error message) — partial failure tests. */
@@ -40,11 +47,15 @@ export class MockObs {
     const f = this.failOn?.(req, data);
     if (f) this.err(702, f);
     switch (req) {
-      case 'GetVersion': return { obsVersion: '31.0.0 (mock)', obsWebSocketVersion: '5.5.0 (mock)', rpcVersion: 1, availableRequests: ['GetVersion', 'GetVideoSettings', 'GetSceneList', 'GetInputList', 'GetInputKindList', 'GetSceneItemList', 'GetInputSettings', 'CreateScene', 'CreateInput', 'SetInputSettings', 'CreateSceneItem', 'SetSceneItemTransform', 'SetSceneItemEnabled', 'SetSceneItemIndex', 'SetCurrentProgramScene'] };
+      case 'GetVersion': return { obsVersion: '31.0.0 (mock)', obsWebSocketVersion: '5.5.0 (mock)', rpcVersion: 1, availableRequests: ['GetVersion', 'GetVideoSettings', 'GetSceneList', 'GetInputList', 'GetInputKindList', 'GetSceneItemList', 'GetInputSettings', 'CreateScene', 'CreateInput', 'SetInputSettings', 'CreateSceneItem', 'SetSceneItemTransform', 'SetSceneItemEnabled', 'SetSceneItemIndex', 'SetCurrentProgramScene', 'GetSourceActive', 'GetStats'] };
       case 'GetVideoSettings': return { ...this.video };
       case 'GetSceneList': return { currentProgramSceneName: this.program, currentPreviewSceneName: this.studioMode ? this.preview : null,
         scenes: [...this.scenes].map(([n, s], i) => ({ sceneName: n, sceneUuid: s.uuid, sceneIndex: this.scenes.size - 1 - i })).reverse() };
-      case 'GetInputList': return { inputs: [...this.inputs].map(([n, i]) => ({ inputName: n, inputUuid: i.uuid, inputKind: i.kind, unversionedInputKind: i.kind })) };
+      case 'GetInputList': return { inputs: [...this.inputs].filter(([, i]) => !data?.inputKind || i.kind === data.inputKind).map(([n, i]) => ({ inputName: n, inputUuid: i.uuid, inputKind: i.kind, unversionedInputKind: i.kind })) };
+      // OBS semantics: active = drawn in Program (nested scenes included, enabled items only); showing = active or in
+      // the Studio-Mode Preview (or a projector: `projected`).
+      case 'GetSourceActive': { const n = this.name(data.sourceName); const active = this.reaches(this.program, n); return { videoActive: active, videoShowing: active || (this.studioMode && this.reaches(this.preview, n)) || this.projected.has(n) }; }
+      case 'GetStats': return { cpuUsage: 7.5, memoryUsage: 812.4, availableDiskSpace: 1e5, activeFps: 60, averageFrameRenderTime: 3.21, renderSkippedFrames: 0, renderTotalFrames: 36000, outputSkippedFrames: 0, outputTotalFrames: 36000, webSocketSessionIncomingMessages: 0, webSocketSessionOutgoingMessages: 0 };
       case 'GetInputKindList': return { inputKinds: this.kinds };
       case 'GetSceneItemList': {
         const s = this.scene(data.sceneName);

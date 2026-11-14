@@ -224,6 +224,36 @@ const browserInputs = (m: MockObs) => [...m.inputs].filter(([, i]) => i.kind ===
     check('quality check is read-only (no OBS write while verifying)', A.obs.log.filter(l => !l.req.startsWith('Get')).length === writes1 && writes1 >= writes0 && A.b.state().canvas?.ow === 1280);
   }
 
+  // ---- output resolution profiles (4K native) ----
+  {
+    check('profiles: 1080p stays the default for existing setups', defaultObsSetup().options.profile === 'fhd' && sanitizeObsSetup({ options: { audio: true } }).options.profile === 'fhd' && sanitizeObsSetup({ options: { profile: 'uhd' } }).options.profile === 'uhd' && sanitizeObsSetup({ options: { profile: '8k' } }).options.profile === 'fhd');
+    const t4 = discoverTargets(sanitizeGraphics([]), defaultShow().obsScenes, { audio: true, gameCapture: true, profile: 'uhd' });
+    check('profiles: under 4K every picture target is 3840×2160 (same routes, same scenes)', t4.length > 10 && t4.every(t => t.width === 3840 && t.height === 2160)
+      && JSON.stringify(t4.map(t => [t.id, t.route, t.scene])) === JSON.stringify(discoverTargets(sanitizeGraphics([]), defaultShow().obsScenes, { audio: true, gameCapture: true }).map(t => [t.id, t.route, t.scene])));
+    check('profiles: native sizes ×2 under 4K, controls pages too', nativeSizeOf('/g/caster-desk', 'uhd')?.w === 3840 && nativeSizeOf('/output/screen/brb', 'uhd')?.h === 2160 && nativeSizeOf('/output/casters?controls&token=x', 'uhd')?.h === 2960 && nativeSizeOf('/output/music', 'uhd') === null);
+    check('profiles: 4K canvas + 1080p output is a supported setup; 4K canvas under the 1080p profile is reported with both fixes',
+      canvasQuality({ w: 3840, h: 2160, ow: 1920, oh: 1080, fps: 60 }, 'uhd').length === 0 && canvasQuality({ w: 3840, h: 2160, ow: 3840, oh: 2160, fps: 60 }, 'uhd').length === 0
+      && canvasQuality({ w: 1920, h: 1080 }, 'uhd').length === 1 && /switch the output profile/.test(canvasQuality({ w: 3840, h: 2160 }, 'fhd')[0]?.fix ?? '')
+      && canvasQuality({ w: 3840, h: 2160, ow: 1280, oh: 720 }, 'uhd').length === 1 && canvasQuality({ w: 1920, h: 1080, fps: 30 }).length === 1);
+    check('profiles: a 1920×1080 source under the 4K profile is reported (OBS would upscale it)', sourceQuality('x', '/g/caster-desk', { width: 1920, height: 1080 }, [], 'uhd').length === 1 && sourceQuality('x', '/g/caster-desk', { width: 3840, height: 2160 }, [], 'uhd').length === 0);
+    // switching a built 1080p setup to 4K: verify shows each scene outdated (wrong size), repair resizes, nothing else changes
+    const P = rig(); P.obs.video = { ...P.obs.video, baseWidth: 3840, baseHeight: 2160, outputWidth: 1920, outputHeight: 1080 };
+    await P.build('build', 'all');
+    await P.b.scan(); const before = P.b.state().targets; const okBefore = before.filter(x => x.inAll && x.kind !== 'support' && x.status === 'ok').length;
+    const w0 = P.obs.log.filter(l => !l.req.startsWith('Get')).length;
+    P.b.setOptions({ profile: 'uhd' });
+    const w1 = P.obs.log.filter(l => !l.req.startsWith('Get')).length;
+    await P.b.scan(); const after = P.b.state().targets;
+    const out4 = after.filter(x => x.inAll && x.status === 'outdated');
+    check('profiles: switching to 4K writes nothing to OBS by itself', w1 === w0);
+    check('profiles: after switching, every built scene reports the 1920×1080 size as outdated', out4.length === okBefore && out4.every(x => x.issues.some(i => /3840×2160/.test(i))), `${out4.length}/${okBefore} ${JSON.stringify(after.filter(x => x.inAll && x.status !== 'outdated').map(x => [x.id, x.status, x.issues]))}`);
+    const rep = await P.build('repair', 'all');
+    const inputs = [...P.obs.inputs.values()].filter((i: any) => i.kind === 'browser_source' && /\/(g|output)\//.test(i.settings?.url ?? '') && !/\/output\/(audio|music)/.test(i.settings?.url));
+    await P.b.scan(); const again = P.b.state().targets;
+    check('profiles: Repair resizes the sources to 3840×2160 (only after confirming the plan)', !('error' in rep) && inputs.length > 0 && inputs.every((i: any) => i.settings.width === 3840 && i.settings.height === 2160) && again.filter(x => x.inAll).every(x => x.status === 'ok'), JSON.stringify(inputs.slice(0, 2).map((i: any) => [i.settings.width, i.settings.height])));
+    check('profiles: 4K canvas + 4K sources = no quality findings', (await P.b.verify(), P.b.state().quality.length === 0), JSON.stringify(P.b.state().quality));
+  }
+
   console.log(`\n${ok} passed, ${bad} failed`);
   process.exit(bad ? 1 : 0);
 })();

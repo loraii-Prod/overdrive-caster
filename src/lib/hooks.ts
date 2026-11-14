@@ -1,3 +1,4 @@
+import { attachOutputRuntime } from './outputRuntime';
 import type { TransitionKind } from '../../shared/engine';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Socket, type ConnState } from './socket';
@@ -14,6 +15,8 @@ export function useSocket(hello: { role: Role; route?: string; slot?: CasterId; 
   useEffect(() => () => sock.close(), [sock]);
   // Producer recovery: every browser source reloads (and resyncs from the server) on request.
   useEffect(() => (hello.role === 'output' ? sock.on(m => { if (m.t === 'reload') window.location.reload(); }) : undefined), [sock]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Off-air suspension + performance monitor (both off unless the producer enables them).
+  useEffect(() => (hello.role === 'output' ? attachOutputRuntime(sock, hello.route ?? '?') : undefined), [sock]); // eslint-disable-line react-hooks/exhaustive-deps
   return sock;
 }
 

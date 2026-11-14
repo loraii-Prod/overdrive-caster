@@ -44,6 +44,7 @@ export interface PackageDef {
   category: 'Desk' | 'Game' | 'Overlay' | 'Bracket' | 'Intermission' | 'Interview' | 'Media';
   description: string;
   renderer: string;
+  /** LOGICAL size (1920×1080 grid units); the device size comes from the output profile (×2 at 4K). */
   resolution: [number, number];
   props: PropDef[];
   bindings: Binding[];

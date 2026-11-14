@@ -1,6 +1,6 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
-import { BNL, compose, CANVAS } from '../../shared/layout';
+import { BNL, compose, CANVAS, deviceScale } from '../../shared/layout';
 import type { Caster, ForcedLayout, Rect, Scene, ThemeId, Tile } from '../../shared/types';
 import type { RtcViewer } from '../lib/rtcViewer';
 import { BgVideo, Logo, Mark, Pattern } from './Brand';
@@ -32,25 +32,69 @@ interface Props {
   theme?: ThemeId;
 }
 
-/** Fixed 1920x1080 canvas, uniformly scaled to fit its parent. */
-export function ScaledCanvas({ children, className = '' }: { children: ReactNode; className?: string }) {
+/**
+ * The 1920×1080 LOGICAL canvas, scaled to fit its parent.
+ *
+ * Previews (Studio, Controller, Admin) get an exact fit at any size. Broadcast outputs (`output`) render natively at
+ * the browser source's size: 3840×2160 → exactly 2 device px per unit, 1920×1080 → 1. Text, SVG and CSS shapes are
+ * rasterised at that device size (measured identical to Chrome's own 2× rendering), images and video keep their pixels.
+ * Outputs also hold the first paint until the bundled fonts are ready (no fallback-font frame on air).
+ *
+ * `?raster=zoom` switches outputs from a transform to CSS zoom (layout-level scaling) for A/B tests in real OBS.
+ */
+export function ScaledCanvas({ children, className = '', output = false }: { children: ReactNode; className?: string; output?: boolean }) {
   const ref = useRef<HTMLDivElement>(null);
-  const [s, setS] = useState(1);
+  const [box, setBox] = useState<{ w: number; h: number }>({ w: CANVAS.w, h: CANVAS.h });
   useLayoutEffect(() => {
     const el = ref.current!;
-    const fit = () => setS(Math.min(el.clientWidth / CANVAS.w, el.clientHeight / CANVAS.h) || 1);
+    const fit = () => { if (el.clientWidth && el.clientHeight) setBox({ w: el.clientWidth, h: el.clientHeight }); };
     fit();
     const ro = new ResizeObserver(fit);
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
+  const ready = useFontsReady(output);
+  const s = output ? deviceScale(box.w, box.h) : Math.min(box.w / CANVAS.w, box.h / CANVAS.h) || 1;
+  // An exact whole-number fit that fills the box is anchored at 0,0: no centring offset, every unit on whole device pixels.
+  const exact = output && Number.isInteger(s) && box.w === CANVAS.w * s && box.h === CANVAS.h * s;
+  const zoom = exact && rasterMode() === 'zoom';
+  const style: CSSProperties = zoom
+    ? { position: 'absolute', left: 0, top: 0, width: CANVAS.w, height: CANVAS.h, zoom: s }
+    : exact
+      ? { position: 'absolute', left: 0, top: 0, width: CANVAS.w, height: CANVAS.h, transform: s === 1 ? undefined : `scale(${s})`, transformOrigin: '0 0' }
+      : { position: 'absolute', left: '50%', top: '50%', width: CANVAS.w, height: CANVAS.h, transform: `translate(-50%, -50%) scale(${s})`, transformOrigin: 'center' };
   return (
-    <div ref={ref} className={`relative h-full w-full overflow-hidden ${className}`}>
-      <div className="absolute left-1/2 top-1/2" style={{ width: CANVAS.w, height: CANVAS.h, transform: `translate(-50%, -50%) scale(${s})`, transformOrigin: 'center' }}>
+    <div ref={ref} className={`relative h-full w-full overflow-hidden ${className}`}
+      {...(output ? { 'data-od-canvas': `${box.w}x${box.h}`, 'data-od-scale': String(Math.round(s * 1000) / 1000), 'data-od-raster': zoom ? 'zoom' : 'transform', 'data-od-ready': ready ? '1' : '0' } : {})}>
+      <div style={{ ...style, ...(ready ? {} : { visibility: 'hidden' }) }}>
         {children}
       </div>
     </div>
   );
+}
+
+const rasterMode = (): 'transform' | 'zoom' => (typeof location !== 'undefined' && new URLSearchParams(location.search).get('raster') === 'zoom' ? 'zoom' : 'transform');
+
+/** Every bundled broadcast face (fontsource + Wildcard). Loading them up front avoids a fallback-font frame when data arrives. */
+const BROADCAST_FACES = [
+  '400 1em Inter', '500 1em Inter', '600 1em Inter', '700 1em Inter', '600 1em Sora', '700 1em Sora', '400 1em "Bebas Neue"',
+  '500 1em "Barlow Condensed"', '600 1em "Barlow Condensed"', '700 1em "Barlow Condensed"', '400 1em "WC Anton"',
+  '600 1em "WC Montserrat"', '700 1em "WC Montserrat"', '800 1em "WC Montserrat"', 'italic 600 1em "WC Montserrat"',
+  'italic 700 1em "WC Montserrat"', 'italic 800 1em "WC Montserrat"', 'italic 900 1em "WC Montserrat"',
+];
+let fontsDone = false;
+/** True once the broadcast fonts are loaded (or after 2.5 s, so a missing font never keeps a source blank). */
+function useFontsReady(enabled: boolean) {
+  const [ok, setOk] = useState(!enabled || fontsDone || typeof document === 'undefined' || !document.fonts);
+  useEffect(() => {
+    if (ok) return;
+    let live = true;
+    const done = () => { fontsDone = true; if (live) setOk(true); };
+    const t = setTimeout(done, 2500);
+    Promise.allSettled(BROADCAST_FACES.map(f => document.fonts.load(f))).then(() => document.fonts.ready).then(() => { clearTimeout(t); done(); });
+    return () => { live = false; clearTimeout(t); };
+  }, [ok]);
+  return ok;
 }
 
 export function Stage(props: Props) {

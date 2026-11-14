@@ -1,6 +1,35 @@
 import type { Caster, Composition, ForcedLayout, Rect, Scene, ThemeId, Tile, TileKind } from './types';
 
+/**
+ * The LOGICAL canvas every graphic is designed on (1 unit = 1 px at 1080p, 2 px at 4K). Positions, sizes and
+ * fonts stay in these units; the output profile only decides how many device pixels each unit gets.
+ */
 export const CANVAS = { w: 1920, h: 1080 } as const;
+
+/** Output resolution profiles. The picture is rendered natively at the profile size (never captured and stretched). */
+export type OutputProfileId = 'uhd' | 'fhd';
+export interface OutputProfile { id: OutputProfileId; label: string; w: number; h: number; /** device px per logical unit */ scale: number }
+export const OUTPUT_PROFILES: Record<OutputProfileId, OutputProfile> = {
+  uhd: { id: 'uhd', label: '4K UHD 3840×2160', w: 3840, h: 2160, scale: 2 },
+  fhd: { id: 'fhd', label: '1080p 1920×1080', w: 1920, h: 1080, scale: 1 },
+};
+/** Existing setups keep 1080p until the producer switches. */
+export const DEFAULT_PROFILE: OutputProfileId = 'fhd';
+export const profileOf = (id: unknown): OutputProfile => OUTPUT_PROFILES[id === 'uhd' ? 'uhd' : 'fhd'];
+/** Device size of a picture of `logical` size (e.g. a 1920×1080 graphic) under a profile. */
+export const deviceSize = (logical: { w: number; h: number }, p: OutputProfile) => ({ w: Math.round(logical.w * p.scale), h: Math.round(logical.h * p.scale) });
+
+/**
+ * Device pixels per logical unit for a box of w×h device px. A value within 0.5 % of a whole number is snapped to it
+ * (3840 → exactly 2), so text, borders and hairlines land on whole device pixels; anything else (a preview pane)
+ * gets the exact fit.
+ */
+export function deviceScale(w: number, h: number): number {
+  const s = Math.min(w / CANVAS.w, h / CANVAS.h);
+  if (!(s > 0)) return 1;
+  const r = Math.round(s);
+  return r >= 1 && Math.abs(s - r) / r < 0.005 ? r : s;
+}
 
 /** 16:9 camera geometry for 1, 2 and 3 tiles on a 1920x1080 canvas. */
 const VIDEO_RECTS: Record<number, Rect[]> = {

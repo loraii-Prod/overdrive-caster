@@ -140,13 +140,13 @@ export function Output({ route, kind }: { route: string; kind: OutputKind }) {
     return (
       <div className="fixed inset-0 flex flex-col">
         <div className="relative flex-none" style={{ height: '56.25vw' }}>
-          <ScaledCanvas>
+          <ScaledCanvas output>
             <ThemeProvider theme={live.show.theme} brand={live.show.brand}>
               <div className="od-stage relative h-[1080px] w-[1920px] overflow-hidden" data-theme={live.show.theme}>{body}</div>
             </ThemeProvider>
           </ScaledCanvas>
         </div>
-        <div className="min-h-0 flex-1 overflow-auto bg-[#101010] p-3 text-white" style={{ zoom: 1.6 }}>
+        <div className="min-h-0 flex-1 overflow-auto bg-[#101010] p-3 text-white" style={{ zoom: 1.6 * Math.max(1, window.innerWidth / 1920) }}>
           {!token && <div className="mb-2 text-[12px] text-amber-300">Add &amp;token=… (Controller → Settings → Integrations) to this address so these buttons can change the show.</div>}
           <SceneDock live={screen} preview={screen} show={live.show} wc={wc} now={now} send={post} quick={op => post({ t: 'quick', op })}
             twConnected={!!wc?.tw?.connected} casters={live.scene.casters} screens={kind.k === 'program'} />
@@ -158,7 +158,7 @@ export function Output({ route, kind }: { route: string; kind: OutputKind }) {
 
   return (
     <div className="fixed inset-0">
-      <ScaledCanvas>
+      <ScaledCanvas output>
         <ThemeProvider theme={live?.show.theme ?? 'bnl'} brand={live?.show.brand ?? null}>
           <div className="od-stage relative h-[1080px] w-[1920px] overflow-hidden" data-theme={live?.show.theme ?? 'bnl'}>{body}</div>
         </ThemeProvider>
@@ -243,7 +243,7 @@ export function GraphicOutput() {
   if (graphics && !inst) return <div className="fixed inset-0 grid place-items-center font-mono text-[14px] text-white/60">Unknown graphic “{id}”</div>;
   return (
     <div className="fixed inset-0">
-      <ScaledCanvas>
+      <ScaledCanvas output>
         <ThemeProvider theme={live?.show.theme ?? 'bnl'} brand={live?.show.brand ?? null}>
           <div className="od-stage relative h-[1080px] w-[1920px] overflow-hidden" data-theme={live?.show.theme ?? 'bnl'}>
             {inst && live && <GraphicHost inst={inst} d={{ scene: live.scene, show: live.show, wc, now, tournament, bnl, viewer }} onHealth={health} />}

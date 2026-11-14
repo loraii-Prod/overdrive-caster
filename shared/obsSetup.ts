@@ -1,7 +1,8 @@
 /**
  * OBS Scene Builder (Studio Mode → OBS Setup).
  *
- * Every Overdrive output becomes ITS OWN OBS scene holding ITS OWN 1920×1080 browser source:
+ * Every Overdrive output becomes ITS OWN OBS scene holding ITS OWN full-canvas browser source (sized by the output profile:
+ * 3840×2160 for 4K, 1920×1080 for 1080p):
  *  - every graphics-engine instance  → /g/<instance>
  *  - every registered scene source   → its /output/… route (legacy screens included)
  * Never one master scene, never a shared /output/program source. OBS keeps switching between these scenes;
@@ -11,6 +12,7 @@ import { pkgById, type GfxInstance } from './gfx';
 import { REGISTRY } from './registry';
 import { SCREEN_LABELS } from './defaults';
 import type { ScreenId } from './types';
+import { CANVAS, DEFAULT_PROFILE, profileOf, type OutputProfileId } from './layout';
 
 export type TargetKind = 'gfx' | 'screen' | 'source' | 'support';
 
@@ -47,6 +49,12 @@ export interface ObsSetupOptions {
   legacy: boolean;
   /** Base URL OBS uses to reach Overdrive ('' = automatic). */
   baseUrl: string;
+  /** Output resolution profile: the size of every picture browser source and the expected OBS canvas. */
+  profile: OutputProfileId;
+  /** Pause videos/loops in Overdrive pages OBS is not showing (Program/Preview/projector). Off by default. */
+  suspendOffAir: boolean;
+  /** Live performance monitor: outputs report frame timing, OBS reports render/encode stats. Off by default. */
+  perfMonitor: boolean;
 }
 
 /** Persistent mapping: Overdrive output ↔ OBS objects. */
@@ -131,14 +139,16 @@ export interface ObsSetupState {
 export interface QualityIssue { where: string; issue: string; fix: string }
 
 /**
- * Native OBS browser-source size of an Overdrive page: every picture output is drawn 1:1 on a 1920×1080 canvas
- * (`?controls` pages are 1920×1480: picture + controls). null = not a picture (audio, music, control pages).
+ * Native OBS browser-source size of an Overdrive page under an output profile: every picture output is the 1920×1080
+ * logical canvas at the profile's scale (3840×2160 at 4K). `?controls` pages are 1920×1480 logical (picture + controls).
+ * null = not a picture (audio, music, control pages).
  */
-export function nativeSizeOf(route: string | null): { w: number; h: number } | null {
+export function nativeSizeOf(route: string | null, profile: OutputProfileId = DEFAULT_PROFILE): { w: number; h: number } | null {
   if (!route) return null;
   const [path, q = ''] = route.split('?');
   if (!/^\/(output|g)\//.test(path) || /^\/output\/(audio|music)(\/|$)/.test(path)) return null;
-  return new URLSearchParams(q).has('controls') ? { w: 1920, h: 1480 } : { w: 1920, h: 1080 };
+  const k = profileOf(profile).scale;
+  return new URLSearchParams(q).has('controls') ? { w: 1920 * k, h: 1480 * k } : { w: CANVAS.w * k, h: CANVAS.h * k };
 }
 
 /** How much OBS resizes a scene item when drawing it (1 = pixel for pixel). */
@@ -154,8 +164,9 @@ export function itemScale(tr: any, srcW: number, srcH: number): { x: number; y: 
 }
 
 /** Quality findings for one Overdrive browser source and the scene items that show it. */
-export function sourceQuality(input: string, route: string, settings: any, items: { scene: string; transform: any }[]): QualityIssue[] {
-  const n = nativeSizeOf(route);
+export function sourceQuality(input: string, route: string, settings: any, items: { scene: string; transform: any }[], profile: OutputProfileId = DEFAULT_PROFILE): QualityIssue[] {
+  const n = nativeSizeOf(route, profile);
+  const P = profileOf(profile);
   if (!n) return [];
   const out: QualityIssue[] = [];
   const w = Number(settings?.width) || 800, h = Number(settings?.height) || 600;
@@ -165,23 +176,33 @@ export function sourceQuality(input: string, route: string, settings: any, items
   }
   for (const it of items) {
     const s = itemScale(it.transform, w, h);
-    if (Math.abs(s.x - 1) > 0.005 || Math.abs(s.y - 1) > 0.005) out.push({ where: `${input} in “${it.scene}”`, issue: `drawn at ${s.x === s.y ? `${Math.round(s.x * 1000) / 10}%` : `${Math.round(s.x * 1000) / 10}% × ${Math.round(s.y * 1000) / 10}%`} of its size, so OBS resamples every pixel`, fix: 'Right-click the source → Transform → Reset Transform (it then fills a 1920×1080 canvas 1:1).' });
+    if (Math.abs(s.x - 1) > 0.005 || Math.abs(s.y - 1) > 0.005) out.push({ where: `${input} in “${it.scene}”`, issue: `drawn at ${s.x === s.y ? `${Math.round(s.x * 1000) / 10}%` : `${Math.round(s.x * 1000) / 10}% × ${Math.round(s.y * 1000) / 10}%`} of its size, so OBS resamples every pixel`, fix: `Right-click the source → Transform → Reset Transform (it then fills a ${P.w}×${P.h} canvas 1:1).` });
   }
   return out;
 }
 
-/** Quality findings for the OBS video settings. */
-export function canvasQuality(v: { w: number; h: number; ow?: number; oh?: number; fps?: number }): QualityIssue[] {
+/**
+ * Quality findings for the OBS video settings, against the output profile. Under the 4K profile a 3840×2160 canvas with
+ * a 1920×1080 output is a supported setup (4K graphics, 1080p broadcast: OBS downscales once, at the end).
+ */
+export function canvasQuality(v: { w: number; h: number; ow?: number; oh?: number; fps?: number }, profile: OutputProfileId = DEFAULT_PROFILE): QualityIssue[] {
   const out: QualityIssue[] = [];
-  if (v.w !== 1920 || v.h !== 1080) out.push({ where: 'OBS video settings', issue: `base canvas is ${v.w}×${v.h}: every 1920×1080 Overdrive source has to be resized to fit it`, fix: 'Settings → Video → Base (Canvas) Resolution: 1920×1080.' });
-  if (v.ow && v.oh && (v.ow < v.w || v.oh < v.h)) out.push({ where: 'OBS video settings', issue: `output is scaled down to ${v.ow}×${v.oh}: the stream and recordings are not 1080p`, fix: 'Settings → Video → Output (Scaled) Resolution: 1920×1080 (same as the canvas), if your upload allows it.' });
+  const P = profileOf(profile);
+  if (v.w !== P.w || v.h !== P.h) {
+    const other = profileOf(profile === 'uhd' ? 'fhd' : 'uhd');
+    out.push({ where: 'OBS video settings', issue: `base canvas is ${v.w}×${v.h}: every ${P.w}×${P.h} Overdrive source (${P.label} profile) has to be resized to fit it`,
+      fix: v.w === other.w && v.h === other.h ? `Either Settings → Video → Base (Canvas) Resolution: ${P.w}×${P.h}, or switch the output profile to ${other.label} in OBS Setup.` : `Settings → Video → Base (Canvas) Resolution: ${P.w}×${P.h}.` });
+  }
+  const fhdOut = profile === 'uhd' && v.ow === 1920 && v.oh === 1080;
+  if (v.ow && v.oh && (v.ow < v.w || v.oh < v.h) && !fhdOut) out.push({ where: 'OBS video settings', issue: `output is scaled down to ${v.ow}×${v.oh}: the stream and recordings are below ${profile === 'uhd' ? '1080p' : 'the canvas'}`, fix: `Settings → Video → Output (Scaled) Resolution: ${profile === 'uhd' ? '3840×2160 for a 4K stream, or 1920×1080 for a 1080p stream' : '1920×1080 (same as the canvas)'}, if your upload allows it.` });
+  if (v.fps && v.fps < 59) out.push({ where: 'OBS video settings', issue: `OBS runs at ${Math.round(v.fps * 100) / 100} fps: Overdrive animates at 60`, fix: 'Settings → Video → Common FPS Values: 60.' });
   return out;
 }
 
 export const AUDIO_SCENE = 'Overdrive · Caster audio';
 export const GAME_CAPTURE = 'Overdrive Game capture';
 
-export const defaultObsSetup = (): ObsSetupStore => ({ options: { audio: true, gameCapture: true, legacy: false, baseUrl: '' }, map: {}, results: {} });
+export const defaultObsSetup = (): ObsSetupStore => ({ options: { audio: true, gameCapture: true, legacy: false, baseUrl: '', profile: DEFAULT_PROFILE, suspendOffAir: false, perfMonitor: false }, map: {}, results: {} });
 
 export function sanitizeObsSetup(v: any): ObsSetupStore {
   const o = v?.options ?? {};
@@ -200,6 +221,8 @@ export function sanitizeObsSetup(v: any): ObsSetupStore {
     options: {
       audio: o.audio !== false, gameCapture: o.gameCapture !== false, legacy: o.legacy === true,
       baseUrl: typeof o.baseUrl === 'string' && /^https?:\/\/[^\s/?#]+$/i.test(o.baseUrl.trim().replace(/\/$/, '')) ? o.baseUrl.trim().replace(/\/$/, '') : '',
+      profile: o.profile === 'uhd' ? 'uhd' : DEFAULT_PROFILE,
+      suspendOffAir: o.suspendOffAir === true, perfMonitor: o.perfMonitor === true,
     },
     map, results,
   };
@@ -211,8 +234,9 @@ const GAMEPLAY_RENDERERS = new Set(['gameplay']);
  * Every Overdrive output, discovered from the graphics engine and the registry (no hardcoded scene list).
  * Names are made unique across scenes AND inputs (OBS shares one namespace for both).
  */
-export function discoverTargets(graphics: GfxInstance[], obsScenes: Partial<Record<ScreenId, string>>, opt: Pick<ObsSetupOptions, 'audio' | 'gameCapture'>): ObsTarget[] {
+export function discoverTargets(graphics: GfxInstance[], obsScenes: Partial<Record<ScreenId, string>>, opt: Pick<ObsSetupOptions, 'audio' | 'gameCapture'> & { profile?: OutputProfileId }): ObsTarget[] {
   const out: ObsTarget[] = [];
+  const k = profileOf(opt.profile ?? DEFAULT_PROFILE).scale;
   const defaultInstance = (g: GfxInstance) => { const p = pkgById(g.pkg); return !!p && p.id.replace(/^od\./, '') === g.id; };
   for (const g of graphics) {
     const p = pkgById(g.pkg);
@@ -220,7 +244,7 @@ export function discoverTargets(graphics: GfxInstance[], obsScenes: Partial<Reco
     out.push({
       id: `g:${g.id}`, kind: 'gfx', name: g.name, route: `/g/${g.id}`,
       scene: g.obsScene || `Overdrive · ${g.name}`, input: `Overdrive · ${g.name} · g/${g.id}`,
-      width: p.resolution[0], height: p.resolution[1],
+      width: p.resolution[0] * k, height: p.resolution[1] * k,
       gameCapture: opt.gameCapture && GAMEPLAY_RENDERERS.has(p.renderer), rerouteAudio: false, audio: opt.audio,
     });
   }
@@ -230,7 +254,7 @@ export function discoverTargets(graphics: GfxInstance[], obsScenes: Partial<Reco
     out.push({
       id: `s:${s.id}`, kind: s.screen ? 'screen' : 'source', name: s.name, route: s.route,
       scene: (s.screen && obsScenes[s.screen]) || `Overdrive · ${label}`, input: `Overdrive · ${label} overlay`,
-      width: s.resolution[0], height: s.resolution[1],
+      width: s.resolution[0] * k, height: s.resolution[1] * k,
       gameCapture: opt.gameCapture && s.id === 'gameplay', rerouteAudio: s.view === 'media', audio: opt.audio,
       ...(by ? { supersededBy: `g:${by.id}` } : {}), ...(s.screen ? { screen: s.screen } : {}),
     });

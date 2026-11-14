@@ -22,6 +22,7 @@ export type ClientMsg =
   | { t: 'media-ended'; seq: number }
   /** A graphics browser source reports whether its renderer works (per-graphic isolation). */
   | { t: 'gfx-health'; id: string; ok: boolean; error?: string }
+  | { t: 'out-perf'; perf: OutputPerf }
   /** Overdrive 2.0 production command: always answered with an `ack` carrying the same id. */
   | { t: 'cmd'; id: string; cmd: ProducerCmd; source?: CmdSource; /** engine version the operator saw */ base?: number }
   | { t: 'ping' }
@@ -110,6 +111,11 @@ export type ServerMsg =
   | { t: 'gfx'; graphics: import('./gfx').GfxInstance[]; now: number }
   /** Producer recovery: browser sources reload themselves and resync. */
   | { t: 'reload' }
+  /** This output's OBS source is off air (not in Program/Preview): pause its videos and loops. Off = resume. */
+  | { t: 'suspend'; on: boolean }
+  /** Producer turned the live performance monitor on/off: outputs sample their frame timing while on. */
+  | { t: 'perf-mode'; on: boolean }
+  | { t: 'perf'; perf: PerfReport }
   | { t: 'state'; state: ControllerState }
   | { t: 'tournament'; tournament: Tournament }
   | { t: 'ros'; ros: RunOfShow; now: number }
@@ -125,3 +131,26 @@ export type ServerMsg =
   | { t: 'rtc-publisher'; slot: CasterId; online: boolean }
   | { t: 'error'; code: string; message: string }
   | { t: 'pong' };
+
+/** One output page's rendering health (sent every 5 s while the performance monitor is on). */
+export interface OutputPerf {
+  route: string;
+  /** Browser source size in device px, device px per logical unit, scaling backend. */
+  w: number; h: number; scale: number; raster: string;
+  suspended: boolean;
+  /** rAF frame rate over the last window, its 95th-percentile frame time and frames over 25 ms (main thread). */
+  fps: number; p95: number; long: number;
+  /** <video> elements: playing now, and decoder frames dropped / decoded since the last report. */
+  videos: number; dropped: number; decoded: number;
+  fontsReady: boolean;
+  heapMB?: number;
+}
+export interface PerfReport {
+  on: boolean;
+  suspendOffAir: boolean;
+  outputs: (OutputPerf & { id: string; at: number })[];
+  /** OBS GetStats (render/encode health) while connected. */
+  obs: { fps: number; renderMs: number; renderSkipped: number; renderTotal: number; outputSkipped: number; outputTotal: number; cpu: number; memMB: number } | null;
+  /** route → showing in OBS (Program/Preview/projector), when known. */
+  showing: Record<string, boolean>;
+}

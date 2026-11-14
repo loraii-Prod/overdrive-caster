@@ -9,7 +9,9 @@ html, body, #root { margin: 0; min-height: 100%; }
 body { background: #101010; color: #fff; font-family: var(--font-sans); -webkit-font-smoothing: antialiased; }
 
 /* OBS browser sources: fully transparent page, no scrollbars. */
-html.output, html.output body, html.output #root { background: transparent !important; overflow: hidden; height: 100%; }
+html.output, html.output body, html.output #root { background: transparent !important; overflow: hidden; height: 100%; margin: 0; }
+/* Off-air suspension (lib/outputRuntime.ts): freeze every CSS loop in place; the last frame stays in the OBS source. */
+html.od-suspended *, html.od-suspended *::before, html.od-suspended *::after { animation-play-state: paused !important; }
 
 .od-stage { font-family: var(--font-sans); color: #fff; }
 

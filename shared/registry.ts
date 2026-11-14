@@ -1,7 +1,8 @@
 /**
  * Overdrive 2.0 Graphics Registry + Module Registry.
  *
- * Every broadcast scene is an independent 1920×1080 OBS browser source (its own URL). OBS does the final
+ * Every broadcast scene is an independent full-canvas OBS browser source (its own URL), designed on the 1920×1080
+ * logical grid and rendered at the output profile's size (3840×2160 at 4K). OBS does the final
  * switching and transitions; Overdrive controls what each source shows. The Producer Console previews the
  * selected source with the same components the source renders, and loads the scene's modules.
  *
@@ -49,6 +50,7 @@ export interface SourceDef {
   route: string;
   /** OBS scene key in the scene mapping (Build scenes in OBS uses the screen ids). */
   obsKey?: string;
+  /** LOGICAL size (1920×1080 grid units); the device size comes from the output profile (×2 at 4K). */
   resolution: [number, number];
   animations: string[];
   /** Default modules, in order (Studio Mode can change this per scene). */

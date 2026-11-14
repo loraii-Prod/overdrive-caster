@@ -39,6 +39,7 @@ wss.on('connection', ws => {
         out(ws, { op: 7, d: { requestType, requestId, requestStatus: { result: true, code: 100 }, responseData } });
         if (obs.scenes.size !== before) emit('SceneListChanged', { scenes: [] });
         if (requestType === 'CreateSceneItem' || requestType === 'CreateInput') emit('SceneItemCreated', { sceneName: requestData.sceneName });
+        if (requestType === 'SetCurrentProgramScene') emit('CurrentProgramSceneChanged', { sceneName: obs.program });
       } catch (e: any) {
         out(ws, { op: 7, d: { requestType, requestId, requestStatus: { result: false, code: e.code ?? 500, comment: e.message } } });
         if (!obs.connected) { ws.terminate(); obs.connected = true; }
@@ -54,6 +55,7 @@ http.createServer((req, res) => {
   if (u.pathname === '/state') return j({ program: obs.program, scenes: [...obs.scenes].map(([n, s]) => ({ name: n, uuid: s.uuid, items: s.items })), inputs: [...obs.inputs].map(([n, i]) => ({ name: n, ...i })), log: obs.log });
   if (u.pathname === '/reset') { obs = new MockObs(); return j({ ok: true }); }
   if (u.pathname === '/program') { obs.program = u.searchParams.get('scene') ?? obs.program; emit('CurrentProgramSceneChanged', { sceneName: obs.program }); return j({ ok: true }); }
+  if (u.pathname === '/project') { const n = u.searchParams.get('source') ?? ''; if (u.searchParams.get('on') === '0') obs.projected.delete(n); else obs.projected.add(n); return j({ ok: true }); }
   if (u.pathname === '/studio-off') { obs.studioMode = false; emit('StudioModeStateChanged', { studioModeEnabled: false }); return j({ ok: true }); }
   if (u.pathname === '/preview') { obs.studioMode = true; obs.preview = u.searchParams.get('scene') ?? obs.preview; emit('StudioModeStateChanged', { studioModeEnabled: true }); emit('CurrentPreviewSceneChanged', { sceneName: obs.preview }); return j({ ok: true }); }
   if (u.pathname === '/add-browser') { obs.addInput(u.searchParams.get('scene')!, u.searchParams.get('name')!, 'browser_source', { url: u.searchParams.get('url'), width: 1920, height: 1480 }); return j({ ok: true }); }

@@ -1,3 +1,4 @@
+import { feedPerf } from '../../lib/perfStore';
 import type { TransitionKind } from '../../../shared/engine';
 import { GameFeedSettingsCard } from './GameFeedSettings';
 import { boothScene } from '../../components/wildcard/Desk';
@@ -95,6 +96,7 @@ const SECTIONS = NAV.flatMap(g => g.items);
 
 export function Controller({ onLogout, dockOnly = false, dockAll = false }: { onLogout: () => void; dockOnly?: boolean; dockAll?: boolean }) {
   const sock = useSocket({ role: 'controller' });
+  useEffect(() => feedPerf(sock), [sock]);
   const conn = useConnState(sock);
   const [st, setSt] = useState<ControllerState | null>(null);
   const [draft, setDraft] = useState<Scene | null>(null);
