@@ -125,6 +125,8 @@ export const PACKAGES: PackageDef[] = [
       { key: 'clock', label: 'Countdown', type: 'boolean', default: false, group: 'Panel' },
       { key: 'names', label: 'Name bars', type: 'boolean', default: true, group: 'Layout' },
       { key: 'ticker', label: 'Ticker', type: 'boolean', default: true, group: 'Panel' },
+      { key: 'qr', label: 'Voting QR', type: 'boolean', default: false, group: 'Panel', help: 'Scannable voting code at the side of the desk (needs the public voting URL in Studio → Audience & QR).' },
+      { key: 'qrTitle', label: 'QR title', type: 'text', default: 'Vote for the MVP', group: 'Panel' },
       ...MOTION('slide', 350),
     ],
     bindings: [{ kind: 'seats', label: 'Analyst positions', seats: [4, 5] }, { kind: 'match', label: 'Match' }, { kind: 'predictions', label: 'Desk predictions', seats: [4, 5] }],

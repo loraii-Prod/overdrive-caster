@@ -185,7 +185,7 @@ async function polls(session: string, priv: boolean): Promise<AudPoll[]> {
   return r.rows.map(p => {
     const counts: Record<string, number> = {};
     for (const x of c.rows) if (x.poll === p.id) counts[x.player] = x.n;
-    const base: AudPoll = { id: p.id, match: p.match, label: p.label, result: p.result, players: p.players, status: p.status, openedAt: p.opened_at ? +p.opened_at : null, closedAt: p.closed_at ? +p.closed_at : null, frozen: p.frozen };
+    const base: AudPoll = { id: p.id, match: p.match, label: p.label, result: p.result, players: p.players, status: p.status, openedAt: p.opened_at ? +p.opened_at : null, closedAt: p.closed_at ? +p.closed_at : null, closesAt: p.closes_at && p.status === 'open' ? +p.closes_at : null, frozen: p.frozen };
     return priv ? { ...base, counts, total: Object.values(counts).reduce((a, b) => a + b, 0) } : base;
   });
 }
@@ -206,7 +206,8 @@ async function publicState() {
       ok: true, session: s, name: ses.rows[0]?.name ?? '', signIn: !!CLIENT_ID || DEV_LOGIN, dev: DEV_LOGIN,
       matches: ms.map(m => { const t = tot.find(x => x.id === m.id)!; return { id: m.id, label: m.label, a: m.a, b: m.b, bestOf: m.best_of, scores: bestOf(m.best_of), status: m.status, winner: m.winner, score: m.score, split: t.revealed ? { total: t.total, byTeam: t.byTeam } : null }; }),
       champion: { locked: ses.rows[0]?.champion_locked ?? true, teams: MAJOR_TEAMS.map(t => t.name) },
-      polls: ps.filter(p => p.status === 'open' || p.status === 'revealed').map(p => ({ ...p, frozen: p.status === 'revealed' ? p.frozen : null })),
+      // Closed polls are listed ("voting closed") but their result only once revealed on air.
+      polls: ps.filter(p => p.status !== 'draft').map(p => ({ ...p, frozen: p.status === 'revealed' ? p.frozen : null })),
       accuracy: accuracyOf(ms, tot),
     };
   })();
@@ -276,9 +277,9 @@ app.post('/v1/mvp', limit(IP_WRITES), async (req, res) => {
   if (typeof poll !== 'string' || typeof player !== 'string') return bad(res, 'Invalid vote', 400);
   try {
     const out = await tx(db, async (c): Promise<{ error: string; code: number } | { player: string; already?: boolean }> => {
-      const p = (await c.query('select status, players from polls where id = $1 for share', [poll])).rows[0];
+      const p = (await c.query('select status, players, closes_at from polls where id = $1 for share', [poll])).rows[0];
       if (!p) return { error: 'Unknown vote', code: 400 };
-      if (p.status !== 'open') return { error: 'Voting is closed', code: 409 };
+      if (p.status !== 'open' || (p.closes_at && +p.closes_at <= Date.now())) return { error: 'Voting is closed', code: 409 };
       if (!p.players.some((x: any) => x.handle === player)) return { error: 'That player is not eligible', code: 400 };
       const ins = await c.query('insert into mvp_votes(poll, viewer, player) values ($1,$2,$3) on conflict (poll, viewer) do nothing returning player', [poll, v.id, player]);
       if (ins.rowCount) return { player };
@@ -337,12 +338,13 @@ app.post('/internal/reveal-match', internal, async (req, res) => {
 
 app.post('/internal/poll', internal, async (req, res) => {
   const s = await current();
-  const { match, label, result, players } = req.body ?? {};
+  const { match, label, result, players, photos } = req.body ?? {};
   if (!s || typeof match !== 'string' || !Array.isArray(players)) return bad(res, 'bad poll', 400);
   const m = (await db.query('select * from matches where session = $1 and id = $2', [s, match])).rows[0];
   if (!m || !m.winner) return bad(res, 'MVP voting needs a finished match');
   const eligible = [...teamRoster(m.a), ...teamRoster(m.b)];
-  const chosen = eligible.filter(p => players.includes(p.handle));
+  const photo = (h: string) => { const u = photos && typeof photos === 'object' ? photos[h] : undefined; return typeof u === 'string' && /^https:\/\/[^\s"'<>]+$/.test(u) && u.length <= 300 ? u : undefined; };
+  const chosen = eligible.filter(p => players.includes(p.handle)).map(p => (photo(p.handle) ? { ...p, photo: photo(p.handle) } : p));
   if (chosen.length < 2) return bad(res, 'Choose at least two eligible players', 400);
   const out = await tx(db, async c => {
     const ex = (await c.query("select * from polls where session = $1 and match = $2 and status <> 'draft' order by created desc limit 1", [s, match])).rows[0];
@@ -356,6 +358,15 @@ app.post('/internal/poll', internal, async (req, res) => {
   res.json({ ok: true, ...out });
 });
 
+app.post('/internal/poll/:id/timer', internal, async (req, res) => {
+  const id = String(req.params.id), raw = req.body?.seconds, sec = raw == null ? null : Number(raw);
+  if (sec != null && (!Number.isFinite(sec) || sec < 10)) return bad(res, 'At least 10 seconds', 400);
+  const r = await db.query("update polls set closes_at = $2 where id = $1 and status = 'open' returning id", [id, sec == null ? null : new Date(Date.now() + Math.min(3600, sec) * 1000)]);
+  if (!r.rowCount) return bad(res, 'Voting is not open');
+  await audit(db, actor(req), 'mvp-timer', id, null, { seconds: sec });
+  fresh(); res.json({ ok: true });
+});
+
 app.post('/internal/poll/:id/:action', internal, async (req, res) => {
   const id = String(req.params.id), action = String(req.params.action);
   const flow: Record<string, [string, string]> = { open: ['draft', 'open'], close: ['open', 'closed'], reveal: ['closed', 'revealed'] };
@@ -366,7 +377,10 @@ app.post('/internal/poll/:id/:action', internal, async (req, res) => {
     if (!p) return 'Unknown poll';
     if (p.status === f[1]) return null; // repeated command: nothing to do
     if (p.status !== f[0]) return `Poll is ${p.status}`;
-    if (action === 'open') await c.query("update polls set status = 'open', opened_at = now() where id = $1", [id]);
+    if (action === 'open') {
+      const sec = Number(req.body?.seconds);
+      await c.query("update polls set status = 'open', opened_at = now(), closes_at = $2 where id = $1", [id, Number.isFinite(sec) && sec >= 10 ? new Date(Date.now() + Math.min(3600, sec) * 1000) : null]);
+    }
     else if (action === 'close') {
       // Freeze the result in the same transaction that stops voting: what is revealed is exactly what was counted.
       const n = await c.query('select player, count(*)::int n from mvp_votes where poll = $1 group by player', [id]);

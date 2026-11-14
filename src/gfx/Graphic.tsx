@@ -40,8 +40,10 @@ export const RENDERERS: Record<string, Renderer> = {
     const slots = cfg.layout === 'solo' ? [4] : [4, 5];
     const guest = cfg.guest === 'none' ? null : Number(cfg.guest);
     const wc = d.wc && { ...d.wc, state: { ...d.wc.state, desk: { ...d.wc.state.desk, slots, guest, panel: String(cfg.panel) as 'cams', strip: cfg.strip === true, clock: cfg.clock === true } } };
-    return <ScreenView id="analysis" scene={{ ...d.scene, screen: 'analysis', showNames: cfg.names !== false }} show={{ ...d.show, ticker: { ...d.show.ticker, onScreens: cfg.ticker !== false } }}
+    const desk = <ScreenView id="analysis" scene={{ ...d.scene, screen: 'analysis', showNames: cfg.names !== false }} show={{ ...d.show, ticker: { ...d.show.ticker, onScreens: cfg.ticker !== false } }}
       now={d.now} tournament={d.tournament} viewer={d.viewer} monitor={d.monitor} bnl={d.bnl} wc={wc} />;
+    // Optional voting QR on the desk (off by default; the same approved code as the QR graphic's desk position).
+    return cfg.qr === true ? <>{desk}{AUD_RENDERERS.qr({ cfg: { qr: 'vote', position: cfg.layout === 'solo' ? 'desk-inline-solo' : 'desk-inline', title: String(cfg.qrTitle || 'Vote for the MVP') }, d })}</> : desk;
   },
   scoreboard: ({ cfg, d }) => <Scoreboard show={{ ...d.show, showScoreboard: true, mapName: cfg.map === false ? '' : d.show.mapName }} />,
   gameplay: ({ cfg, d }) => (

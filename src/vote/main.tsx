@@ -5,15 +5,24 @@ import { teamLogo } from '../../shared/major';
 import './vote.css';
 
 interface Match { id: string; label: string; a: string; b: string; bestOf: number; scores: string[]; status: 'open' | 'locked' | 'final'; winner: string | null; score: string | null; split: { total: number; byTeam: Record<string, number> } | null }
-interface Poll { id: string; match: string; label: string; result: string; players: { handle: string; team: string }[]; status: 'open' | 'revealed'; frozen: { total: number; counts: Record<string, number> } | null }
+interface Poll { id: string; match: string; label: string; result: string; players: { handle: string; team: string; photo?: string }[]; status: 'open' | 'closed' | 'revealed'; closesAt?: number | null; frozen: { total: number; counts: Record<string, number> } | null }
 interface State { ok: boolean; session: string | null; name: string; signIn: boolean; dev?: boolean; matches: Match[]; champion: { locked: boolean; teams: string[] }; polls: Poll[]; accuracy: { played: number; right: number; points: number } }
 interface Me { name: string; picks: Record<string, { team: string; score: string }>; champion: string | null; votes: Record<string, string>; points: number; rank: number | null; ranked: number }
 
 const api = async (path: string, body?: unknown) => {
-  const r = await fetch(path, body === undefined ? { cache: 'no-store' } : { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+  let r: Response;
+  try {
+    r = await fetch(path, body === undefined ? { cache: 'no-store' } : { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+  } catch { return { status: 0, ok: false, error: 'No connection. Nothing was sent: try again.' }; }
   const j = await r.json().catch(() => ({ ok: false, error: 'Voting is unavailable right now' }));
   return { status: r.status, ...j };
 };
+/** Player portrait (uploaded by the production) with the silhouette as the fallback. */
+function Face({ src }: { src?: string }) {
+  const [bad, setBad] = useState(false);
+  return src && !bad ? <img className="face" src={src} alt="" loading="lazy" decoding="async" referrerPolicy="no-referrer" onError={() => setBad(true)} /> : <div className="sil" aria-hidden />;
+}
+const mmss = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 const pct = (n: number, t: number) => (t ? Math.round((n / t) * 100) : 0);
 const Logo = ({ team, size = 32 }: { team: string; size?: number }) => { const src = teamLogo(team); return src ? <img src={src} alt="" width={size} height={size} className="logo" /> : null; };
 
@@ -36,17 +45,23 @@ function App() {
   }, []);
   useEffect(() => { load(true); const t = setInterval(() => load(false), 8000); return () => clearInterval(t); }, [load]);
   const openPoll = st?.polls.find(p => p.status === 'open') ?? null;
+  const closedPoll = !openPoll ? [...(st?.polls ?? [])].reverse().find(p => p.status === 'closed') ?? null : null;
+  const lastReveal = [...(st?.polls ?? [])].reverse().find(p => p.status === 'revealed' && p.frozen) ?? null;
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => { if (!openPoll?.closesAt) return; const t = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(t); }, [openPoll?.closesAt]);
+  const left = openPoll?.closesAt ? Math.max(0, Math.ceil((openPoll.closesAt - now) / 1000)) : null;
   const seenPoll = useRef<string | null>(null);
   useEffect(() => { if (openPoll && seenPoll.current !== openPoll.id) { seenPoll.current = openPoll.id; setMvpChoice(null); setTab('mvp'); } }, [openPoll]);
 
   const say = (text: string, bad = false) => { setToast({ text, bad }); setTimeout(() => setToast(null), 2600); };
-  const act = async (path: string, body: unknown, ok: string) => {
-    if (busy.current) return; busy.current = true;
+  const act = async (path: string, body: unknown, ok: string): Promise<boolean> => {
+    if (busy.current) return false; busy.current = true;
     try {
       const r = await api(path, body);
       if (r.ok) { say(r.already ? 'You already voted in this one' : ok); await load(true); }
       else if (r.status === 401) say('Sign in with Twitch first', true);
-      else say(r.error || 'Not saved, try again', true);
+      else { say(r.error || 'Not saved, try again', true); await load(true); } // show what the server really has
+      return !!r.ok;
     } finally { busy.current = false; }
   };
   const pick = (m: Match, team: string, score = '') => {
@@ -91,15 +106,25 @@ function App() {
             onClick={() => me ? act('/v1/champion', { team: t }, `Champion pick: ${t}`) : say('Sign in with Twitch first', true)}><Logo team={t} /><b>{t}</b></button>)}</div>}
         </>}
 
-        {tab === 'mvp' && (openPoll ? (() => { const mine = me?.votes[openPoll.id]; return <>
-          <div className="live"><i />Voting open · closes on air</div>
+        {tab === 'mvp' && (openPoll ? (() => { const mine = me?.votes[openPoll.id]; const over = left === 0; return <>
+          <div className="live"><i />{over ? 'Voting closing…' : left != null ? <>Voting open · closes in <b className="cd">{mmss(left)}</b></> : 'Voting open · closes on air'}</div>
           <h1>Who was the MVP?</h1><p className="s">{openPoll.result || openPoll.label}</p>
-          <div className="pl">{openPoll.players.map(p => { const on = (mine ?? mvpChoice) === p.handle; return (
-            <button key={p.handle} className={'p' + (on ? ' on' : '')} aria-pressed={on} disabled={!!mine} onClick={() => setMvpChoice(p.handle)}>
-              <div className="sil" aria-hidden /><Logo team={p.team} size={26} /><b>{p.handle}</b><small>{p.team}</small></button>); })}</div>
-          {mine ? <p className="ok center">✓ You voted for {mine}. The result is revealed on stream.</p>
-            : <button className="btn" disabled={!mvpChoice} onClick={() => me ? act('/v1/mvp', { poll: openPoll.id, player: mvpChoice }, `Vote saved: ${mvpChoice}`) : say('Sign in with Twitch first', true)}>{mvpChoice ? `Vote ${mvpChoice}` : 'Choose a player'}</button>}
-          <p className="lock center">One vote per viewer · results are revealed on stream</p>
+          <div className="pl" role="radiogroup" aria-label="MVP candidates">{openPoll.players.map(p => { const on = (mine ?? mvpChoice) === p.handle; return (
+            <button key={p.handle} role="radio" className={'p' + (on ? ' on' : '')} aria-checked={on} disabled={!!mine || over} onClick={() => setMvpChoice(p.handle)}>
+              <Face src={p.photo} /><Logo team={p.team} size={26} /><b>{p.handle}</b><small>{p.team}</small></button>); })}</div>
+          {mine ? <p className="ok center" data-voted>✓ Vote received: {mine}. The result is revealed on stream.</p>
+            : <button className="btn" disabled={!mvpChoice || over} onClick={() => me ? act('/v1/mvp', { poll: openPoll.id, player: mvpChoice }, `Vote received: ${mvpChoice}`) : say('Sign in with Twitch first', true)}>{over ? 'Voting closed' : mvpChoice ? `Vote ${mvpChoice}` : 'Choose a player'}</button>}
+          <p className="lock center">One vote per Twitch account · results are revealed on stream</p>
+        </>; })() : closedPoll ? (() => { const mine = me?.votes[closedPoll.id]; return <>
+          <div className="live off"><i />Voting closed</div>
+          <h1>Votes are in</h1><p className="s">{closedPoll.result || closedPoll.label}</p>
+          <p className="empty" data-closed>The Community MVP is revealed on stream.{mine ? ` You voted for ${mine}.` : ''}</p>
+        </>; })() : lastReveal ? (() => { const [w, n] = Object.entries(lastReveal.frozen!.counts).sort((a, b) => b[1] - a[1])[0] ?? ['', 0]; const p = lastReveal.players.find(x => x.handle === w); const mine = me?.votes[lastReveal.id]; return <>
+          <div className="live off"><i />Revealed on stream</div>
+          <h1>Community MVP</h1><p className="s">{lastReveal.result || lastReveal.label}</p>
+          <div className="win" data-winner><Face src={p?.photo} /><div><b>{w}</b><small>{p?.team}</small><em>{pct(n, lastReveal.frozen!.total)}% of {lastReveal.frozen!.total.toLocaleString('en-US')} votes</em></div></div>
+          {mine && <p className="lock center">You voted for {mine}{mine === w ? ': you called it' : ''}.</p>}
+          <p className="empty">The next vote opens on stream after the next match.</p>
         </>; })() : <><h1>Community MVP</h1><p className="empty">Voting opens on stream after each match.</p></>)}
 
         {tab === 'results' && <>

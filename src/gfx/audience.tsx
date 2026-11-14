@@ -6,7 +6,7 @@
  */
 import { useEffect, useState, type ReactNode } from 'react';
 import type { GfxInstance } from '../../shared/gfx';
-import { communityPick, pcts, teamRoster, type AudPlayer, type AudPoll } from '../../shared/audience';
+import { communityPick, pcts, teamRoster, type AudPlayer, type AudPoll, type MvpCard } from '../../shared/audience';
 import { matchName, wcResolve } from '../../shared/wildcard';
 import { normHandle, teamLogo } from '../../shared/major';
 import { BgVideo } from '../components/Brand';
@@ -174,6 +174,17 @@ function deskMvp(d: GfxData, matchId: string, roster: AudPlayer[]) {
   return { player, n, of: picks.length, team: roster.find(p => p.handle === player)?.team ?? '', reason: picks.find(p => p.player === player && p.reason)?.reason ?? '' };
 }
 
+/** Mode C extras: the producer's stats and achievements for the revealed player (nothing when none were entered). */
+function CardExtras({ card }: { card?: MvpCard }) {
+  if (!card || (!card.stats.length && !card.achievements.length)) return null;
+  return (
+    <div className="mvx-extras" data-mvp-extras>
+      {card.stats.length > 0 && <div className="mvx-stats">{card.stats.map((x, i) => <div key={i} style={{ animationDelay: `${1.7 + i * 0.08}s` }}><b>{x.value}</b><small>{x.label}</small></div>)}</div>}
+      {card.achievements.length > 0 && <div className="mvx-ach">{card.achievements.map((x, i) => <span key={i} style={{ animationDelay: `${2.0 + i * 0.08}s` }}>{x}</span>)}</div>}
+    </div>
+  );
+}
+
 const mvp: R = ({ cfg, d }) => {
   const m = matchOf(cfg, d);
   const step = String(cfg.step || 'voting');
@@ -190,11 +201,15 @@ const mvp: R = ({ cfg, d }) => {
   if (step === 'voting') {
     const players = poll?.players.length ? poll.players : roster;
     const qr = d.aud?.qr.find(q => q.id === 'vote');
-    const open = poll?.status === 'open';
+    const open = poll?.status === 'open', closed = poll?.status === 'closed' || poll?.status === 'revealed';
+    // Mode A extras: a countdown when the producer set one; live totals only when the producer put them on air.
+    const left = open && poll?.closesAt ? Math.max(0, Math.ceil((poll.closesAt - d.now) / 1000)) : null;
+    const live = open && poll ? d.aud?.liveTotals?.[poll.id] : undefined;
+    const share = live ? pcts(players.slice(0, 4).map(p => live.counts[p.handle] ?? 0)) : null;
     return (
-      <div className="aud">
+      <div className={'aud' + (closed ? ' mv-closed' : '')} data-mvp-mode={open ? 'A' : closed ? 'B' : 'pre'}>
         <BgVideo /><div className="aud-dim" />
-        <Head kick={`Community MVP · ${result}`} title="Vote for the MVP" />
+        <Head kick={`Community MVP · ${result}`} title={closed ? 'Voting closed' : 'Vote for the MVP'} />
         <div className="aud-left mv">
           {players.slice(0, 4).map((p, i) => {
             const info = pr.info(portraitUrl(d, p.handle));
@@ -202,14 +217,18 @@ const mvp: R = ({ cfg, d }) => {
               <div className={'pc' + (p.team === m.b ? ' b' : '')} key={p.handle} style={{ animationDelay: `${i * 70}ms` }}>
                 <div className="num">{String(i + 1).padStart(2, '0')}</div><Logo team={p.team} size={70} />
                 {info ? <img className={info.cutout ? 'pc-cut' : 'pc-photo'} src={info.url} alt="" /> : <div className="sil" />}
-                <b>{p.handle}</b><small>{p.team}</small><div className="tm" />
+                <b>{p.handle}</b><small>{p.team}</small>
+                {share && <div className="pc-live" data-live-total><span>{share[i]}%</span><i style={{ width: `${share[i]}%` }} /></div>}
+                <div className="tm" />
               </div>
             );
           })}
         </div>
-        {qr && <div className="qrbox"><Qr url={qr.url} size={300} /><b>Scan to vote</b><span>{qr.url.replace(/^https:\/\//, '')}</span></div>}
-        <div className="status"><div className={'live' + (open ? '' : ' off')}><i />{open ? 'VOTING OPEN' : poll?.status === 'closed' || poll?.status === 'revealed' ? 'VOTING CLOSED' : 'VOTING OPENS SOON'}</div>
-          <div className="t">One vote per viewer · results revealed on air</div></div>
+        {qr && !closed && <div className="qrbox"><Qr url={qr.url} size={300} /><b>Scan to vote</b><span>{qr.url.replace(/^https:\/\//, '')}</span></div>}
+        {closed && <div className="qrbox done"><div className="lock" /><b>Votes are in</b><span>{poll?.frozen ? `${poll.frozen.total.toLocaleString('en-US')} votes counted` : 'Counting'}</span></div>}
+        <div className="status"><div className={'live' + (open ? '' : ' off')}><i />{open ? 'VOTING OPEN' : closed ? 'VOTING CLOSED' : 'VOTING OPENS SOON'}</div>
+          {left != null && <div className="cd" data-countdown>{left > 0 ? <>Closes in <b>{Math.floor(left / 60)}:{String(left % 60).padStart(2, '0')}</b></> : <b>Closing…</b>}</div>}
+          <div className="t">{closed ? 'The MVP is revealed on air' : live ? `Live count · ${live.total.toLocaleString('en-US')} votes · one vote per viewer` : 'One vote per viewer · results revealed on air'}</div></div>
       </div>
     );
   }
@@ -232,6 +251,7 @@ const mvp: R = ({ cfg, d }) => {
       </div>
     );
   };
+  const extras = (handle: string) => <CardExtras card={d.aud?.mvpCards?.[m.id]?.[handle]} />;
   if (step === 'winner') {
     if (!res || !res.top.length) return null; // never a guess: nothing until the result is frozen
     const win = res.top[0];
@@ -239,6 +259,7 @@ const mvp: R = ({ cfg, d }) => {
       <div className="mvx-res">{label} · <b>{result}</b></div>
       <div className="mvx-share"><div className="lbl"><span>Community vote · {res.total.toLocaleString('en-US')} votes</span><b>{win.pct}%</b></div><div className="bar"><i style={{ ['--w' as string]: `${win.pct}%` }} /></div></div>
       <div className="mvx-rest">{res.rows.filter(r => !res.top.includes(r)).slice(0, 3).map(r => <div key={r.handle}><b>{r.handle}</b><span>{r.pct}%</span></div>)}</div>
+      {extras(win.handle)}
     </>);
   }
   if (step === 'desk') {
@@ -247,6 +268,7 @@ const mvp: R = ({ cfg, d }) => {
       <div className="mvx-res">{label} · <b>{result}</b></div>
       {desk.reason && <div className="mvx-quote">“{desk.reason}”</div>}
       <div className="mvx-quote-by">Picked by {desk.n} of {desk.of} analysts</div>
+      {extras(desk.player)}
     </>, 'desk');
   }
   // compare: one portrait when they agree, both side by side when they differ
@@ -256,6 +278,7 @@ const mvp: R = ({ cfg, d }) => {
     return hero(win, <><div className="mvx-badge"><small>Community</small>MVP</div><div className="mvx-badge desk"><small>Analyst</small>MVP</div></>, <>
       <div className="mvx-res">Community and analysts agree · <b>{result}</b></div>
       <div className="mvx-share"><div className="lbl"><span>Community {win.pct}% · Analysts {desk.n} of {desk.of}</span><b>{desk.n === desk.of ? 'Unanimous' : 'They agree'}</b></div><div className="bar"><i style={{ ['--w' as string]: `${win.pct}%` }} /></div></div>
+      {extras(win.handle)}
     </>);
   }
   const half = (side: 'l' | 'r', who: { handle: string; team: string }, tag: string, line: string) => (
@@ -284,6 +307,9 @@ const qr: R = ({ cfg, d }) => {
   if (!link) return null; // invalid, expired or not approved: draw nothing
   const pos = String(cfg.position || 'lower-third'), title = String(cfg.title || ''), url = link.url.replace(/^https:\/\//, '');
   if (pos === 'corner') return <div className="aud"><div className="qr-corner"><div className="q"><Qr url={link.url} size={170} /></div><b>{title || link.label}</b></div></div>;
+  // Inside the Analyst Desk graphic: smaller, in the band between the camera boxes and the ticker (never over a camera).
+  if (pos === 'desk-inline-solo') return <div className="aud"><div className="qr-corner in-desk-solo"><div className="q"><Qr url={link.url} size={176} /></div><b>{title || link.label}</b></div></div>;
+  if (pos === 'desk-inline') return <div className="aud"><div className="qr-desk in-desk"><div className="q"><Qr url={link.url} size={160} /></div><div className="tx"><b>{title || link.label}</b>{cfg.showUrl !== false && <span>{url}</span>}</div></div></div>;
   if (pos === 'desk') return <div className="aud"><div className="qr-desk"><div className="q"><Qr url={link.url} size={200} /></div><div className="tx"><b>{title || link.label}</b>{cfg.showUrl !== false && <span>{url}</span>}</div></div></div>;
   return (
     <div className="aud">

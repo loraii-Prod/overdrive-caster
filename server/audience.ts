@@ -7,8 +7,10 @@
  * Nothing here switches OBS or airs a graphic.
  */
 import { WC_IDS, wcResolve, matchName, type WildcardState } from '../shared/wildcard';
-import { emptyAudPublic, qrUrlOk, teamRoster, type AudOp, type AudPublic, type AudSessionIn, type AudSummary, type QrLink, type StaffMvp } from '../shared/audience';
+import { normHandle } from '../shared/major';
+import { emptyAudPublic, qrUrlOk, sanitizeMvpCard, teamRoster, voteUrlOk, type AudLiveTotals, type MvpCards, type AudOp, type AudPublic, type AudSessionIn, type AudSummary, type QrLink, type StaffMvp } from '../shared/audience';
 import type { GfxInstance } from '../shared/gfx';
+import type { AudPoll } from '../shared/audience';
 import { config } from './config';
 
 export interface AudStore {
@@ -20,8 +22,16 @@ export interface AudStore {
   qrHosts: string[];
   /** Last summary confirmed by the vote service (kept through outages and restarts). */
   last: AudSummary | null;
+  /** Polls whose live totals the producer put on air (only while open). */
+  liveTotals: string[];
+  /** Reveal card extras (stats, achievements) per match and player. */
+  mvpCards: MvpCards;
+  /** Matches whose MVP session is archived (kept, no longer the module's default). */
+  archived: string[];
+  /** Studio override of the public voting address ('' = VOTE_PUBLIC_URL). */
+  publicUrl: string;
 }
-export const emptyAudStore = (): AudStore => ({ lockedMatches: [], championLocked: false, staffMvp: {}, qr: [], qrHosts: [], last: null });
+export const emptyAudStore = (): AudStore => ({ lockedMatches: [], championLocked: false, staffMvp: {}, qr: [], qrHosts: [], last: null, liveTotals: [], mvpCards: {}, archived: [], publicUrl: '' });
 export function sanitizeAudStore(v: any): AudStore {
   const d = emptyAudStore();
   if (!v || typeof v !== 'object') return d;
@@ -34,6 +44,11 @@ export function sanitizeAudStore(v: any): AudStore {
     qr: Array.isArray(v.qr) ? v.qr.slice(0, 20).filter((q: any) => typeof q?.url === 'string' && typeof q?.id === 'string').map((q: any) => ({ id: str(q.id, 24).replace(/[^\w-]/g, ''), label: str(q.label, 40), url: str(q.url, 300), expires: Number(q.expires) || 0 })) : [],
     qrHosts: Array.isArray(v.qrHosts) ? v.qrHosts.filter((h: unknown) => typeof h === 'string' && /^[a-z0-9.-]{3,80}$/.test(h)).slice(0, 10) : [],
     last: v.last && typeof v.last === 'object' && Array.isArray(v.last.matches) ? v.last : null,
+    liveTotals: Array.isArray(v.liveTotals) ? v.liveTotals.filter((x: unknown) => typeof x === 'string').slice(0, 50) : [],
+    mvpCards: v.mvpCards && typeof v.mvpCards === 'object' ? Object.fromEntries(Object.entries(v.mvpCards).filter(([k]) => WC_IDS.includes(k)).map(([k, x]: [string, any]) =>
+      [k, Object.fromEntries(Object.entries(x ?? {}).slice(0, 20).map(([h, c]) => [h.slice(0, 40), sanitizeMvpCard(c)]).filter(([, c]) => c))])) : {},
+    archived: Array.isArray(v.archived) ? v.archived.filter((x: unknown) => typeof x === 'string' && WC_IDS.includes(x as string)) : [],
+    publicUrl: typeof v.publicUrl === 'string' && !voteUrlOk(v.publicUrl) ? v.publicUrl : '',
   };
 }
 
@@ -51,9 +66,11 @@ export class Audience {
   constructor(private store: AudStore, private save: () => void, private wc: () => WildcardState, private push: () => void) {}
 
   get configured() { return !!(config.voteUrl && config.voteSecret); }
-  get publicUrl() { return config.votePublicUrl; }
+  get publicUrl() { return this.store.publicUrl || config.votePublicUrl; }
   /** Hosts a QR code may point to. */
-  get hosts() { return [...new Set([host(config.votePublicUrl), ...this.store.qrHosts].filter(Boolean))]; }
+  get hosts() { return [...new Set([host(this.publicUrl), host(config.votePublicUrl), ...this.store.qrHosts].filter(Boolean))]; }
+  /** Polls already asked to close on their countdown (so a slow answer is not asked twice). */
+  private closing = new Set<string>();
 
   start() {
     if (this.timer) return;
@@ -99,6 +116,11 @@ export class Audience {
       }
       const j = await this.call('GET', '/internal/summary');
       if (j.summary) { this.store.last = j.summary; this.save(); }
+      // Countdown: the vote service already refuses late votes; this freezes the result right on time.
+      for (const p of (j.summary?.polls ?? []) as AudPoll[]) if (p.status === 'open' && p.closesAt && p.closesAt <= Date.now() && !this.closing.has(p.id)) {
+        this.closing.add(p.id);
+        this.call('POST', `/internal/poll/${encodeURIComponent(p.id)}/close`, undefined, 'countdown').then(() => this.tick()).catch(() => this.closing.delete(p.id));
+      }
       this.failures = 0;
       this.setOnline(true, null, true);
     } catch (e: any) {
@@ -114,26 +136,29 @@ export class Audience {
   }
 
   /** What every broadcast client gets: no live counts. */
-  pub(): AudPublic & { staffMvp: StaffMvp; qr: QrLink[] } {
+  pub(): AudPublic & { staffMvp: StaffMvp; qr: QrLink[]; liveTotals: AudLiveTotals; mvpCards: MvpCards; archived: string[] } {
     const s = this.store.last, base = emptyAudPublic(this.publicUrl);
     const now = Date.now();
     const qr = [
       ...(this.publicUrl ? [{ id: 'vote', label: "Pick'ems & MVP", url: this.publicUrl, expires: 0 }] : []),
       ...this.store.qr.filter(q => !qrUrlOk(q.url, this.hosts) && (!q.expires || q.expires > now)),
     ];
-    if (!s) return { ...base, online: this.online, error: this.error, staffMvp: this.store.staffMvp, qr };
+    const extra = { mvpCards: this.store.mvpCards, archived: this.store.archived };
+    if (!s) return { ...base, online: this.online, error: this.error, staffMvp: this.store.staffMvp, qr, liveTotals: {}, ...extra };
+    // Live totals reach the outputs only for an OPEN vote the producer chose to show (never closed or draft ones).
+    const liveTotals: AudLiveTotals = Object.fromEntries(s.polls.filter(p => p.status === 'open' && this.store.liveTotals.includes(p.id)).map(p => [p.id, { total: p.total ?? 0, counts: p.counts ?? {} }]));
     return {
       online: this.online, at: s.at, error: this.error, url: this.publicUrl,
       // Only locked / final matches: an open match's split could still change.
       matches: s.matches.filter(m => m.status !== 'open'),
       champion: s.champion.locked ? s.champion : null,
       polls: s.polls.map(({ counts: _c, total: _t, ...p }) => p),
-      accuracy: s.accuracy, leaderboard: s.leaderboard, staffMvp: this.store.staffMvp, qr,
+      accuracy: s.accuracy, leaderboard: s.leaderboard, staffMvp: this.store.staffMvp, qr, liveTotals, ...extra,
     };
   }
   /** Producer view: everything, live counts included. */
   priv() {
-    return { configured: this.configured, online: this.online, error: this.error, summary: this.store.last, lockedMatches: this.store.lockedMatches, championLocked: this.store.championLocked, qrHosts: this.hosts, customQr: this.store.qr, publicUrl: this.publicUrl };
+    return { configured: this.configured, online: this.online, error: this.error, summary: this.store.last, lockedMatches: this.store.lockedMatches, championLocked: this.store.championLocked, qrHosts: this.hosts, customQr: this.store.qr, publicUrl: this.publicUrl, publicUrlSet: this.store.publicUrl, envPublicUrl: config.votePublicUrl, liveTotals: this.store.liveTotals };
   }
 
   /** Producer command. Returns an error message or null. */
@@ -158,6 +183,31 @@ export class Audience {
         this.store.staffMvp = { ...this.store.staffMvp, [op.match]: cur };
         this.save(); this.push(); return null;
       }
+      case 'mvp-totals': {
+        this.store.liveTotals = op.on ? [...new Set([...this.store.liveTotals, op.poll])].slice(-50) : this.store.liveTotals.filter(x => x !== op.poll);
+        this.save(); this.push(); return null;
+      }
+      case 'mvp-card': {
+        const r = R[op.match];
+        if (!r?.t1 || !r?.t2) return 'Choose a match';
+        if (![...teamRoster(r.t1), ...teamRoster(r.t2)].some(p => p.handle === op.player)) return 'That player did not play this match';
+        const card = sanitizeMvpCard(op.card), cur = { ...(this.store.mvpCards[op.match] ?? {}) };
+        if (card) cur[op.player] = card; else delete cur[op.player];
+        this.store.mvpCards = { ...this.store.mvpCards, [op.match]: cur };
+        this.save(); this.push(); return null;
+      }
+      case 'mvp-archive': {
+        if (!WC_IDS.includes(op.match)) return 'Unknown match';
+        const p = this.store.last?.polls.filter(x => x.match === op.match).pop();
+        if (op.on && p && p.status === 'open') return 'Close voting before archiving';
+        this.store.archived = op.on ? [...new Set([...this.store.archived, op.match])] : this.store.archived.filter(x => x !== op.match);
+        this.save(); this.push(); return null;
+      }
+      case 'vote-url': {
+        const url = String(op.url ?? '').trim(), bad = voteUrlOk(url);
+        if (bad) return bad;
+        this.store.publicUrl = url; this.save(); this.push(); return null;
+      }
       case 'qr-set': {
         const list: QrLink[] = [];
         for (const q of op.qr.slice(0, 20)) {
@@ -177,10 +227,28 @@ export class Audience {
           const st = wc.matches[op.match];
           const result = `${r.t1} ${st.s1}–${st.s2} ${r.t2}`.replace(/\b(W|L|FF)\b/g, m => (m === 'W' ? 'w/o' : m === 'L' ? '' : 'FF')).replace(/\s+/g, ' ').trim();
           this.lastPush = ''; await this.tick(); // the vote service must know the result first
-          await this.call('POST', '/internal/poll', { match: op.match, label: matchName(op.match), result, players: op.players });
+          // Portraits for the public page: only uploaded ones, as absolute https addresses.
+          const base = (process.env.PUBLIC_URL || process.env.RENDER_EXTERNAL_URL || '').trim().replace(/\/$/, '');
+          const photos: Record<string, string> = {};
+          for (const h of op.players) {
+            const u = wc.showcase.photos[normHandle(h)];
+            const abs = !u ? '' : /^https:\/\//.test(u) ? u : u.startsWith('/') && /^https:\/\//.test(base) ? base + u : '';
+            if (abs && abs.length <= 300) photos[h] = abs;
+          }
+          await this.call('POST', '/internal/poll', { match: op.match, label: matchName(op.match), result, players: op.players, photos });
           break;
         }
-        case 'mvp-open': await this.call('POST', `/internal/poll/${encodeURIComponent(op.poll)}/open`); break;
+        case 'mvp-open': {
+          const sec = Number(op.seconds);
+          await this.call('POST', `/internal/poll/${encodeURIComponent(op.poll)}/open`, Number.isFinite(sec) && sec >= 10 ? { seconds: Math.min(3600, Math.round(sec)) } : {});
+          break;
+        }
+        case 'mvp-timer': {
+          const sec = op.seconds == null ? null : Number(op.seconds);
+          if (sec != null && (!Number.isFinite(sec) || sec < 10)) return 'At least 10 seconds';
+          await this.call('POST', `/internal/poll/${encodeURIComponent(op.poll)}/timer`, { seconds: sec == null ? null : Math.min(3600, Math.round(sec)) });
+          break;
+        }
         case 'mvp-close': await this.call('POST', `/internal/poll/${encodeURIComponent(op.poll)}/close`); break;
       }
       await this.tick(); this.push(); return null;

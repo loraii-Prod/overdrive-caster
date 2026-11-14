@@ -36,7 +36,7 @@ export type AudMatchStatus = 'open' | 'locked' | 'final';
 export const matchStatus = (m: Pick<AudMatchIn, 'live' | 'locked' | 'winner'>): AudMatchStatus => (m.winner ? 'final' : m.live || m.locked ? 'locked' : 'open');
 
 export type PollStatus = 'draft' | 'open' | 'closed' | 'revealed';
-export interface AudPlayer { handle: string; team: string }
+export interface AudPlayer { handle: string; team: string; /** Portrait for the public voting page (absolute https URL), when one was uploaded. */ photo?: string }
 export interface AudFrozen { total: number; counts: Record<string, number>; at: number; hash: string }
 export interface AudPoll {
   id: string;
@@ -48,6 +48,8 @@ export interface AudPoll {
   status: PollStatus;
   openedAt: number | null;
   closedAt: number | null;
+  /** Voting closes automatically at this time (ms epoch; votes after it are refused). null = closed by hand. */
+  closesAt?: number | null;
   /** Live counts: PRIVATE (producer only, never on air, never public). */
   total?: number;
   counts?: Record<string, number>;
@@ -105,10 +107,45 @@ export type AudOp =
   | { k: 'lock-match'; match: string; locked: boolean }
   | { k: 'lock-champion'; locked: boolean }
   | { k: 'mvp-prepare'; match: string; players: string[] }
-  | { k: 'mvp-open'; poll: string }
+  | { k: 'mvp-open'; poll: string; /** Countdown: voting closes by itself after this many seconds (optional). */ seconds?: number }
   | { k: 'mvp-close'; poll: string }
+  /** Change or clear the countdown of an open vote. */
+  | { k: 'mvp-timer'; poll: string; seconds: number | null }
+  /** Live totals on air while voting is open (off by default: totals are private until the reveal). */
+  | { k: 'mvp-totals'; poll: string; on: boolean }
+  /** Reveal card extras for one player of one match: up to 4 stats and 3 achievements. */
+  | { k: 'mvp-card'; match: string; player: string; card: MvpCard | null }
+  /** Archive a match's MVP session (results kept, the module moves on to the next match). */
+  | { k: 'mvp-archive'; match: string; on: boolean }
+  /** Public voting page address used for the QR codes (Studio). '' = the VOTE_PUBLIC_URL setting. */
+  | { k: 'vote-url'; url: string }
   | { k: 'staff-mvp'; match: string; slot: number; player: string | null; reason?: string }
   | { k: 'qr-set'; qr: QrLink[] };
+
+export interface MvpCard { stats: { label: string; value: string }[]; achievements: string[] }
+/** match → player handle → reveal extras. */
+export type MvpCards = Record<string, Record<string, MvpCard>>;
+export const MVP_STATS = 4, MVP_ACHIEVEMENTS = 3;
+export function sanitizeMvpCard(v: any): MvpCard | null {
+  if (!v || typeof v !== 'object') return null;
+  const t = (x: unknown, n: number) => (typeof x === 'string' ? x.replace(/\s+/g, ' ').trim().slice(0, n) : '');
+  const stats = (Array.isArray(v.stats) ? v.stats : []).map((x: any) => ({ label: t(x?.label, 24), value: t(x?.value, 16) })).filter((x: any) => x.label && x.value).slice(0, MVP_STATS);
+  const achievements = (Array.isArray(v.achievements) ? v.achievements : []).map((x: unknown) => t(x, 60)).filter(Boolean).slice(0, MVP_ACHIEVEMENTS);
+  return stats.length || achievements.length ? { stats, achievements } : null;
+}
+/** Live totals the producer chose to show on air (only while that vote is open). */
+export type AudLiveTotals = Record<string, { total: number; counts: Record<string, number> }>;
+/** A public voting address the Studio may set: https, no credentials, short enough for a scannable code. */
+export function voteUrlOk(url: string): string | null {
+  if (url === '') return null;
+  let u: URL;
+  try { u = new URL(url); } catch { return 'Not a valid address'; }
+  if (u.protocol !== 'https:') return 'Only https:// addresses';
+  if (u.username || u.password) return 'No passwords in the address';
+  if (!/^[a-z0-9.-]+\.[a-z]{2,}$/i.test(u.hostname)) return 'Use a public host name';
+  if (url.length > 120) return 'Address too long for a scannable code';
+  return null;
+}
 
 /** The desk's own MVP per match (broadcast server state). slot = talent position 1–5. */
 export type StaffMvp = Record<string, Record<string, { player: string; reason: string }>>;

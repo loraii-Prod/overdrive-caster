@@ -24,6 +24,7 @@ create table if not exists audit(id bigserial primary key, at timestamptz not nu
   before jsonb, after jsonb);
 create index if not exists picks_match on picks(session, match);
 create index if not exists votes_poll on mvp_votes(poll);
+alter table polls add column if not exists closes_at timestamptz;
 `;
 
 export type Db = pg.Pool;

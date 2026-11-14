@@ -5,7 +5,7 @@
  */
 import { useState } from 'react';
 import type { AudOp, QrLink } from '../../../shared/audience';
-import { pcts, teamRoster } from '../../../shared/audience';
+import { MVP_ACHIEVEMENTS, MVP_STATS, pcts, teamRoster } from '../../../shared/audience';
 import { matchName, WC_IDS, wcResolve } from '../../../shared/wildcard';
 import type { AudPrivate } from '../../../shared/protocol';
 import type { AudLive } from '../../lib/hooks';
@@ -92,46 +92,114 @@ export function PickemsModule({ x, a }: { x: Ctx; a: AudCtx }) {
 
 // ------------------------------------------------------------------ MVP
 
+const COUNTDOWNS: [string, string][] = [['0', 'No timer'], ['60', '1 min'], ['120', '2 min'], ['180', '3 min'], ['300', '5 min']];
+
 export function MvpModule({ x, a }: { x: Ctx; a: AudCtx }) {
+  const archived = a.aud?.archived ?? [];
   const done = matchesWithTeams(x).filter(r => r.winner && r.winner !== 'BYE');
   const [sel, setSel] = useState('');
-  const id = sel || (x.wc.cast && done.some(d => d.id === x.wc.cast) ? x.wc.cast : done[done.length - 1]?.id) || '';
+  // Default: the cast match, else the latest finished match not archived yet (= the next MVP session).
+  const next = [...done].reverse().find(d => !archived.includes(d.id));
+  const id = sel || (x.wc.cast && done.some(d => d.id === x.wc.cast) && !archived.includes(x.wc.cast) ? x.wc.cast : next?.id ?? done[done.length - 1]?.id) || '';
   const m = done.find(r => r.id === id);
   const roster = m ? [...teamRoster(m.t1!), ...teamRoster(m.t2!)] : [];
   const [off, setOff] = useState<string[]>([]);
+  const [cd, setCd] = useState('0');
   const poll = a.priv?.summary?.polls.filter(p => p.match === id).pop();
   const staff = a.aud?.staffMvp[id] ?? {};
   const seats = [1, 2, 3, 4, 5].filter(s => x.st.live.casters.find(c => c.id === s)?.enabled);
   const frozen = !!poll?.frozen;
+  const isArchived = archived.includes(id);
+  const totalsOn = !!poll && !!a.priv?.liveTotals.includes(poll.id);
+  const left = poll?.status === 'open' && poll.closesAt ? Math.max(0, Math.round((poll.closesAt - x.now) / 1000)) : null;
+  const g = gfxOf(x, 'mvp'), draftStep = g?.draft?.step, draftMatch = g?.draft?.match;
+  const reveal = ['winner', 'desk', 'compare'];
+  const [busy, setBusy] = useState(false);
+  const once = async (f: () => unknown) => { if (busy) return; setBusy(true); try { await f(); } finally { setTimeout(() => setBusy(false), 600); } };
+  const top = poll?.frozen ? Object.entries(poll.frozen.counts).sort((p, q) => q[1] - p[1])[0]?.[0] : undefined;
   return (
     <>
       <Health a={a} />
-      <div className="flex items-center gap-2"><Tag>Finished match</Tag>
+      <div className="flex items-center gap-2"><Tag>Match</Tag>
         <select value={id} onChange={e => { setSel(e.target.value); setOff([]); }} className="min-w-0 flex-1 rounded-[2px] border border-white/15 bg-black px-1 py-0.5 text-[12px]">
-          {done.map(r => <option key={r.id} value={r.id}>{matchName(r.id)}: {r.t1} vs {r.t2}</option>)}
+          {done.map(r => <option key={r.id} value={r.id}>{matchName(r.id)}: {r.t1} vs {r.t2}{archived.includes(r.id) ? ' (archived)' : ''}</option>)}
         </select></div>
       {!m ? <div className="text-[12px] text-white/50">MVP voting opens after a match has a result.</div> : <>
         <Tag>Eligible players</Tag>
         <div className="flex flex-wrap gap-1">{roster.map(p => <Chip key={p.handle} on={!off.includes(p.handle)} disabled={!!poll && poll.status !== 'draft'} onClick={() => setOff(o => (o.includes(p.handle) ? o.filter(h => h !== p.handle) : [...o, p.handle]))}>{p.handle}</Chip>)}</div>
         <Tag live>Voting</Tag>
         <div className="flex flex-wrap items-center gap-1 text-[12px]">
-          <span className="mr-1">{poll ? poll.status.toUpperCase() : 'NOT PREPARED'}</span>
+          <span className="mr-1" data-testid="mvp-status">{poll ? poll.status.toUpperCase() : 'NOT PREPARED'}</span>
           {(!poll || poll.status === 'draft') && <Btn onClick={() => a.op({ k: 'mvp-prepare', match: id, players: roster.filter(p => !off.includes(p.handle)).map(p => p.handle) }, 'Prepare MVP vote')}>Prepare</Btn>}
-          {poll?.status === 'draft' && <Btn active onClick={() => a.op({ k: 'mvp-open', poll: poll.id }, 'Open MVP voting')}>Open voting</Btn>}
-          {poll?.status === 'open' && <Btn danger onClick={() => a.op({ k: 'mvp-close', poll: poll.id }, 'Close MVP voting')}>Close voting</Btn>}
+          {poll?.status === 'draft' && <>
+            <Seg value={cd} options={COUNTDOWNS} onChange={setCd} />
+            <Btn active onClick={() => a.op({ k: 'mvp-open', poll: poll.id, ...(Number(cd) ? { seconds: Number(cd) } : {}) }, 'Open MVP voting')}>Open voting</Btn>
+          </>}
+          {poll?.status === 'open' && <>
+            <Btn danger onClick={() => a.op({ k: 'mvp-close', poll: poll.id }, 'Close MVP voting')}>Close voting</Btn>
+            <Tiny title="Countdown +30 s" onClick={() => a.op({ k: 'mvp-timer', poll: poll.id, seconds: (left ?? 0) + 30 }, 'MVP countdown +30 s')}>+30s</Tiny>
+            {left != null && <Tiny title="Remove the countdown (close by hand)" onClick={() => a.op({ k: 'mvp-timer', poll: poll.id, seconds: null }, 'MVP countdown off')}>No timer</Tiny>}
+            {left != null && <span className="tabular-nums text-white/70" data-testid="mvp-countdown">closes in {Math.floor(left / 60)}:{String(left % 60).padStart(2, '0')}</span>}
+          </>}
         </div>
+        {poll?.status === 'open' && <div className="flex items-center gap-2 text-[11.5px]">
+          <Chip on={totalsOn} onClick={() => a.op({ k: 'mvp-totals', poll: poll.id, on: !totalsOn }, totalsOn ? 'MVP live totals off air' : 'MVP live totals on air')}>Live totals on air</Chip>
+          <span className="text-white/45">{totalsOn ? 'Viewers see the running split on the voting graphic.' : 'Off: totals stay private until the reveal.'}</span>
+        </div>}
         {poll && poll.status !== 'draft' && <><div className="text-[11px] text-white/50">{poll.status === 'open' ? `Live count (private): ${poll.total ?? 0} votes` : `Frozen at close: ${poll.frozen?.total ?? 0} votes · ${poll.status === 'revealed' ? 'revealed' : 'not revealed yet'}`}</div>
           <Bars rows={poll.players.map(p => [p.handle, (poll.status === 'open' ? poll.counts?.[p.handle] : poll.frozen?.counts[p.handle]) ?? 0] as [string, number]).sort((p, q) => q[1] - p[1])} /></>}
-        <Tag live>Desk MVP</Tag>
+        <Tag live>Analyst MVP</Tag>
         {seats.map(s => { const name = x.st.live.casters.find(c => c.id === s)?.name ?? `Pos ${s}`, cur = staff[String(s)]?.player; return (
           <div key={s} className="flex flex-wrap items-center gap-1 text-[11.5px]"><span className="w-[80px] truncate font-bold">{name}</span>
             {roster.map(p => <Chip key={p.handle} on={cur === p.handle} onClick={() => a.op({ k: 'staff-mvp', match: id, slot: s, player: cur === p.handle ? null : p.handle }, `${name} MVP ${p.handle}`)}>{p.handle}</Chip>)}</div>); })}
+        <CardEditor a={a} match={id} roster={roster.map(p => p.handle)} suggest={top ?? Object.values(staff)[0]?.player} />
         <Tag>Graphic (prepare, then Publish)</Tag>
         <Steps x={x} gfx="mvp" match={id} value="" disabled={!a.priv?.online && !frozen ? 'Voting offline: the winner can only be shown from a frozen result.' : undefined}
           steps={[['voting', 'Voting open'], ['winner', 'Community MVP', !frozen], ['desk', 'Analyst MVP', !Object.keys(staff).length], ['compare', 'Community vs Analysts', !frozen || !Object.keys(staff).length]]} />
-        {!frozen && <div className="text-[11px] text-white/45">The winner steps unlock once voting is closed. Closing never shows anything on air.</div>}
+        <div className="flex flex-wrap items-center gap-1">
+          <Btn disabled={!frozen || busy} title={frozen ? 'Prepare the Community MVP reveal in Preview (Program untouched)' : 'Close voting first'} onClick={() => once(() => x.run({ c: 'gfx-set', id: 'mvp', patch: { match: id, step: 'winner' } }, 'Preview MVP reveal'))}>Preview reveal</Btn>
+          <Btn danger disabled={busy || !g?.draft || draftMatch !== id || !reveal.includes(String(draftStep))} title="Publish the prepared reveal to Program (does not switch OBS)"
+            onClick={() => once(() => x.run({ c: 'gfx-publish', id: 'mvp' }, 'REVEAL MVP on Program'))}>REVEAL on Program</Btn>
+          <span className="text-[11px] text-white/45">{g?.draft && reveal.includes(String(draftStep)) && draftMatch === id ? `Prepared: ${draftStep}` : 'Nothing prepared'}</span>
+        </div>
+        {!frozen && <div className="text-[11px] text-white/45">The reveal steps unlock once voting is closed. Closing never shows anything on air.</div>}
+        <Tag>Session</Tag>
+        <div className="flex flex-wrap items-center gap-1 text-[11.5px]">
+          <Btn disabled={poll?.status === 'open'} title={poll?.status === 'open' ? 'Close voting first' : ''} onClick={() => a.op({ k: 'mvp-archive', match: id, on: !isArchived }, isArchived ? 'Restore MVP session' : 'Archive MVP session').then(e => { if (!e && !isArchived) setSel(''); })}>{isArchived ? 'Restore' : 'Archive & next match'}</Btn>
+          <span className="text-white/45">{isArchived ? 'Archived: results kept.' : next && next.id !== id ? `Next: ${matchName(next.id)}` : 'Results stay stored after archiving.'}</span>
+        </div>
       </>}
     </>
+  );
+}
+
+/** Reveal extras for one player: up to 4 stats (label + value) and 3 achievements, entered by the producer. */
+function CardEditor({ a, match, roster, suggest }: { a: AudCtx; match: string; roster: string[]; suggest?: string }) {
+  const [who, setWho] = useState('');
+  const player = who && roster.includes(who) ? who : suggest && roster.includes(suggest) ? suggest : roster[0] ?? '';
+  const card = a.aud?.mvpCards?.[match]?.[player];
+  const [draft, setDraft] = useState<{ key: string; stats: { label: string; value: string }[]; ach: string[] } | null>(null);
+  const key = `${match}|${player}|${JSON.stringify(card ?? null)}`;
+  const d = draft && draft.key === key ? draft : { key, stats: Array.from({ length: MVP_STATS }, (_, i) => card?.stats[i] ?? { label: '', value: '' }), ach: Array.from({ length: MVP_ACHIEVEMENTS }, (_, i) => card?.achievements[i] ?? '') };
+  const set = (f: (x: typeof d) => typeof d) => setDraft(f({ ...d, stats: d.stats.map(s => ({ ...s })), ach: [...d.ach] }));
+  if (!player) return null;
+  return (
+    <details className="text-[11.5px]">
+      <summary className="cursor-pointer text-white/70">Reveal card: stats & achievements{card ? ' ✓' : ''}</summary>
+      <div className="mt-1 space-y-1">
+        <select value={player} onChange={e => { setWho(e.target.value); setDraft(null); }} className="rounded-[2px] border border-white/15 bg-black px-1 py-0.5">
+          {roster.map(h => <option key={h} value={h}>{h}{h === suggest ? ' (suggested)' : ''}</option>)}</select>
+        {d.stats.map((st, i) => <div key={i} className="flex gap-1">
+          <input aria-label={`Stat ${i + 1} label`} placeholder="Stat (e.g. Maps won)" maxLength={24} value={st.label} onChange={e => set(x => { x.stats[i].label = e.target.value; return x; })} className="min-w-0 flex-1 rounded-[2px] border border-white/15 bg-black px-1" />
+          <input aria-label={`Stat ${i + 1} value`} placeholder="Value" maxLength={16} value={st.value} onChange={e => set(x => { x.stats[i].value = e.target.value; return x; })} className="w-[80px] rounded-[2px] border border-white/15 bg-black px-1" /></div>)}
+        {d.ach.map((t, i) => <input key={i} aria-label={`Achievement ${i + 1}`} placeholder="Achievement (e.g. Fastest lap on Oasis)" maxLength={60} value={t} onChange={e => set(x => { x.ach[i] = e.target.value; return x; })} className="w-full rounded-[2px] border border-white/15 bg-black px-1" />)}
+        <div className="flex gap-1">
+          <Btn onClick={() => a.op({ k: 'mvp-card', match, player, card: { stats: d.stats, achievements: d.ach } }, `MVP card ${player}`).then(() => setDraft(null))}>Save card</Btn>
+          {card && <Btn onClick={() => a.op({ k: 'mvp-card', match, player, card: null }, `Clear MVP card ${player}`).then(() => setDraft(null))}>Clear</Btn>}
+        </div>
+        <div className="text-white/45">Shown on the reveal under the player (Community, Analyst and agree views). Only what you type here: nothing is computed.</div>
+      </div>
+    </details>
   );
 }
 

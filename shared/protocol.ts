@@ -127,7 +127,7 @@ export type ServerMsg =
   | { t: 'wc-pop'; pop: WcPop }
   | { t: 'twitch'; tw: TwitchPublic }
   /** Audience results everyone may draw (frozen only) + the desk MVPs + approved QR links. */
-  | { t: 'aud'; aud: import('./audience').AudPublic & { staffMvp: import('./audience').StaffMvp; qr: import('./audience').QrLink[] } }
+  | { t: 'aud'; aud: import('./audience').AudPublic & { staffMvp: import('./audience').StaffMvp; qr: import('./audience').QrLink[]; liveTotals: import('./audience').AudLiveTotals; mvpCards: import('./audience').MvpCards; archived: string[] } }
   /** Producer only: live counts and vote-service health. */
   | { t: 'aud-private'; aud: AudPrivate }
   | { t: 'aud-ack'; id: string; ok: boolean; error?: string }
@@ -163,5 +163,5 @@ export interface PerfReport {
 }
 export interface AudPrivate {
   configured: boolean; online: boolean; error: string | null; summary: import('./audience').AudSummary | null;
-  lockedMatches: string[]; championLocked: boolean; qrHosts: string[]; customQr: import('./audience').QrLink[]; publicUrl: string;
+  lockedMatches: string[]; championLocked: boolean; qrHosts: string[]; customQr: import('./audience').QrLink[]; publicUrl: string; /** Studio override of the public voting address ('' = the server setting). */ publicUrlSet: string; envPublicUrl: string; liveTotals: string[];
 }

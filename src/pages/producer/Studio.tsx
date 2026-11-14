@@ -19,6 +19,8 @@ import { obsSceneOfGfx } from './Library';
 import { ObsSetupPanel } from './ObsSetup';
 import { B, C, LABEL, VisBadge } from './ws';
 import { AssetLibrary, Recovery } from './StorageStudio';
+import { Qr } from '../../components/Qr';
+import { voteUrlOk } from '../../../shared/audience';
 
 type Run = (c: ProducerCmd, l: string) => Promise<Ack>;
 
@@ -242,8 +244,41 @@ function ShowFilePanel({ st, run }: { st: ControllerState; run: Run }) {
 }
 
 // ======================================================================= Studio shell
-export type StudioTab = 'packages' | 'instances' | 'obs' | 'talent' | 'bindings' | 'modules' | 'assets' | 'show';
-export const STUDIO_TABS: [StudioTab, string][] = [['packages', 'Packages'], ['instances', 'Instances & OBS'], ['obs', 'OBS Setup'], ['talent', 'Talent'], ['bindings', 'Data bindings'], ['modules', 'Control modules'], ['assets', 'Assets'], ['show', 'Show file']];
+/** Public voting address (what every QR code points to) + what the audience features expose. */
+function AudiencePanel({ x }: { x: Ctx }) {
+  const p = x.aud?.priv ?? null;
+  const [url, setUrl] = useState<string | null>(null), [msg, setMsg] = useState<{ t: string; bad?: boolean } | null>(null);
+  const val = url ?? p?.publicUrlSet ?? '';
+  const bad = voteUrlOk(val.trim());
+  const save = async (u: string) => { const e = x.aud ? await x.aud.op({ k: 'vote-url', url: u }, 'Public voting URL') : 'Not connected'; setMsg(e ? { t: e, bad: true } : { t: u ? 'Saved: QR codes now point here.' : 'Back to the server setting.' }); if (!e) setUrl(null); };
+  return (
+    <div className="space-y-3 overflow-auto p-3 text-[12px]" data-studio-audience>
+      <div className="text-[11px] uppercase tracking-[0.12em] text-white/45">Public voting page</div>
+      <div className="flex items-center gap-2">
+        <input aria-label="Public voting URL" value={val} placeholder={p?.envPublicUrl || 'https://vote.example.com/vote'} onChange={e => setUrl(e.target.value)} className="min-w-0 flex-1 rounded-[2px] border border-white/15 bg-black px-2 py-1 font-mono text-[12px]" />
+        <Btn disabled={!!bad || val.trim() === (p?.publicUrlSet ?? '')} onClick={() => save(val.trim())}>Save</Btn>
+        {p?.publicUrlSet && <Btn onClick={() => save('')}>Use server setting</Btn>}
+      </div>
+      {bad && val.trim() && <div style={{ color: WARN }}>{bad}</div>}
+      {msg && <div style={{ color: msg.bad ? WARN : PVW }}>{msg.t}</div>}
+      <div className="text-white/55">In use: <b className="font-mono text-white/85">{p?.publicUrl || 'none'}</b> {p?.publicUrlSet ? '(set here)' : p?.envPublicUrl ? '(VOTE_PUBLIC_URL)' : ''}. Empty field = the server's VOTE_PUBLIC_URL. Only https; this host is approved for QR codes automatically.</div>
+      {p?.publicUrl && <div className="flex items-start gap-3">
+        <div className="bg-white p-2"><Qr url={p.publicUrl} size={168} /></div>
+        <div className="text-white/55">Same code as on air (lower-third size, 168 px of 1080; 336 px at 4K). Scan it from across the room to check it before the show.</div>
+      </div>}
+      <div className="text-[11px] uppercase tracking-[0.12em] text-white/45">What viewers can reach</div>
+      <ul className="list-disc space-y-0.5 pl-5 text-white/60">
+        <li>The voting page is the vote service's own site, separate from Producer and Studio; it never receives producer credentials.</li>
+        <li>Nothing audience-related is on air until a producer publishes a graphic; the page shows only open votes, closed state, and results already revealed on stream.</li>
+        <li>Vote service: {p?.configured ? (p.online ? 'online' : `offline (${p.error})`) : 'not configured (VOTE_URL / VOTE_SECRET): no public voting at all'}.</li>
+        <li>One vote per Twitch account per MVP vote, enforced by the server (plus rate limits). That is per account, not per person: someone with several Twitch accounts can vote several times.</li>
+      </ul>
+    </div>
+  );
+}
+
+export type StudioTab = 'packages' | 'instances' | 'obs' | 'talent' | 'bindings' | 'modules' | 'assets' | 'audience' | 'show';
+export const STUDIO_TABS: [StudioTab, string][] = [['packages', 'Packages'], ['instances', 'Instances & OBS'], ['obs', 'OBS Setup'], ['talent', 'Talent'], ['bindings', 'Data bindings'], ['modules', 'Control modules'], ['assets', 'Assets'], ['audience', 'Audience & QR'], ['show', 'Show file']];
 
 export function StudioMode({ st, run, tab, setTab, sel, onSelectGfx, srcForModules, setSrcForModules, x }: {
   st: ControllerState; run: Run; tab: StudioTab; setTab: (t: StudioTab) => void; sel: string; onSelectGfx: (id: string) => void;
@@ -270,6 +305,7 @@ export function StudioMode({ st, run, tab, setTab, sel, onSelectGfx, srcForModul
         {tab === 'bindings' && <BindingsPanel st={st} wc={x.wc} />}
         {tab === 'modules' && <ModuleLayoutPanel st={st} src={srcForModules} run={run} />}
         {tab === 'assets' && <AssetsPanel x={x} />}
+        {tab === 'audience' && <AudiencePanel x={x} />}
         {tab === 'show' && <ShowFilePanel st={st} run={run} />}
       </div>
     </div>
