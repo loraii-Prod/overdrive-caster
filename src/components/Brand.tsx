@@ -1,3 +1,4 @@
+import { hiRes } from '../../shared/assetRes';
 import { useEffect, useRef, type CSSProperties } from 'react';
 import { useTheme } from '../lib/theme';
 import { skinOf } from '../../shared/skins';
@@ -16,23 +17,23 @@ export const BRAND = {
 
 export function Logo({ height, style, className }: { height: number; style?: CSSProperties; className?: string }) {
   const { brand } = useTheme();
-  if (brand?.logo) return <img src={brand.logo} alt="" draggable={false} className={className} style={{ height, width: 'auto', display: 'block', ...style }} />;
+  if (brand?.logo) return <img src={hiRes(brand.logo)} alt="" draggable={false} className={className} style={{ height, width: 'auto', display: 'block', ...style }} />;
   if (brand?.name || brand?.mark) {
     const words = (brand.name || '').toUpperCase().split(/\s+/).filter(Boolean);
     const l1 = words.length > 1 ? words[0] : words.join(' '), l2 = words.length > 1 ? words.slice(1).join(' ') : '';
     return (
       <div className={`flex items-center ${className ?? ''}`} style={{ height, gap: height * 0.22, ...style }}>
-        <img src={brand.mark || BRAND.mark} alt="" draggable={false} style={{ height: height * 0.92, width: 'auto' }} />
+        <img src={hiRes(brand.mark || BRAND.mark)} alt="" draggable={false} style={{ height: height * 0.92, width: 'auto' }} />
         {words.length > 0 && <div className="font-display leading-[0.86] text-white" style={{ fontSize: height * (l2 ? 0.4 : 0.55), letterSpacing: '0.04em' }}>{l1}{l2 && <><br />{l2}</>}</div>}
       </div>
     );
   }
-  return <img src={BRAND.logo} alt="Overdrive" draggable={false} className={className} style={{ height, width: 'auto', display: 'block', ...style }} />;
+  return <img src={hiRes(BRAND.logo)} alt="Overdrive" draggable={false} className={className} style={{ height, width: 'auto', display: 'block', ...style }} />;
 }
 
 export function Mark({ height, style, className }: { height: number; style?: CSSProperties; className?: string }) {
   const { brand } = useTheme();
-  return <img src={brand?.mark || brand?.logo || BRAND.mark} alt="" draggable={false} className={className} style={{ height, width: 'auto', display: 'block', ...style }} />;
+  return <img src={hiRes(brand?.mark || brand?.logo || BRAND.mark)} alt="" draggable={false} className={className} style={{ height, width: 'auto', display: 'block', ...style }} />;
 }
 
 /** Repeating background pattern, shown only when an event has no skin/background of its own. */
@@ -62,7 +63,7 @@ export function BgVideo({ className = '' }: { className?: string }) {
   if (!src) return null;
   return (
     <div className={`absolute inset-0 overflow-hidden bg-[#070707] ${className}`}>
-      <video ref={ref} key={src} src={src} muted loop playsInline autoPlay preload="auto" className="absolute inset-0 h-full w-full object-cover" />
+      <video ref={ref} key={src} src={hiRes(src)} muted loop playsInline autoPlay preload="auto" className="absolute inset-0 h-full w-full object-cover" />
     </div>
   );
 }

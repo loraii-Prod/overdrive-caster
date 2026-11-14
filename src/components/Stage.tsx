@@ -1,4 +1,5 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
+import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
+import { setHiResAssets } from '../../shared/assetRes';
 import { AnimatePresence, motion } from 'motion/react';
 import { BNL, compose, CANVAS, deviceScale } from '../../shared/layout';
 import type { Caster, ForcedLayout, Rect, Scene, ThemeId, Tile } from '../../shared/types';
@@ -44,7 +45,8 @@ interface Props {
  */
 export function ScaledCanvas({ children, className = '', output = false }: { children: ReactNode; className?: string; output?: boolean }) {
   const ref = useRef<HTMLDivElement>(null);
-  const [box, setBox] = useState<{ w: number; h: number }>({ w: CANVAS.w, h: CANVAS.h });
+  // Outputs fill the window: start from its size, so the first render already has the right scale (and assets).
+  const [box, setBox] = useState<{ w: number; h: number }>(() => (output && typeof window !== 'undefined' && innerWidth && innerHeight ? { w: innerWidth, h: innerHeight } : { w: CANVAS.w, h: CANVAS.h }));
   useLayoutEffect(() => {
     const el = ref.current!;
     const fit = () => { if (el.clientWidth && el.clientHeight) setBox({ w: el.clientWidth, h: el.clientHeight }); };
@@ -55,6 +57,8 @@ export function ScaledCanvas({ children, className = '', output = false }: { chi
   }, []);
   const ready = useFontsReady(output);
   const s = output ? deviceScale(box.w, box.h) : Math.min(box.w / CANVAS.w, box.h / CANVAS.h) || 1;
+  const hi = output && s >= 1.5;
+  if (output) setHiResAssets(hi); // before the scene below renders: 4K replacements only at 4K
   // An exact whole-number fit that fills the box is anchored at 0,0: no centring offset, every unit on whole device pixels.
   const exact = output && Number.isInteger(s) && box.w === CANVAS.w * s && box.h === CANVAS.h * s;
   const zoom = exact && rasterMode() === 'zoom';
@@ -67,7 +71,7 @@ export function ScaledCanvas({ children, className = '', output = false }: { chi
     <div ref={ref} className={`relative h-full w-full overflow-hidden ${className}`}
       {...(output ? { 'data-od-canvas': `${box.w}x${box.h}`, 'data-od-scale': String(Math.round(s * 1000) / 1000), 'data-od-raster': zoom ? 'zoom' : 'transform', 'data-od-ready': ready ? '1' : '0' } : {})}>
       <div style={{ ...style, ...(ready ? {} : { visibility: 'hidden' }) }}>
-        {children}
+        <Fragment key={output ? (hi ? 'uhd' : 'fhd') : 'p'}>{children}</Fragment>
       </div>
     </div>
   );

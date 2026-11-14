@@ -65,7 +65,7 @@ function TeamEditor({ team, side, onChange, liveScore, quick, locked }: { team: 
       </div>
       <div className="mt-2 flex items-end gap-2">
         <div className="min-w-0 flex-1"><Label>Logo URL</Label><TextField mono value={team.logo} onChange={v => onChange({ ...team, logo: v })} placeholder="/uploads/… or https://…" /></div>
-        <UploadButton onUrl={url => onChange({ ...team, logo: url })} />
+        <UploadButton role="team-logo" onUrl={url => onChange({ ...team, logo: url })} />
       </div>
       {locked && <p className="mt-2 text-[11px] text-white/40">Linked to the featured bracket match.</p>}
     </div>
@@ -222,7 +222,7 @@ export function SponsorsTab({ show, set }: ShowProps) {
   return (
     <div>
       <div className="mb-3 flex items-center gap-3">
-        <UploadButton label="Upload logo" onUrl={u => set({ sponsors: [...show.sponsors, u] })} />
+        <UploadButton label="Upload logo" role="logo" onUrl={u => set({ sponsors: [...show.sponsors, u] })} />
         <input className="input min-w-0 flex-1" placeholder="…or paste an image URL" value={url} onChange={e => setUrl(e.target.value)} />
         <button type="button" className="btn-sm" disabled={!url.trim()} onClick={() => { set({ sponsors: [...show.sponsors, url.trim()] }); setUrl(''); }}>Add</button>
         <label className="flex items-center gap-2 text-[12px] text-white/55">Rotate every

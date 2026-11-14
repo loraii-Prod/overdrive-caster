@@ -3,6 +3,7 @@
  * Each map has an in-game shot (public/brand/overdrive/maps/<id>.jpg) used on the map card and the veto;
  * a photo uploaded in the Major tab replaces it. MapArt.tsx (drawn in code) is the fallback.
  */
+import { hiRes } from './assetRes';
 export interface MajorMap {
   id: string;
   country: string;
@@ -31,4 +32,4 @@ export const isMapId = (v: unknown): v is string => typeof v === 'string' && MAJ
 export const MAP_CARD_MS = 7000;
 
 /** The picture for a map: the uploaded photo, else the in-game shot. */
-export const mapPhoto = (id: string, uploads: Record<string, string> = {}) => uploads[id] || majorMap(id)?.photo || '';
+export const mapPhoto = (id: string, uploads: Record<string, string> = {}) => uploads[id] || hiRes(majorMap(id)?.photo) || '';

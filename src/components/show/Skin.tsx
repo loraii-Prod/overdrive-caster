@@ -1,3 +1,4 @@
+import { hiRes } from '../../../shared/assetRes';
 import { Reveal } from '../Reveal';
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
@@ -27,7 +28,7 @@ export function useSkin(): Skin | null {
 export function SkinVideo({ src, style, loop = true, onEnded }: { src: string; style?: CSSProperties; loop?: boolean; onEnded?: () => void }) {
   const ref = useRef<HTMLVideoElement>(null);
   useEffect(() => { const v = ref.current; if (v) { v.currentTime = 0; v.play().catch(() => {}); } }, [src]);
-  return <video ref={ref} key={src} src={src} muted loop={loop} playsInline autoPlay preload="auto" onEnded={onEnded}
+  return <video ref={ref} key={src} src={hiRes(src)} muted loop={loop} playsInline autoPlay preload="auto" onEnded={onEnded}
     className="pointer-events-none absolute inset-0 h-full w-full object-cover" style={style} />;
 }
 
@@ -193,7 +194,7 @@ export function SkinIntermission({ skin, kind, show, now, bnl }: { skin: Skin; k
   const hasMatch = show.showMatchupOnScreens && (a.name || b.name);
   return (
     <div className="absolute inset-0">
-      <motion.img src={skin.plates[kind]} alt="" className="pointer-events-none absolute inset-0 h-full w-full" initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, ease: EASE }} />
+      <motion.img src={hiRes(skin.plates[kind])} alt="" className="pointer-events-none absolute inset-0 h-full w-full" initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, ease: EASE }} />
       <div className="absolute flex items-center gap-10 px-12" style={{ left: p.x, top: p.y, width: p.w, height: p.h }}>
         {timer && (
           // Fixed width keeps the divider + matchup panel from drifting as the

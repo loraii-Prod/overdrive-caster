@@ -12,6 +12,7 @@
  *   4. Rapid changes always settle on the latest target; nothing is left half-way.
  * Only opacity, transform and clip-path are animated.
  */
+import { hiRes } from '../../shared/assetRes';
 import { createContext, useContext, useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 
 export type TransitionKind = 'crossfade' | 'slide' | 'wipe' | 'scale' | 'cut';
@@ -134,7 +135,7 @@ export function StageVideo({ src, visible, ms, enter = 'fade', leave = 'fade', w
   const style: CSSProperties = visible
     ? { opacity: 1, transition: enter === 'instant' ? 'none' : `opacity ${ms}ms ${EASE_OUT}${wipe ? `, clip-path ${ms}ms ${EASE_OUT}` : ''}`, clipPath: wipe ? 'inset(0 0 0 0)' : undefined }
     : { opacity: 0, transition: leave === 'hold' ? `opacity 0s linear ${ms}ms` : `opacity ${ms}ms ${EASE_OUT}`, clipPath: wipe ? 'inset(0 100% 0 0)' : undefined };
-  return <video ref={ref} src={src} muted loop playsInline autoPlay preload="auto" data-stage-video={src} data-visible={visible ? '1' : '0'}
+  return <video ref={ref} src={hiRes(src)} muted loop playsInline autoPlay preload="auto" data-stage-video={src} data-visible={visible ? '1' : '0'}
     className="pointer-events-none absolute inset-0 h-full w-full object-cover" style={{ ...style, zIndex: z, willChange: 'opacity' }} />;
 }
 

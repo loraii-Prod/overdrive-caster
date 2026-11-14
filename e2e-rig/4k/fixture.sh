@@ -15,5 +15,5 @@ s['stories'] = [{'id': 's-fixture', 'kind': 'rivalry', 'title': 'Third final in 
 s['wildcard']['teams'] = ['Solary', 'Nexus Esports', 'Karmine Corp', 'BIG', 'Team Vitality', 'Elevate', 'Sinners', 'Joka Esports']
 json.dump(s, open(p, 'w'))
 PY
-(cd $R && PORT=8787 DATA_DIR=/tmp/od4k CONTROLLER_PASSWORD=testpw ADMIN_PASSWORD=adminpw nohup node dist/server.js >> /tmp/od4k.log 2>&1 &)
+(cd $R && PORT=8787 DATA_DIR=/tmp/od4k CONTROLLER_PASSWORD=testpw ADMIN_PASSWORD=adminpw nohup node dist/server.js >> /tmp/od4k.log 2>&1 < /dev/null &)
 for i in $(seq 1 50); do curl -sf localhost:8787/api/health >/dev/null && break; sleep 0.2; done

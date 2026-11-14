@@ -1,3 +1,4 @@
+import { advice4k, imageInfo, roleOf } from '../shared/assetAdvice';
 import { MEDIA_EXT, mediaName } from '../shared/media';
 import type { ProducerCmd } from '../shared/engine';
 import fs from 'node:fs';
@@ -231,7 +232,10 @@ export function uploads() {
     if (!ext.match(/mp4|webm/) && req.body.length > 8 * 1024 * 1024) return res.status(413).json({ error: 'images up to 8 MB' });
     const name = `${crypto.randomBytes(9).toString('base64url')}.${ext}`;
     fs.writeFileSync(path.join(dir, name), req.body);
-    res.json({ url: `/uploads/${name}` });
+    // 4K size advice for the role it is uploaded for (?role=team-logo|logo|portrait|map|background): never blocks.
+    const info = ext.match(/mp4|webm/) ? null : imageInfo(req.body);
+    const advice = advice4k(roleOf(req.query.role), info);
+    res.json({ url: `/uploads/${name}`, ...(info ? { size: info.vector ? 'vector' : `${info.w}x${info.h}` } : {}), ...(advice ? { advice } : {}) });
   });
   r.use('/uploads', express.static(dir, {
     maxAge: '365d',

@@ -1,3 +1,4 @@
+import { hiRes } from './assetRes';
 import { MAJOR_TEAMS } from './major';
 import { MAJOR_MAPS, isMapId } from './maps';
 
@@ -44,7 +45,7 @@ export const SEASON_SHEET_ID = '1wvKS0QsGqGUXCM2upmuFVw4pKUPPwYGi-D1o21v62gU';
 export const WC_TEAMS: Record<string, { seed: number; logo: string }> = Object.fromEntries(MAJOR_TEAMS.map((t, i) => [t.name, { seed: i + 1, logo: t.logo }]));
 export const wcLogo = (name: string | null | undefined): string => {
   const t = name ? WC_TEAMS[name] : undefined;
-  return t ? `/brand/overdrive/teams/${t.logo}.png` : '';
+  return t ? hiRes(`/brand/overdrive/teams/${t.logo}.png`) : '';
 };
 
 /** No default times: they come from the sheet or the controller. */

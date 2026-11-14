@@ -6,7 +6,7 @@
   "description": "Overdrive — web broadcast caster system",
   "scripts": {
     "dev": "node scripts/embed-plugin.mjs && concurrently -k -n server,client \"tsx watch server/index.ts\" \"vite\"",
-    "build": "npm install --include=dev --no-audit --no-fund && node scripts/embed-plugin.mjs && tsc -p tsconfig.json --noEmit && vite build && esbuild server/index.ts --bundle --platform=node --format=esm --packages=external --outfile=dist/server.js",
+    "build": "npm install --include=dev --no-audit --no-fund && node scripts/embed-plugin.mjs && node scripts/uhd-manifest.mjs && tsc -p tsconfig.json --noEmit && vite build && esbuild server/index.ts --bundle --platform=node --format=esm --packages=external --outfile=dist/server.js",
     "start": "node dist/server.js",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },

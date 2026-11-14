@@ -2,6 +2,7 @@
  * OverDrive 2026 Split 3 Major: player profiles for the Warm-up screen.
  * From Liquipedia (player pages, read 9 Nov 2026): check for changes before the event (21–22 Nov).
  */
+import { hiRes } from './assetRes';
 export interface MajorProfile {
   handle: string; team: string; how: string; name: string; country: string; age: string; winnings: string; history: string;
   /** Best / most recent placings: [year, place, event] */
@@ -74,7 +75,7 @@ export const MAJOR_TEAMS: { name: string; how: string; logo: string }[] = [
   { name: 'All Gamers Global', how: 'Wildcards · 3rd–4th', logo: 'ag' },
 ];
 export const majorTeam = (name: string) => MAJOR_TEAMS.find(t => t.name === name);
-export const teamLogo = (name: string) => { const t = majorTeam(name); return t ? `/brand/overdrive/teams/${t.logo}.png` : ''; };
+export const teamLogo = (name: string) => { const t = majorTeam(name); return t ? hiRes(`/brand/overdrive/teams/${t.logo}.png`) : ''; };
 export const teamPlayers = (name: string) => MAJOR_PROFILES.filter(p => p.team === name);
 
 /**

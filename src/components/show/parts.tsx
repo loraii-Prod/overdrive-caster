@@ -1,3 +1,4 @@
+import { hiRes } from '../../../shared/assetRes';
 import { useLayoutEffect, useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import type { Show, Team } from '../../../shared/types';
@@ -49,7 +50,7 @@ export function TeamLogo({ team, size }: { team: Pick<Team, 'name' | 'tag' | 'lo
   const [broken, setBroken] = useState(false);
   useEffect(() => setBroken(false), [team.logo]);
   if (team.logo && !broken) {
-    return <img src={team.logo} alt="" onError={() => setBroken(true)} style={{ width: size, height: size, objectFit: 'contain', flex: 'none' }} />;
+    return <img src={hiRes(team.logo)} alt="" onError={() => setBroken(true)} style={{ width: size, height: size, objectFit: 'contain', flex: 'none' }} />;
   }
   return (
     <div className="grid flex-none place-items-center rounded-[6px] border border-white/15 bg-[#1e1e1e] font-display font-bold text-white/85"
@@ -189,7 +190,7 @@ export function Sponsors({ show, height = 56, label = 'PARTNERS' }: { show: Show
       <span className="font-sans font-bold text-white/40" style={{ fontSize: 11, letterSpacing: '0.3em' }}>{label}</span>
       <div className="relative" style={{ height, width: height * 3.2 }}>
         <AnimatePresence initial={false}>
-          <motion.img key={src} src={src} alt="" className="absolute inset-0 h-full w-full object-contain object-left"
+          <motion.img key={src} src={hiRes(src)} alt="" className="absolute inset-0 h-full w-full object-contain object-left"
             initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.45, ease: EASE }} />
         </AnimatePresence>
       </div>

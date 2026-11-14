@@ -1,3 +1,4 @@
+import { hiRes } from '../../../shared/assetRes';
 import type { TransitionKind } from '../../../shared/engine';
 import { Reveal } from '../Reveal';
 import { useEffect, useRef, useState } from 'react';
@@ -45,7 +46,7 @@ function WcIntermission({ skin, kind, show, now, wc }: { skin: Skin; kind: 'star
   const timer = show.timer.target != null && show.timer.showOn[kind] ? show.timer.target : null;
   return (
     <div className="absolute inset-0">
-      <motion.img src={skin.plates[kind]} alt="" className="pointer-events-none absolute inset-0 h-full w-full" initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, ease: EASE }} />
+      <motion.img src={hiRes(skin.plates[kind])} alt="" className="pointer-events-none absolute inset-0 h-full w-full" initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, ease: EASE }} />
       <WcWaiting wc={wc.state} now={now} title="" timer={timer} />
     </div>
   );

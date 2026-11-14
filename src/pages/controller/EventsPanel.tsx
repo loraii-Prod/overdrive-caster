@@ -70,7 +70,7 @@ export function BrandPanel({ show, set }: { show: Show; set: (p: Partial<Show>) 
     <div className="rounded-md border border-white/10 bg-[#171717] p-3">
       <Label>{label}</Label>
       <div className="grid h-16 place-items-center rounded bg-[#0d0d0d]">{b[k] ? <img src={b[k]} alt="" className="max-h-14 max-w-full object-contain" /> : <span className="text-[11px] text-white/35">theme default</span>}</div>
-      <div className="mt-2 flex items-center gap-2"><UploadButton onUrl={u => up({ [k]: u } as Partial<BrandKit>)} label="Upload" />{b[k] && <button type="button" className="btn-xs" onClick={() => up({ [k]: '' } as Partial<BrandKit>)}>Clear</button>}</div>
+      <div className="mt-2 flex items-center gap-2"><UploadButton role="logo" onUrl={u => up({ [k]: u } as Partial<BrandKit>)} label="Upload" />{b[k] && <button type="button" className="btn-xs" onClick={() => up({ [k]: '' } as Partial<BrandKit>)}>Clear</button>}</div>
       <div className="mt-1 text-[10.5px] text-white/35">{hint}</div>
     </div>
   );
@@ -89,7 +89,7 @@ export function BrandPanel({ show, set }: { show: Show; set: (p: Partial<Show>) 
             {b.bg ? (b.bgKind === 'video' ? <video src={b.bg} muted autoPlay loop className="h-full w-full object-cover" /> : <img src={b.bg} alt="" className="h-full w-full object-cover" />) : <span className="text-[11px] text-white/35">theme default</span>}
           </div>
           <div className="mt-2 flex items-center gap-2">
-            <UploadButton accept="video/mp4,video/webm,image/png,image/jpeg,image/webp" label="Upload" onUrl={(u, type) => up({ bg: u, bgKind: type.startsWith('video') ? 'video' : 'image' })} />
+            <UploadButton accept="video/mp4,video/webm,image/png,image/jpeg,image/webp" label="Upload" role="background" onUrl={(u, type) => up({ bg: u, bgKind: type.startsWith('video') ? 'video' : 'image' })} />
             {b.bg && <button type="button" className="btn-xs" onClick={() => up({ bg: '', bgKind: '' })}>Clear</button>}
           </div>
           <div className="mt-1 text-[10.5px] text-white/35">1920×1080 MP4 (H.264, loop, up to 250 MB) or image.</div>

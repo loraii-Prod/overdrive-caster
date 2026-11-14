@@ -120,7 +120,7 @@ function PlayerEditor({ p, onSave, onDelete, onShow }: { p: Player; onSave: (p: 
       ))}
       <div className="flex items-center gap-2">
         <input className="input min-w-0 flex-1 font-mono text-[11px]" placeholder="Photo URL (optional)" value={d.photo} onChange={e => setD({ ...d, photo: e.target.value })} />
-        <UploadButton label="Upload photo" onUrl={url => setD({ ...d, photo: url })} />
+        <UploadButton label="Upload photo" role="portrait" onUrl={url => setD({ ...d, photo: url })} />
       </div>
       <div className="flex gap-2 pt-1">
         <button type="button" className="btn-sm !border-white !bg-white !text-[#111]" disabled={!dirty} onClick={() => onSave(d)}>Save</button>

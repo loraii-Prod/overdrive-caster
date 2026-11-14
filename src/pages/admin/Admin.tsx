@@ -1,3 +1,4 @@
+import type { AssetRole } from '../../../shared/assetAdvice';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Logo } from '../../components/Brand';
 import { ScaledCanvas } from '../../components/Stage';
@@ -8,14 +9,16 @@ import { ThemeProvider } from '../../lib/theme';
 import { isTeam, MAX_TEAMS, nextSize, resolve, type BMatch, type Format, type Resolved, type TournamentOp, type TTeam } from '../../../shared/tournament';
 import { ConfirmButton, Dot, Label, Panel, Segmented, Switch, TextField } from '../controller/ui';
 
-export async function uploadImage(file: File): Promise<string> {
-  const r = await fetch('/api/upload', { method: 'POST', headers: { 'Content-Type': file.type }, body: file });
+/** Upload an image. `role` gets 4K size advice back (shown to the producer; the upload is kept either way). */
+export async function uploadImage(file: File, role?: AssetRole): Promise<string> {
+  const r = await fetch(`/api/upload${role ? `?role=${role}` : ''}`, { method: 'POST', headers: { 'Content-Type': file.type }, body: file });
   const j = await r.json().catch(() => ({}));
   if (!r.ok) throw new Error(j.error ?? 'Upload failed');
+  if (j.advice) window.alert(`Uploaded.\n\n${j.advice}`);
   return j.url;
 }
 
-export function UploadButton({ onUrl, label = 'Upload', accept = 'image/png,image/jpeg,image/webp,image/gif,image/svg+xml' }: { onUrl: (url: string, type: string) => void; label?: string; accept?: string }) {
+export function UploadButton({ onUrl, label = 'Upload', accept = 'image/png,image/jpeg,image/webp,image/gif,image/svg+xml', role }: { onUrl: (url: string, type: string) => void; label?: string; accept?: string; role?: AssetRole }) {
   const ref = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
   return (
@@ -26,7 +29,7 @@ export function UploadButton({ onUrl, label = 'Upload', accept = 'image/png,imag
           e.target.value = '';
           if (!f) return;
           setBusy(true);
-          try { onUrl(await uploadImage(f), f.type); } catch (err: any) { alert(err.message); } finally { setBusy(false); }
+          try { onUrl(await uploadImage(f, role), f.type); } catch (err: any) { alert(err.message); } finally { setBusy(false); }
         }} />
       <button type="button" className="btn-xs" disabled={busy} onClick={() => ref.current?.click()}>{busy ? '…' : label}</button>
     </>
@@ -114,7 +117,7 @@ function Teams({ teams, op, size }: { teams: TTeam[]; op: (o: TournamentOp) => v
             <TeamLogo team={tm} size={30} />
             <input className="input h-8 min-w-0 flex-1 text-[12.5px]" value={tm.name} onChange={e => upd(i, { name: e.target.value })} />
             <input className="input h-8 w-[62px] text-[12px] uppercase" value={tm.tag} maxLength={6} placeholder="TAG" onChange={e => upd(i, { tag: e.target.value.toUpperCase() })} />
-            <UploadButton label="Logo" onUrl={url => upd(i, { logo: url })} />
+            <UploadButton label="Logo" role="team-logo" onUrl={url => upd(i, { logo: url })} />
             <div className="flex flex-col">
               <button type="button" className="h-4 text-[9px] text-white/50 hover:text-white" onClick={() => move(i, -1)}>▲</button>
               <button type="button" className="h-4 text-[9px] text-white/50 hover:text-white" onClick={() => move(i, 1)}>▼</button>
