@@ -40,7 +40,7 @@ export const MODULES: Record<ModuleId, { name: string; about: string }> = {
   showcase: { name: 'Player showcase', about: 'Which team / player the cards show and how long' },
 };
 
-export type SourceCategory = 'Desk' | 'Game' | 'Overlay' | 'Bracket' | 'Intermission' | 'Interview' | 'Media';
+export type SourceCategory = 'Desk' | 'Game' | 'Overlay' | 'Bracket' | 'Intermission' | 'Interview' | 'Media' | 'Audience' | 'MVP & Awards';
 
 export interface SourceDef {
   id: string;
@@ -50,6 +50,10 @@ export interface SourceDef {
   screen?: ScreenId;
   /** Non-screen renderers (overlays / media). */
   view?: 'scoreboard' | 'media' | 'standings';
+  /** Scene drawn by a graphics-engine instance (its browser source is /g/<gfx>; no second source is built). */
+  gfx?: string;
+  /** MVP & Awards scenes: the fixed view of the MVP graphic this scene shows (its source is /g/mvp?view=<view>). */
+  gfxView?: import('./mvpFlow').GfxView;
   /** The independent OBS browser source (1920×1080). */
   route: string;
   /** OBS scene key in the scene mapping (Build scenes in OBS uses the screen ids). */
@@ -62,6 +66,8 @@ export interface SourceDef {
   note?: string;
 }
 
+const MVPV = (id: string, name: string, view: import('./mvpFlow').MvpView, animations: string[], note: string): SourceDef =>
+  ({ id, name, category: 'MVP & Awards', gfx: 'mvp', gfxView: view, route: `/g/mvp?view=${view}`, resolution: [1920, 1080], animations, modules: ['mvp', 'qr'], note });
 const S = (id: string, name: string, category: SourceCategory, screen: ScreenId, modules: ModuleId[], animations: string[], note?: string): SourceDef =>
   ({ id, name, category, screen, route: `/output/screen/${screen}`, obsKey: screen, resolution: [1920, 1080], animations, modules, note });
 
@@ -73,13 +79,24 @@ export const REGISTRY: SourceDef[] = [
   S('team-intro', 'Team intro / Player showcase', 'Desk', 'warmup', ['intro', 'showcase', 'predictions', 'match', 'countdown', 'music'], ['VS intro', 'Player cards'], 'The "Player / team card" scene: team introduction and player showcase.'),
   S('veto', 'Map Veto', 'Game', 'veto', ['veto', 'match', 'music'], ['Pick / ban stamps', 'PB comparison']),
   S('interview', 'Interview', 'Interview', 'interview', ['interview', 'talent-guest', 'cameras', 'music'], ['Lower third', 'Question bar']),
-  S('bracket', 'Bracket', 'Bracket', 'bracket', ['bracket', 'match', 'music'], ['Rows race in', 'Score pop']),
-  { id: 'standings', name: 'Standings', category: 'Bracket', view: 'standings', route: '/output/major?part=2', resolution: [1920, 1080], animations: ['Rows race in'], modules: ['bracket', 'match'], note: 'Lower bracket + standings (bracket part 2) as its own source.' },
+  // Upper and lower bracket are separate scenes, each with its own browser source (fixed views of the bracket graphic):
+  // never the two halves on one page. 'standings' keeps its id so saved rundowns open on the Lower Bracket.
+  { id: 'bracket-upper', name: 'Upper Bracket', category: 'Bracket', gfx: 'bracket', gfxView: 'upper', route: '/g/bracket?view=upper', resolution: [1920, 1080], animations: ['Rows race in', 'Score pop'], modules: ['bracket', 'match', 'music'], note: 'Upper quarter-finals → semi-finals → upper final, and the grand final.' },
+  { id: 'standings', name: 'Lower Bracket', category: 'Bracket', gfx: 'bracket', gfxView: 'lower', route: '/g/bracket?view=lower', resolution: [1920, 1080], animations: ['Rows race in', 'Score pop'], modules: ['bracket', 'match', 'music'], note: 'Lower round 1 → quarter-finals → semi-final → lower final, full width.' },
+  S('bracket', 'Bracket (both halves)', 'Bracket', 'bracket', ['bracket', 'match', 'music'], ['Rows race in', 'Score pop']),
   S('matches', 'Matches', 'Bracket', 'matches', ['match', 'bracket', 'music'], ['Cards stagger in']),
   S('starting', 'Starting Soon', 'Intermission', 'starting', ['countdown', 'match', 'music'], ['Card build-in', 'Countdown']),
   S('brb', 'BRB', 'Intermission', 'brb', ['countdown', 'match', 'music'], ['Card build-in']),
   S('ending', 'Ending', 'Intermission', 'ending', ['countdown', 'graphics', 'music'], ['Card build-in', 'Champions']),
   { id: 'media', name: 'Media Playback', category: 'Media', view: 'media', route: '/output/media', resolution: [1920, 1080], animations: ['Fade between items'], modules: ['media'] },
+  // MVP & Awards: five scenes, each a fixed view of the ONE MVP graphic (same data, same native-4K renderer, same
+  // portraits and animations), each with its own OBS browser source /g/mvp?view=<view>. 'mvp' keeps its id so show
+  // plans that used the MVP scene now open on Voting Open. The plain /g/mvp source still follows the MVP sequence.
+  MVPV('mvp', 'Community MVP — Voting Open', 'voting', ['Voting cards', 'Live totals', 'QR / chat'], 'Candidates, QR (and Twitch chat command), countdown, optional live totals.'),
+  MVPV('mvp-closed', 'Community MVP — Voting Closed', 'closed', ['Votes are in'], 'The voting graphic in its closed state: no result shown.'),
+  MVPV('mvp-winner', 'Community MVP — Winner Reveal', 'winner', ['Award reveal (9 beats)'], 'Draws the winner only after the producer authorizes the reveal (TAKE / GO). Frozen result only.'),
+  MVPV('mvp-desk', 'Analyst MVP — Winner Reveal', 'desk', ['Award reveal'], 'The analyst desk pick; drawn after the producer authorizes the reveal.'),
+  MVPV('mvp-compare', 'Community vs Analyst MVP — Comparison', 'compare', ['Comparison'], 'Both winners side by side; drawn after the producer authorizes it.'),
 ];
 
 /** Producer modules of the audience graphics (graphics-engine only: no scene source, not in the OBS builder). */
@@ -93,6 +110,12 @@ export const AUD_SOURCES: Record<string, SourceDef> = {
 export const sourceById = (id: string) => REGISTRY.find(s => s.id === id);
 
 /** Studio Mode: per-scene module layout (order = shown order; pinned modules come first and stay expanded). */
+/** The route a scene's browser source reports (connection counts): 'g/mvp?view=winner', 'g/scoreboard', 'screen/casters'. */
+export function outputRouteOf(s: SourceDef): string {
+  if (s.gfx) return `g/${s.gfx}${s.gfxView ? `?view=${s.gfxView}` : ''}`;
+  return s.route.replace(/^\/output\//, '').split('?')[0];
+}
+
 export interface StudioScene { modules: ModuleId[]; pinned: ModuleId[] }
 export type Studio = { scenes: Record<string, StudioScene> };
 

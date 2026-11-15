@@ -115,4 +115,4 @@ PY
 }
 
 /** Overdrive control pages: these must never be a browser source inside a broadcast scene. */
-export const isControllerRoute = (route: string | null) => !!route && /^\/(producer|controller|admin|login)(\/|\?|$)/.test(route);
+export const isControllerRoute = (route: string | null) => !!route && /^\/(producer|studio|controller|admin|login)(\/|\?|$)/.test(route);

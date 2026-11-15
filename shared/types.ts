@@ -244,6 +244,8 @@ export interface ControllerState {
   studio?: import('./registry').Studio;
   graphics?: import('./gfx').GfxInstance[];
   rundown?: import('./rundown').Rundown;
+  /** Studio Mode 2.0 show plan: segments, automation rules, prepared / on-air segment, pending GO. */
+  plan?: import('./showplan').ShowPlan;
   /** OBS Scene Builder (Studio Mode → OBS Setup). */
   obsSetup?: import('./obsSetup').ObsSetupState;
   gfxHealth?: Record<string, import('./gfx').GfxHealth>;
@@ -273,6 +275,8 @@ export interface ControllerState {
   /** Key for the read-only crew / run-of-show page. */
   crewKey: string;
   ros: RunOfShow;
+  /** Internal staff pick'em (with its private link key: controller only). */
+  staffPicks?: import('./staffPicks').StaffPicks;
   /** This machine's addresses on the local network, e.g. http://192.168.1.20:8787 */
   lanUrls: string[];
   /** Twitch predictions & polls connection. */

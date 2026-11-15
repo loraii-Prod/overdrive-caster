@@ -12,6 +12,7 @@ import type { MatchData } from '../../shared/protocol';
 import type { Tournament } from '../../shared/tournament';
 import type { GfxInstance } from '../../shared/gfx';
 import { pkgById } from '../../shared/gfx';
+import { VIEW_STEP, isBracketView, isMvpView, isRevealView, viewAllowed, type GfxView } from '../../shared/mvpFlow';
 import type { RtcViewer } from '../lib/rtcViewer';
 import type { AudLive, WcLive } from '../lib/hooks';
 import { AUD_RENDERERS } from './audience';
@@ -43,7 +44,7 @@ export const RENDERERS: Record<string, Renderer> = {
     const desk = <ScreenView id="analysis" scene={{ ...d.scene, screen: 'analysis', showNames: cfg.names !== false }} show={{ ...d.show, ticker: { ...d.show.ticker, onScreens: cfg.ticker !== false } }}
       now={d.now} tournament={d.tournament} viewer={d.viewer} monitor={d.monitor} bnl={d.bnl} wc={wc} />;
     // Optional voting QR on the desk (off by default; the same approved code as the QR graphic's desk position).
-    return cfg.qr === true ? <>{desk}{AUD_RENDERERS.qr({ cfg: { qr: 'vote', position: cfg.layout === 'solo' ? 'desk-inline-solo' : 'desk-inline', title: String(cfg.qrTitle || 'Vote for the MVP') }, d })}</> : desk;
+    return cfg.qr === true ? <>{desk}{AUD_RENDERERS.qr({ cfg: { qr: 'vote', position: cfg.layout === 'solo' ? 'desk-inline-solo' : 'desk-inline', title: String(cfg.qrTitle || 'Vote for the MVP'), winner: cfg.qrWinner === true }, d })}</> : desk;
   },
   scoreboard: ({ cfg, d }) => <Scoreboard show={{ ...d.show, showScoreboard: true, mapName: cfg.map === false ? '' : d.show.mapName }} />,
   gameplay: ({ cfg, d }) => (
@@ -75,7 +76,9 @@ class Isolate extends Component<{ id: string; onError: (e: string) => void; chil
  * One graphics instance. `cfgOverride` = render a draft (operator preview) instead of the published config.
  * `onHealth` is called with ok/error so the source can report its health to the engine.
  */
-export function GraphicHost({ inst, d, cfgOverride, onHealth, preview = false, forceShow = false }: { inst: GfxInstance; d: GfxData; cfgOverride?: Cfg | null; onHealth?: (ok: boolean, error?: string) => void; preview?: boolean; /** Operator Draft view: render even when OUT, to inspect and prepare it. */ forceShow?: boolean }) {
+export function GraphicHost({ inst, d, cfgOverride, onHealth, preview = false, forceShow = false, view, gate }: { inst: GfxInstance; d: GfxData; cfgOverride?: Cfg | null; onHealth?: (ok: boolean, error?: string) => void; preview?: boolean; /** Operator Draft view: render even when OUT, to inspect and prepare it. */ forceShow?: boolean;
+  /** Scene = a fixed view of this graphic (/g/mvp?view=winner, /g/bracket?view=lower…). */ view?: GfxView;
+  /** Draw a reveal view only once the producer authorized it (browser sources; default: when not a preview). */ gate?: boolean }) {
   const pkg = pkgById(inst.pkg);
   const R = pkg ? RENDERERS[pkg.renderer] : undefined;
   const layer = useRef<HTMLDivElement>(null);
@@ -116,7 +119,11 @@ export function GraphicHost({ inst, d, cfgOverride, onHealth, preview = false, f
   }, [inst.anim.seq]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!R || (!shown && !forceShow)) return <div ref={layer} data-gfx={inst.id} data-gfx-state="out" className="absolute inset-0" />;
-  const cfg = cfgOverride ?? inst.config;
+  const base = cfgOverride ?? inst.config;
+  const cfg = isMvpView(view) ? { ...base, step: VIEW_STEP[view] }
+    : isBracketView(view) ? { ...base, view: 'bracket', part: view === 'lower' ? '2' : '1', cycle: false } : base;
+  // A reveal scene's source draws nothing until the producer authorized that reveal (never a winner by accident).
+  if (isMvpView(view) && isRevealView(view) && (gate ?? !preview) && !viewAllowed(view, inst.config, String(d.wc?.state.cast ?? ''))) return <div ref={layer} data-gfx={inst.id} data-gfx-state="held" data-mvp-held={view} className="absolute inset-0" />;
   const accent = typeof cfg.accent === 'string' && cfg.accent ? cfg.accent : undefined;
   return (
     <div ref={layer} data-gfx={inst.id} data-gfx-state="in" className="absolute inset-0" style={accent ? ({ ['--brand-accent' as string]: accent, ['--accent' as string]: accent, ['--hot' as string]: accent }) : undefined}>

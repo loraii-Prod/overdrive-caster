@@ -164,4 +164,6 @@ export interface PerfReport {
 export interface AudPrivate {
   configured: boolean; online: boolean; error: string | null; summary: import('./audience').AudSummary | null;
   lockedMatches: string[]; championLocked: boolean; qrHosts: string[]; customQr: import('./audience').QrLink[]; publicUrl: string; /** Studio override of the public voting address ('' = the server setting). */ publicUrlSet: string; envPublicUrl: string; liveTotals: string[];
+  /** Twitch chat voting (connection, counting, activity). Never contains a token. */
+  chat?: import('./twitchChat').ChatStatus;
 }

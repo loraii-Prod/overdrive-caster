@@ -77,7 +77,7 @@ export function TalentDashboard({ st, run }: { st: ControllerState; run: (c: Pro
 
 
 // ======================================================================= Control modules (scene sources)
-function ModuleLayoutPanel({ st, src, run }: { st: ControllerState; src: SourceDef; run: Run }) {
+export function ModuleLayoutPanel({ st, src, run }: { st: ControllerState; src: SourceDef; run: Run }) {
   const cur = studioFor(st.studio, src.id);
   const save = (modules: ModuleId[], pinned: ModuleId[], l: string) => run({ c: 'studio-set', scene: src.id, modules, pinned }, l);
   const all = Object.keys(MODULES) as ModuleId[];
@@ -109,7 +109,7 @@ function ModuleLayoutPanel({ st, src, run }: { st: ControllerState; src: SourceD
 
 
 // ======================================================================= Instances & OBS mapping
-function InstancesPanel({ st, run, onSelect, sel }: { st: ControllerState; run: Run; onSelect: (id: string) => void; sel: string }) {
+export function InstancesPanel({ st, run, onSelect, sel }: { st: ControllerState; run: Run; onSelect: (id: string) => void; sel: string }) {
   const gs = st.graphics ?? [];
   const [names, setNames] = useState<Record<string, string>>({});
   const isDefault = (g: GfxInstance) => PACKAGES.some(p => p.id.replace(/^od\./, '') === g.id);
@@ -155,7 +155,7 @@ function InstancesPanel({ st, run, onSelect, sel }: { st: ControllerState; run: 
 }
 
 // ======================================================================= Data bindings overview
-function BindingsPanel({ st, wc }: { st: ControllerState; wc: Ctx['wc'] }) {
+export function BindingsPanel({ st, wc }: { st: ControllerState; wc: Ctx['wc'] }) {
   const gs = st.graphics ?? [];
   const tal = (s: number) => { const t = (st.talent ?? []).find(p => p.id === st.seats?.[s as Seat]); return t ? `${talentLabel(t)}${t.publishing ? ' ●' : ''}` : '—'; };
   const m = wc.cast ? wcResolve(wc.matches, wc.teams)[wc.cast] : null;
@@ -183,7 +183,7 @@ function BindingsPanel({ st, wc }: { st: ControllerState; wc: Ctx['wc'] }) {
 }
 
 // ======================================================================= Assets
-function AssetsPanel({ x }: { x: Ctx }) {
+export function AssetsPanel({ x }: { x: Ctx }) {
   return (
     <div className="flex min-h-0 flex-1 overflow-hidden" data-assets>
       <div className="min-h-0 w-[520px] flex-none overflow-y-auto border-r border-white/10 p-2.5 text-[12px]">
@@ -198,7 +198,7 @@ function AssetsPanel({ x }: { x: Ctx }) {
 }
 
 // ======================================================================= Show file
-function ShowFilePanel({ st, run }: { st: ControllerState; run: Run }) {
+export function ShowFilePanel({ st, run }: { st: ControllerState; run: Run }) {
   const file = useRef<HTMLInputElement>(null);
   const [msg, setMsg] = useState('');
   const exportShow = () => {
@@ -208,6 +208,8 @@ function ShowFilePanel({ st, run }: { st: ControllerState; run: Run }) {
       media: st.media ? { playlist: st.media.playlist, auto: st.media.auto, loop: st.media.loop, volume: st.media.volume } : null,
       graphics: (st.graphics ?? []).map(({ id, pkg, name, config, presets, obsScene }) => ({ id, pkg, name, config, presets, obsScene })),
       rundown: st.rundown ?? null,
+      // Studio Mode 2.0 show plan (segments + automation; never the on-air state or a pending GO).
+      plan: st.plan ? { segments: st.plan.segments, rules: st.plan.rules.map(r => ({ ...r, fired: null })), crewSync: st.plan.crewSync } : null,
     };
     const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })); a.download = 'overdrive-show.json'; a.click();
   };
@@ -229,12 +231,13 @@ function ShowFilePanel({ st, run }: { st: ControllerState; run: Run }) {
         if (g.obsScene) ok(await run({ c: 'gfx-obs', id, scene: g.obsScene }, `Import ${g.name} OBS scene`));
       }
       for (const it of (d.rundown?.items ?? []) as { gfx: string; label: string; preset: string | null }[]) ok(await run({ c: 'rd-add', gfx: it.gfx, label: it.label, preset: it.preset }, `Import rundown ${it.label}`));
+      if (d.plan && (d.plan.segments?.length || d.plan.rules?.length)) ok(await run({ c: 'sp-import', plan: d.plan }, 'Import show rundown & automation'));
       setMsg(`Imported: ${n} settings applied${fail ? `, ${fail} refused (see the log)` : ''}. Graphics configs are prepared as drafts: review and publish. Talent links stay as they are.`);
     } catch (e) { setMsg(`Import failed: ${(e as Error).message}`); }
   };
   return (
     <div className="space-y-2 p-3 text-[12px]" data-showfile>
-      <p className="max-w-[760px] text-white/55">Export the prepared show (graphics configs, presets and OBS mapping, rundown, module layouts, talent names / roles / positions, playlist) and load it on another day or machine. Talent link keys and passwords are never exported. On import, graphics configs arrive as drafts so nothing changes on air until you publish.</p>
+      <p className="max-w-[760px] text-white/55">Export the prepared show (graphics configs, presets and OBS mapping, graphics rundown, show rundown and automation, module layouts, talent names / roles / positions, playlist) and load it on another day or machine. Talent link keys and passwords are never exported. On import, graphics configs arrive as drafts so nothing changes on air until you publish.</p>
       <div className="flex gap-1"><Btn onClick={exportShow}>Export show…</Btn><Btn onClick={() => file.current?.click()}>Import show…</Btn></div>
       <input ref={file} type="file" accept="application/json" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) importShow(f); e.target.value = ''; }} />
       {msg && <div style={{ color: msg.startsWith('Import failed') ? WARN : PVW }}>{msg}</div>}
@@ -245,7 +248,7 @@ function ShowFilePanel({ st, run }: { st: ControllerState; run: Run }) {
 
 // ======================================================================= Studio shell
 /** Public voting address (what every QR code points to) + what the audience features expose. */
-function AudiencePanel({ x }: { x: Ctx }) {
+export function AudiencePanel({ x }: { x: Ctx }) {
   const p = x.aud?.priv ?? null;
   const [url, setUrl] = useState<string | null>(null), [msg, setMsg] = useState<{ t: string; bad?: boolean } | null>(null);
   const val = url ?? p?.publicUrlSet ?? '';

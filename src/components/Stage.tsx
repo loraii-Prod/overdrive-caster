@@ -58,7 +58,7 @@ export function ScaledCanvas({ children, className = '', output = false }: { chi
   const ready = useFontsReady(output);
   const s = output ? deviceScale(box.w, box.h) : Math.min(box.w / CANVAS.w, box.h / CANVAS.h) || 1;
   const hi = output && s >= 1.5;
-  if (output) setHiResAssets(hi); // before the scene below renders: 4K replacements only at 4K
+  if (output) setHiResAssets(hi, s); // before the scene below renders: 4K replacements only at 4K
   // An exact whole-number fit that fills the box is anchored at 0,0: no centring offset, every unit on whole device pixels.
   const exact = output && Number.isInteger(s) && box.w === CANVAS.w * s && box.h === CANVAS.h * s;
   const zoom = exact && rasterMode() === 'zoom';

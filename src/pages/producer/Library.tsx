@@ -11,21 +11,23 @@ import { REGISTRY, type SourceDef } from '../../../shared/registry';
 import type { Ack } from './modules';
 import { C, DraftBadge, LABEL, PanelHead, VisBadge } from './ws';
 
-export const CATEGORIES = ['Desks', 'Gameplay', 'Match graphics', 'Tournament graphics', 'Audience', 'Player & team', 'Media', 'Utility'] as const;
+export const CATEGORIES = ['Desks', 'Gameplay', 'Match graphics', 'Tournament graphics', 'MVP & Awards', 'Audience', 'Player & team', 'Media', 'Utility'] as const;
 export type Category = typeof CATEGORIES[number];
 
 const SOURCE_CAT: Record<string, Category> = {
   'caster-desk': 'Desks', 'analyst-desk': 'Desks', gameplay: 'Gameplay', scoreboard: 'Match graphics', veto: 'Match graphics', interview: 'Match graphics',
-  bracket: 'Tournament graphics', standings: 'Tournament graphics', matches: 'Tournament graphics', 'team-intro': 'Player & team', media: 'Media',
+  bracket: 'Tournament graphics', 'bracket-upper': 'Tournament graphics', standings: 'Tournament graphics', matches: 'Tournament graphics', 'team-intro': 'Player & team', media: 'Media',
   starting: 'Utility', brb: 'Utility', ending: 'Utility',
 };
 const PKG_CAT: Record<string, Category> = { Desk: 'Desks', Game: 'Gameplay', Overlay: 'Match graphics', Bracket: 'Tournament graphics', Interview: 'Match graphics', Intermission: 'Utility', Media: 'Media', Audience: 'Audience' };
 
-export const gfxCategory = (g: GfxInstance): Category => PKG_CAT[pkgById(g.pkg)?.category ?? ''] ?? 'Utility';
-export const sourceCategory = (s: SourceDef): Category => SOURCE_CAT[s.id] ?? 'Utility';
+export const gfxCategory = (g: GfxInstance): Category => (g.pkg === 'od.mvp' ? 'MVP & Awards' : PKG_CAT[pkgById(g.pkg)?.category ?? ''] ?? 'Utility');
+export const sourceCategory = (s: SourceDef): Category => (s.category === 'MVP & Awards' ? 'MVP & Awards' : SOURCE_CAT[s.id] ?? 'Utility');
 
 /** OBS scene of a scene source: the "Build scenes in OBS" mapping or a scene named like it. */
 export function obsSceneOfSource(src: SourceDef, st: ControllerState): string | undefined {
+  if (src.gfxView) return st.obs.scenes.find(n => n === `Overdrive · ${src.name}`) ?? st.obs.scenes.find(n => n.toLowerCase().includes(src.name.toLowerCase()));
+  if (src.gfx) { const g = st.graphics?.find(x => x.id === src.gfx); if (g) return obsSceneOfGfx(g, st); }
   const map = st.showLive.obsScenes as Record<string, string | undefined>;
   const byKey = src.obsKey ? map[src.obsKey] : undefined;
   if (byKey) return byKey;
@@ -36,7 +38,9 @@ export function obsSceneOfGfx(g: GfxInstance, st: ControllerState): string | und
   if (g.obsScene) return g.obsScene;
   const key = pkgById(g.pkg)?.obsKey;
   const src = key ? REGISTRY.find(s => s.obsKey === key) : undefined;
-  return (g.id === pkgById(g.pkg)?.id.replace(/^od\./, '') && src ? obsSceneOfSource(src, st) : undefined) ?? st.obs.scenes.find(n => n.toLowerCase().includes(g.name.toLowerCase()));
+  const asScene = REGISTRY.find(s => s.gfx === g.id && !s.gfxView); // a graphic that is a scene: its OBS scene
+  const legacy = g.id === 'mvp' && st.obs.scenes.includes('Overdrive · MVP') ? 'Overdrive · MVP' : undefined;
+  return (g.id === pkgById(g.pkg)?.id.replace(/^od\./, '') && src ? obsSceneOfSource(src, st) : undefined) ?? (asScene ? st.obs.scenes.find(n => n === `Overdrive · ${asScene.name}`) : undefined) ?? legacy ?? (g.id === 'mvp' ? st.obs.scenes.find(n => n === `Overdrive · ${g.name}`) : st.obs.scenes.find(n => n.toLowerCase().includes(g.name.toLowerCase())));
 }
 
 const conns = (st: ControllerState, route: string) => st.outputs.find(o => o.route === route)?.count ?? 0;

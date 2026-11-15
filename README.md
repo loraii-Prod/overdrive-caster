@@ -28,6 +28,12 @@ docker run -p 8787:8787 -v overdrive-data:/data -e CONTROLLER_PASSWORD=… overd
 
 | Route | Purpose |
 |---|---|
+| `/g/mvp` | **MVP voting & awards** (native 4K; see [docs/MVP-4K.md](docs/MVP-4K.md)) |
+| `/g/bracket?view=upper` · `/g/bracket?view=lower` | **Upper Bracket** (with the grand final) and **Lower Bracket** (with the final standings): separate scenes, separate OBS sources |
+| `/g/mvp?view=voting` · `closed` · `winner` · `desk` · `compare` | **MVP & Awards scenes**: one OBS source per scene; reveal views draw only after the producer authorizes ([docs/MVP-SCENES.md](docs/MVP-SCENES.md)) |
+| Twitch chat `!vote 1–4` | MVP votes from Twitch chat, one per Twitch account with the website ([docs/TWITCH-CHAT-VOTING.md](docs/TWITCH-CHAT-VOTING.md)) |
+| `/studio` | **Studio Mode 2.0**: full-screen show preparation (see [STUDIO-MODE-2.0.md](STUDIO-MODE-2.0.md)) |
+| `/producer` | Producer Mode (live operation); Alt+2 switches to Studio Mode |
 | `/controller` | Producer dashboard (login required) |
 | `/output/casters` | Main caster composition (cameras, cards, nameplates, branding) |
 | `/output/solo` · `/output/duo` · `/output/trio` | Same scene, capped at 1 / 2 / 3 tiles. These always adapt down and never show an empty box |

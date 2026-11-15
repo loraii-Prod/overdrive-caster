@@ -22,6 +22,8 @@ export interface PropDef {
   min?: number; max?: number;
   group?: string;
   help?: string;
+  /** Kept by the server (not edited in the inspector): e.g. the MVP reveal authorizations. */
+  internal?: boolean;
 }
 
 /** Data the graphic reads from the shared show (not stored in the instance). */
@@ -127,6 +129,7 @@ export const PACKAGES: PackageDef[] = [
       { key: 'ticker', label: 'Ticker', type: 'boolean', default: true, group: 'Panel' },
       { key: 'qr', label: 'Voting QR', type: 'boolean', default: false, group: 'Panel', help: 'Scannable voting code at the side of the desk (needs the public voting URL in Studio → Audience & QR).' },
       { key: 'qrTitle', label: 'QR title', type: 'text', default: 'Vote for the MVP', group: 'Panel' },
+      { key: 'qrWinner', label: 'MVP winner beside the QR', type: 'boolean', default: false, group: 'Panel', help: 'After the reveal only: the Community MVP and their share next to the code (never before the producer revealed it on air).' },
       ...MOTION('slide', 350),
     ],
     bindings: [{ kind: 'seats', label: 'Analyst positions', seats: [4, 5] }, { kind: 'match', label: 'Match' }, { kind: 'predictions', label: 'Desk predictions', seats: [4, 5] }],
@@ -156,11 +159,11 @@ export const PACKAGES: PackageDef[] = [
   },
   {
     id: 'od.bracket', name: 'Tournament Bracket', version: '2.1.0', collection: 'Overdrive Major', category: 'Bracket', renderer: 'bracket', obsKey: 'bracket',
-    description: 'The approved Major bracket (upper bracket + grand final / lower bracket + standings) or the matches board, with automatic cycling.',
+    description: 'The approved Major bracket (upper bracket + grand final / lower bracket) or the matches board, with automatic cycling.',
     resolution: [1920, 1080],
     props: [
       { key: 'view', label: 'Display', type: 'select', default: 'bracket', group: 'Display', options: [{ value: 'bracket', label: 'Bracket' }, { value: 'matches', label: 'Matches board' }] },
-      { key: 'part', label: 'Bracket half', type: 'select', default: '1', group: 'Display', options: [{ value: '1', label: 'Upper + Grand Final' }, { value: '2', label: 'Lower + Standings' }], help: 'Ignored while cycling.' },
+      { key: 'part', label: 'Bracket half', type: 'select', default: '1', group: 'Display', options: [{ value: '1', label: 'Upper + Grand Final' }, { value: '2', label: 'Lower bracket' }], help: 'Ignored while cycling.' },
       { key: 'cycle', label: 'Cycle halves', type: 'boolean', default: false, group: 'Cycling' },
       { key: 'cycleSec', label: 'Cycle every (s)', type: 'number', default: 20, min: 5, max: 300, group: 'Cycling' },
       ...MOTION('crossfade', 350),
@@ -188,12 +191,19 @@ PACKAGES.push(
     animations: IN_OUT, assets: ['/brand/overdrive/loop.webm'], commands: [], permissions: ['match-data'],
   },
   {
-    id: 'od.mvp', name: 'Community MVP', version: '1.0.0', collection: 'Overdrive Major', category: 'Audience', renderer: 'mvp',
+    id: 'od.mvp', name: 'Community MVP', version: '1.2.0', collection: 'Overdrive Major', category: 'Audience', renderer: 'mvp',
     description: 'Community MVP of a finished match: voting open (players + QR), the winner reveal, and the community vs desk comparison. The winner shows only from the result frozen when voting closed; showing it on air also reveals it on the voting page.',
     resolution: [1920, 1080],
     props: [
       { key: 'match', label: 'Match', type: 'select', default: '', group: 'Content', options: MATCH_OPTS },
       { key: 'step', label: 'Show', type: 'select', default: 'voting', group: 'Reveal', options: [{ value: 'voting', label: 'Voting open' }, { value: 'winner', label: 'Community MVP reveal' }, { value: 'desk', label: 'Analyst MVP reveal' }, { value: 'compare', label: 'Community vs Analysts' }] },
+      { key: 'liveOrder', label: 'Rank cards by live votes', type: 'boolean', default: false, group: 'Live voting', help: 'Only while live totals are on air. Off: candidates keep their prepared order (nothing hints at a leader).' },
+      { key: 'liveCounts', label: 'Vote counts on the cards', type: 'boolean', default: false, group: 'Live voting', help: 'Only while live totals are on air: the number of votes next to each percentage.' },
+      { key: 'confirmReveal', label: 'Reveals need producer confirmation', type: 'boolean', default: true, group: 'Reveal', help: 'Producer Mode asks for a second click before a winner goes on air, and automation stops for a producer GO before any reveal.' },
+      { key: 'revealPace', label: 'Reveal pace', type: 'select', default: 'cinematic', group: 'Reveal animation', options: [{ value: 'cinematic', label: 'Cinematic (approved timing)' }, { value: 'standard', label: 'Standard (1.4× faster)' }, { value: 'quick', label: 'Quick (2× faster)' }], help: 'Speed of the reveal sequence; the beats and their order never change.' },
+      { key: 'revealSweep', label: 'Opening sweep + flare', type: 'boolean', default: true, group: 'Reveal animation', help: 'The red angular sweep and flare that open the Community MVP reveal.' },
+      { key: 'countdown', label: 'Voting countdown (s)', type: 'number', default: 0, min: 0, max: 3600, group: 'Voting', help: 'Default countdown when voting opens (0 = closed by hand). The producer can change it when opening.' },
+      { key: 'revealed', label: 'Reveals authorized', type: 'text', default: '', group: 'Reveal', internal: true },
     ],
     bindings: [{ kind: 'audience', label: 'Community MVP', module: 'mvp' }, { kind: 'audience', label: 'QR', module: 'qr' }],
     animations: IN_OUT, assets: ['/brand/overdrive/loop.webm'], commands: [], permissions: ['match-data'],

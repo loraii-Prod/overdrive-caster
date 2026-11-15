@@ -63,7 +63,14 @@ export class Audience {
   private timer: NodeJS.Timeout | null = null;
   private failures = 0;
 
+  /** Twitch chat voting hooks (set by the hub): ways to vote for a vote being opened, and the last chat votes before a close. */
+  chatHooks: { methods: () => { web: boolean; chat: boolean; cmd: string; channel: string }; beforeClose: (poll: string) => Promise<void>; op: (op: import('../shared/twitchChat').ChatOp) => Promise<string | null> } | null = null;
+
   constructor(private store: AudStore, private save: () => void, private wc: () => WildcardState, private push: () => void) {}
+  /** Vote service call for other server modules (chat votes). */
+  internal(method: string, path: string, body?: unknown, actor = 'twitch-chat') { return this.call(method, path, body, actor); }
+  /** The MVP vote currently open (latest summary). */
+  openPoll(): AudPoll | null { return (this.store.last?.polls ?? []).filter(p => p.status === 'open').pop() ?? null; }
 
   get configured() { return !!(config.voteUrl && config.voteSecret); }
   get publicUrl() { return this.store.publicUrl || config.votePublicUrl; }
@@ -119,7 +126,7 @@ export class Audience {
       // Countdown: the vote service already refuses late votes; this freezes the result right on time.
       for (const p of (j.summary?.polls ?? []) as AudPoll[]) if (p.status === 'open' && p.closesAt && p.closesAt <= Date.now() && !this.closing.has(p.id)) {
         this.closing.add(p.id);
-        this.call('POST', `/internal/poll/${encodeURIComponent(p.id)}/close`, undefined, 'countdown').then(() => this.tick()).catch(() => this.closing.delete(p.id));
+        (this.chatHooks?.beforeClose(p.id) ?? Promise.resolve()).catch(() => {}).then(() => this.call('POST', `/internal/poll/${encodeURIComponent(p.id)}/close`, undefined, 'countdown')).then(() => this.tick()).catch(() => this.closing.delete(p.id));
       }
       this.failures = 0;
       this.setOnline(true, null, true);
@@ -152,7 +159,7 @@ export class Audience {
       // Only locked / final matches: an open match's split could still change.
       matches: s.matches.filter(m => m.status !== 'open'),
       champion: s.champion.locked ? s.champion : null,
-      polls: s.polls.map(({ counts: _c, total: _t, ...p }) => p),
+      polls: s.polls.map(({ counts: _c, total: _t, bySource: _b, ...p }) => p),
       accuracy: s.accuracy, leaderboard: s.leaderboard, staffMvp: this.store.staffMvp, qr, liveTotals, ...extra,
     };
   }
@@ -165,6 +172,7 @@ export class Audience {
   async op(op: AudOp): Promise<string | null> {
     const wc = this.wc(), R = wcResolve(wc.matches, wc.teams);
     switch (op.k) {
+      case 'chat': return this.chatHooks ? this.chatHooks.op(op.op) : 'Twitch chat voting is not available';
       case 'lock-match': {
         if (!WC_IDS.includes(op.match)) return 'Unknown match';
         this.store.lockedMatches = op.locked ? [...new Set([...this.store.lockedMatches, op.match])] : this.store.lockedMatches.filter(x => x !== op.match);
@@ -240,7 +248,8 @@ export class Audience {
         }
         case 'mvp-open': {
           const sec = Number(op.seconds);
-          await this.call('POST', `/internal/poll/${encodeURIComponent(op.poll)}/open`, Number.isFinite(sec) && sec >= 10 ? { seconds: Math.min(3600, Math.round(sec)) } : {});
+          const methods = this.chatHooks?.methods();
+          await this.call('POST', `/internal/poll/${encodeURIComponent(op.poll)}/open`, { ...(Number.isFinite(sec) && sec >= 10 ? { seconds: Math.min(3600, Math.round(sec)) } : {}), ...(methods ? { methods } : {}) });
           break;
         }
         case 'mvp-timer': {
@@ -249,7 +258,7 @@ export class Audience {
           await this.call('POST', `/internal/poll/${encodeURIComponent(op.poll)}/timer`, { seconds: sec == null ? null : Math.min(3600, Math.round(sec)) });
           break;
         }
-        case 'mvp-close': await this.call('POST', `/internal/poll/${encodeURIComponent(op.poll)}/close`); break;
+        case 'mvp-close': await this.chatHooks?.beforeClose(op.poll).catch(() => {}); await this.call('POST', `/internal/poll/${encodeURIComponent(op.poll)}/close`); break;
       }
       await this.tick(); this.push(); return null;
     } catch (e: any) { return String(e?.message ?? e).slice(0, 160); }

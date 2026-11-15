@@ -83,3 +83,14 @@ export function sanitizeSeats(v: unknown, talent: TalentProfile[]): Seats {
 }
 
 export const seatOf = (seats: Seats, talentId: string): Seat | null => (SEATS.find(s => seats[s] === talentId) ?? null);
+
+/**
+ * Stream ID from a pasted VDO.Ninja link (…?push=ID, …?view=ID, &push=ID) or a bare ID. null when it holds none.
+ * The room, password and quality parameters of a pasted link are ignored: the show's own settings apply.
+ */
+export function parseVdoId(v: string): string | null {
+  const t = v.trim();
+  if (/^[A-Za-z0-9_]{6,40}$/.test(t)) return t;
+  const m = /[?&#](?:push|view|streamid|permaid)=([A-Za-z0-9_]{6,40})(?:[&#]|$)/i.exec(t);
+  return m ? m[1] : null;
+}

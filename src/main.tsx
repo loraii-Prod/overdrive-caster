@@ -21,6 +21,7 @@ import './index.css';
 import { Output, AudioOutput, ScreenOutput , GraphicOutput } from './pages/Output';
 import { Contribute } from './pages/Contribute';
 import { Crew } from './pages/Crew';
+import { StaffPicks } from './pages/StaffPicks';
 import { Controller } from './pages/controller/Controller';
 import { Login } from './pages/controller/Login';
 import { Producer } from './pages/producer/Producer';
@@ -51,11 +52,11 @@ function ControllerGate({ dockOnly = false, dockAll = false }: { dockOnly?: bool
 }
 
 /** Overdrive 2.0 Producer Console: same producer sign-in as the controller. */
-function ProducerGate({ dock }: { dock?: string }) {
+function ProducerGate({ dock, studio }: { dock?: string; studio?: boolean }) {
   const [role, check, setRole] = useSessionRole();
   if (role === undefined) return <div className="min-h-screen bg-[#0b0b0c]" />;
-  if (role === 'producer') return <Producer key={dock ?? ''} onLogout={() => setRole(null)} dock={dock} />;
-  return <Login onDone={check} title={dock ? 'OVERDRIVE SCENE CONTROLLER' : 'PRODUCER CONSOLE'} producerOnly />;
+  if (role === 'producer') return <Producer key={dock ?? (studio ? 'studio' : '')} onLogout={() => setRole(null)} dock={dock} studio={studio} />;
+  return <Login onDone={check} title={dock ? 'OVERDRIVE SCENE CONTROLLER' : studio ? 'STUDIO MODE' : 'PRODUCER CONSOLE'} producerOnly />;
 }
 /** /producer/scene/<target>: the controller of ONE OBS scene, for an OBS Custom Browser Dock. */
 function SceneControllerGate() {
@@ -76,6 +77,7 @@ createRoot(document.getElementById('root')!).render(
         <Route path="/" element={<Navigate to="/controller" replace />} />
         <Route path="/producer" element={<ProducerGate />} />
         <Route path="/producer/scene/:target" element={<SceneControllerGate />} />
+        <Route path="/studio" element={<ProducerGate studio />} />
         <Route path="/controller" element={<ControllerGate />} />
         <Route path="/controller/dock" element={<ControllerGate dockOnly />} />
         <Route path="/controller/dock/all" element={<ControllerGate dockAll />} />
@@ -115,6 +117,7 @@ createRoot(document.getElementById('root')!).render(
         <Route path="/output/audio/:slot" element={<AudioOutput />} />
         <Route path="/admin" element={<AdminGate />} />
         <Route path="/crew" element={<Crew />} />
+        <Route path="/staff-picks" element={<StaffPicks />} />
         <Route path="/contribute/:slot" element={<Contribute />} />
         <Route path="/gamefeed" element={<GameFeedPage />} />
         <Route path="*" element={<Navigate to="/controller" replace />} />

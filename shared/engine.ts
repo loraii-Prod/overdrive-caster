@@ -56,7 +56,7 @@ export type ProducerCmd =
   | { c: 'op-quick'; op: import('./protocol').QuickOp }
   // ---- Talent (10 profiles) and positions
   | { c: 'seat'; seat: number; talent: string | null }
-  | { c: 'talent-edit'; id: string; name?: string; role?: 'caster' | 'analyst'; mode?: 'webrtc' | 'vdo'; camQuality?: import('./talent').CamQuality }
+  | { c: 'talent-edit'; id: string; name?: string; role?: 'caster' | 'analyst'; mode?: 'webrtc' | 'vdo'; camQuality?: import('./talent').CamQuality; /** VDO.Ninja stream ID, or a pasted VDO.Ninja link (push= / view=) */ vdoId?: string }
   | { c: 'talent-regen'; id: string }
   | { c: 'camera'; seat: number; on: boolean }
   | { c: 'feed-resync'; seat: number }
@@ -93,6 +93,27 @@ export type ProducerCmd =
   | { c: 'rd-take'; id: string; action: 'in' | 'update' | 'out' }
   | { c: 'rd-next' } // take the cued item IN, cue the one after it
   | { c: 'rd-clear' }
+  // ---- Show plan (Studio Mode 2.0): segments, automation rules, producer GO
+  | { c: 'sp-seg-add'; seg?: Partial<import('./showplan').Segment>; at?: number }
+  | { c: 'sp-seg-edit'; id: string; patch: Partial<import('./showplan').Segment> }
+  | { c: 'sp-seg-remove'; id: string }
+  | { c: 'sp-seg-move'; id: string; to: number }
+  | { c: 'sp-next'; id: string | null } // prepare (cue) a segment
+  /** TAKE an MVP & Awards scene: prepare/close/authorize as the scene needs, switch OBS to it, rundown follows. */
+  /** Studio: MVP scene settings saved straight to the event (match, countdown, reveal animation, live-voting options). Never reveals. */
+  | { c: 'mvp-settings'; patch: Record<string, string | number | boolean> }
+  /** Internal staff pick'em: staff list, match locks, remove a pick, reset, new private link. */
+  | { c: 'staff'; op: import('./staffPicks').StaffOp }
+  | { c: 'mvp-take'; view: import('./mvpFlow').MvpView; transition?: 'obs' | TransitionKind; /** prepare only (no OBS switch) */ noObs?: boolean }
+  | { c: 'sp-go' } // producer GO: resolves a pending automation GO, else takes the prepared segment
+  | { c: 'sp-cancel' } // cancel the GO the automation is waiting for
+  | { c: 'sp-onair'; id: string | null } // mark on air without switching OBS (OBS was switched by hand)
+  | { c: 'sp-rule-set'; rule: Partial<import('./showplan').AutoRule> }
+  | { c: 'sp-rule-remove'; id: string }
+  | { c: 'sp-rule-run'; id: string; dry?: boolean } // dry = describe only (safe test)
+  | { c: 'sp-starter' } // starter show + reference automation (only into an empty plan)
+  | { c: 'sp-import'; plan: { segments?: unknown[]; rules?: unknown[]; crewSync?: boolean } } // show file: replaces segments + rules (refused while a segment is on air)
+  | { c: 'sp-opts'; crewSync?: boolean }
   // ---- Recovery
   | { c: 'panic' } // clear every keyed graphic + popups, keep the scene
   | { c: 'safe' } // CUT Program to the BRB screen

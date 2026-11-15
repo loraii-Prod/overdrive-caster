@@ -257,7 +257,7 @@ export function SceneDock({ live, preview, show, wc, now, send, quick, twConnect
       body = s ? (
         <>
           <Group label="Showing">
-            <Segmented size="sm" value={String(s.air) as '1' | '2'} onChange={v => op({ k: 'air', part: v === '2' ? 2 : 1 })} options={[{ value: '1', label: 'Upper + final' }, { value: '2', label: 'Lower + standings' }]} />
+            <Segmented size="sm" value={String(s.air) as '1' | '2'} onChange={v => op({ k: 'air', part: v === '2' ? 2 : 1 })} options={[{ value: '1', label: 'Upper + final' }, { value: '2', label: 'Lower bracket' }]} />
             <Toggle on={s.opts.rotate} onClick={() => op({ k: 'opts', patch: { rotate: !s.opts.rotate } })}>Switch every {s.opts.rotateSec} s</Toggle>
           </Group>
           {match}{champ}

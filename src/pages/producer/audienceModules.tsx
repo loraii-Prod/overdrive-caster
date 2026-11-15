@@ -3,7 +3,8 @@
  * service) or PREPARES a graphic step; the step goes to the source only with Publish, and OBS is never switched.
  * Live counts shown here are private: graphics never get them.
  */
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { STAGES, mvpStage, nextAction, type MvpFlowIn } from '../../../shared/mvpFlow';
 import type { AudOp, QrLink } from '../../../shared/audience';
 import { MVP_ACHIEVEMENTS, MVP_STATS, pcts, teamRoster } from '../../../shared/audience';
 import { matchName, WC_IDS, wcResolve } from '../../../shared/wildcard';
@@ -11,6 +12,7 @@ import type { AudPrivate } from '../../../shared/protocol';
 import type { AudLive } from '../../lib/hooks';
 import { Qr } from '../../components/Qr';
 import { Btn, Chip, Seg, Tag, Tiny, PGM, PVW, WARN, type Ctx } from './modules';
+import { ChatVotingPanel } from './ChatVoting';
 
 export interface AudCtx { aud: AudLive | null; priv: AudPrivate | null; op: (op: AudOp, label: string) => Promise<string | null> }
 
@@ -117,25 +119,28 @@ export function MvpModule({ x, a }: { x: Ctx; a: AudCtx }) {
   const [busy, setBusy] = useState(false);
   const once = async (f: () => unknown) => { if (busy) return; setBusy(true); try { await f(); } finally { setTimeout(() => setBusy(false), 600); } };
   const top = poll?.frozen ? Object.entries(poll.frozen.counts).sort((p, q) => q[1] - p[1])[0]?.[0] : undefined;
+  const studio = !!x.studio;
   return (
     <>
       <Health a={a} />
+      {m && <MvpSequence x={x} a={a} match={id} poll={poll} staff={Object.keys(staff).length > 0} prepare={() => a.op({ k: 'mvp-prepare', match: id, players: roster.filter(p => !off.includes(p.handle)).map(p => p.handle) }, 'Prepare MVP vote')} countdown={Number(cd) || 0} />}
       <div className="flex items-center gap-2"><Tag>Match</Tag>
         <select value={id} onChange={e => { setSel(e.target.value); setOff([]); }} className="min-w-0 flex-1 rounded-[2px] border border-white/15 bg-black px-1 py-0.5 text-[12px]">
           {done.map(r => <option key={r.id} value={r.id}>{matchName(r.id)}: {r.t1} vs {r.t2}{archived.includes(r.id) ? ' (archived)' : ''}</option>)}
         </select></div>
-      {!m ? <div className="text-[12px] text-white/50">MVP voting opens after a match has a result.</div> : <>
+      {!m ? <><div className="text-[12px] text-white/50">MVP voting opens after a match has a result.</div><ChatVotingPanel a={a} poll={undefined} now={x.now} /></> : <>
         <Tag>Eligible players</Tag>
         <div className="flex flex-wrap gap-1">{roster.map(p => <Chip key={p.handle} on={!off.includes(p.handle)} disabled={!!poll && poll.status !== 'draft'} onClick={() => setOff(o => (o.includes(p.handle) ? o.filter(h => h !== p.handle) : [...o, p.handle]))}>{p.handle}</Chip>)}</div>
         <Tag live>Voting</Tag>
         <div className="flex flex-wrap items-center gap-1 text-[12px]">
           <span className="mr-1" data-testid="mvp-status">{poll ? poll.status.toUpperCase() : 'NOT PREPARED'}</span>
           {(!poll || poll.status === 'draft') && <Btn onClick={() => a.op({ k: 'mvp-prepare', match: id, players: roster.filter(p => !off.includes(p.handle)).map(p => p.handle) }, 'Prepare MVP vote')}>Prepare</Btn>}
-          {poll?.status === 'draft' && <>
+          {studio && poll && poll.status !== 'draft' && <span className="text-white/45">Voting is operated in Producer Mode.</span>}
+          {!studio && poll?.status === 'draft' && <>
             <Seg value={cd} options={COUNTDOWNS} onChange={setCd} />
             <Btn active onClick={() => a.op({ k: 'mvp-open', poll: poll.id, ...(Number(cd) ? { seconds: Number(cd) } : {}) }, 'Open MVP voting')}>Open voting</Btn>
           </>}
-          {poll?.status === 'open' && <>
+          {!studio && poll?.status === 'open' && <>
             <Btn danger onClick={() => a.op({ k: 'mvp-close', poll: poll.id }, 'Close MVP voting')}>Close voting</Btn>
             <Tiny title="Countdown +30 s" onClick={() => a.op({ k: 'mvp-timer', poll: poll.id, seconds: (left ?? 0) + 30 }, 'MVP countdown +30 s')}>+30s</Tiny>
             {left != null && <Tiny title="Remove the countdown (close by hand)" onClick={() => a.op({ k: 'mvp-timer', poll: poll.id, seconds: null }, 'MVP countdown off')}>No timer</Tiny>}
@@ -148,6 +153,7 @@ export function MvpModule({ x, a }: { x: Ctx; a: AudCtx }) {
         </div>}
         {poll && poll.status !== 'draft' && <><div className="text-[11px] text-white/50">{poll.status === 'open' ? `Live count (private): ${poll.total ?? 0} votes` : `Frozen at close: ${poll.frozen?.total ?? 0} votes · ${poll.status === 'revealed' ? 'revealed' : 'not revealed yet'}`}</div>
           <Bars rows={poll.players.map(p => [p.handle, (poll.status === 'open' ? poll.counts?.[p.handle] : poll.frozen?.counts[p.handle]) ?? 0] as [string, number]).sort((p, q) => q[1] - p[1])} /></>}
+        <ChatVotingPanel a={a} poll={poll} now={x.now} />
         <Tag live>Analyst MVP</Tag>
         {seats.map(s => { const name = x.st.live.casters.find(c => c.id === s)?.name ?? `Pos ${s}`, cur = staff[String(s)]?.player; return (
           <div key={s} className="flex flex-wrap items-center gap-1 text-[11.5px]"><span className="w-[80px] truncate font-bold">{name}</span>
@@ -156,12 +162,12 @@ export function MvpModule({ x, a }: { x: Ctx; a: AudCtx }) {
         <Tag>Graphic (prepare, then Publish)</Tag>
         <Steps x={x} gfx="mvp" match={id} value="" disabled={!a.priv?.online && !frozen ? 'Voting offline: the winner can only be shown from a frozen result.' : undefined}
           steps={[['voting', 'Voting open'], ['winner', 'Community MVP', !frozen], ['desk', 'Analyst MVP', !Object.keys(staff).length], ['compare', 'Community vs Analysts', !frozen || !Object.keys(staff).length]]} />
-        <div className="flex flex-wrap items-center gap-1">
+        {!studio && <div className="flex flex-wrap items-center gap-1">
           <Btn disabled={!frozen || busy} title={frozen ? 'Prepare the Community MVP reveal in Preview (Program untouched)' : 'Close voting first'} onClick={() => once(() => x.run({ c: 'gfx-set', id: 'mvp', patch: { match: id, step: 'winner' } }, 'Preview MVP reveal'))}>Preview reveal</Btn>
           <Btn danger disabled={busy || !g?.draft || draftMatch !== id || !reveal.includes(String(draftStep))} title="Publish the prepared reveal to Program (does not switch OBS)"
             onClick={() => once(() => x.run({ c: 'gfx-publish', id: 'mvp' }, 'REVEAL MVP on Program'))}>REVEAL on Program</Btn>
           <span className="text-[11px] text-white/45">{g?.draft && reveal.includes(String(draftStep)) && draftMatch === id ? `Prepared: ${draftStep}` : 'Nothing prepared'}</span>
-        </div>
+        </div>}
         {!frozen && <div className="text-[11px] text-white/45">The reveal steps unlock once voting is closed. Closing never shows anything on air.</div>}
         <Tag>Session</Tag>
         <div className="flex flex-wrap items-center gap-1 text-[11.5px]">
@@ -173,8 +179,69 @@ export function MvpModule({ x, a }: { x: Ctx; a: AudCtx }) {
   );
 }
 
+/**
+ * The MVP sequence in one row: Voting prepared → open → closed → results ready → Community MVP → Analyst MVP →
+ * comparison → next scene, with ONE "next step" button. Reveals ask for a second click when the MVP graphic's
+ * "Reveals need producer confirmation" is on (default). Studio shows where the sequence stands; it does not act.
+ */
+function MvpSequence({ x, a, match, poll, staff, prepare, countdown }: { x: Ctx; a: AudCtx; match: string; poll: import('../../../shared/audience').AudPoll | undefined; staff: boolean; prepare: () => unknown; countdown: number }) {
+  const g = gfxOf(x, 'mvp');
+  const gMatch = String(g?.config.match || x.wc.cast || '');
+  const flow: MvpFlowIn = { status: poll?.status ?? null, frozen: !!poll?.frozen, desk: staff, published: gMatch === match ? String(g?.config.step ?? '') : '' };
+  const stage = mvpStage(flow), act = nextAction(flow);
+  const confirmOn = (g?.draft?.confirmReveal ?? g?.config.confirmReveal) !== false;
+  const [armed, setArmed] = useState<string | null>(null), [busy, setBusy] = useState(false);
+  useEffect(() => { if (!armed) return; const t = setTimeout(() => setArmed(null), 4000); return () => clearTimeout(t); }, [armed]);
+  const i = STAGES.findIndex(s => s.id === stage);
+  const step = async () => {
+    if (busy) return;
+    const key = act.kind === 'reveal' ? act.step : act.kind;
+    if (act.critical && confirmOn && armed !== key) { setArmed(key); return; }
+    setArmed(null); setBusy(true);
+    try {
+      if (act.kind === 'prepare') await prepare();
+      else if (act.kind === 'open' && poll) await a.op({ k: 'mvp-open', poll: poll.id, ...(countdown ? { seconds: countdown } : {}) }, 'Open MVP voting');
+      else if (act.kind === 'close' && poll) await a.op({ k: 'mvp-close', poll: poll.id }, 'Close MVP voting');
+      else if (act.kind === 'reveal') {
+        // Only this graphic: the reveal step for this match goes to its source (frozen result only: the step is offered
+        // by nextAction() only once it is allowed), IN if it was out. OBS is never switched.
+        const s1 = await x.run({ c: 'gfx-set', id: 'mvp', patch: { match, step: act.step } }, `Prepare ${act.label}`);
+        if (s1.ok) await x.run({ c: 'gfx-publish', id: 'mvp' }, act.label);
+        if (s1.ok && g?.anim.action === 'out') await x.run({ c: 'gfx-anim', id: 'mvp', action: 'in' }, 'MVP IN');
+      } else if (act.kind === 'next') {
+        if (x.st.plan?.next || x.st.plan?.pending) await x.run({ c: 'sp-go' }, 'Show GO (after the MVP)');
+        else await x.run({ c: 'gfx-anim', id: 'mvp', action: 'out' }, 'MVP OUT');
+      }
+    } finally { setTimeout(() => setBusy(false), 500); }
+  };
+  const replayable = stage === 'community' || stage === 'analyst' || stage === 'compare';
+  return (
+    <div className="space-y-1.5 rounded-[2px] border border-white/10 bg-white/[0.03] p-1.5" data-mvp-sequence={stage}>
+      <div className="flex flex-wrap items-center gap-[3px]">
+        {STAGES.map((s, k) => (
+          <span key={s.id} data-mvp-stage={s.id} className="rounded-[2px] px-1.5 py-[2px] text-[10.5px] font-bold uppercase tracking-[0.04em]"
+            style={k === i ? { background: s.id === 'community' || s.id === 'analyst' || s.id === 'compare' ? PGM : '#fff', color: s.id === 'community' || s.id === 'analyst' || s.id === 'compare' ? '#fff' : '#000' } : k < i ? { color: PVW } : { color: 'rgba(255,255,255,.35)' }}>
+            {k < i ? '✓ ' : ''}{s.label}</span>
+        ))}
+        <span className="px-1 text-[10.5px] font-bold uppercase tracking-[0.04em] text-white/35">→ Next scene</span>
+      </div>
+      {x.studio ? <div className="text-[11px] text-white/50">Producer Mode runs this sequence (one Next step button; reveals need a second click{confirmOn ? '' : ': confirmation is OFF for this graphic'}).</div> : (
+        <div className="flex flex-wrap items-center gap-1">
+          <Btn active={!act.critical && act.kind !== 'wait'} danger={act.critical} disabled={busy || act.kind === 'wait'} onClick={step}
+            title={act.critical ? (confirmOn ? 'Click twice: the winner goes on air' : 'Goes on air at once (confirmation is off)') : act.label}>
+            {act.kind === 'reveal' && armed === act.step ? `CONFIRM: ${act.label}` : `Next step: ${act.label}`}
+          </Btn>
+          {replayable && <Btn onClick={() => x.run({ c: 'gfx-anim', id: 'mvp', action: 'in' }, 'Replay the MVP reveal')} title="Plays the reveal animation again (same step, same result)">Replay reveal</Btn>}
+          <Chip on={confirmOn} onClick={() => x.run({ c: 'gfx-set', id: 'mvp', patch: { confirmReveal: !confirmOn } }, `Reveal confirmation ${confirmOn ? 'off' : 'on'} (prepared)`)}
+            title="Reveals need a second click here and a producer GO in automation. Prepared: Publish the MVP graphic to apply.">Confirm reveals</Chip>
+        </div>
+      )}
+    </div>
+  );
+}
+
 /** Reveal extras for one player: up to 4 stats (label + value) and 3 achievements, entered by the producer. */
-function CardEditor({ a, match, roster, suggest }: { a: AudCtx; match: string; roster: string[]; suggest?: string }) {
+export function CardEditor({ a, match, roster, suggest }: { a: AudCtx; match: string; roster: string[]; suggest?: string }) {
   const [who, setWho] = useState('');
   const player = who && roster.includes(who) ? who : suggest && roster.includes(suggest) ? suggest : roster[0] ?? '';
   const card = a.aud?.mvpCards?.[match]?.[player];

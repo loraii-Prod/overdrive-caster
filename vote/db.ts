@@ -25,6 +25,12 @@ create table if not exists audit(id bigserial primary key, at timestamptz not nu
 create index if not exists picks_match on picks(session, match);
 create index if not exists votes_poll on mvp_votes(poll);
 alter table polls add column if not exists closes_at timestamptz;
+-- Twitch chat voting: where a vote came from, and which ways a poll accepts votes (chat command shown to viewers).
+alter table mvp_votes add column if not exists source text not null default 'web';
+alter table polls add column if not exists web boolean not null default true;
+alter table polls add column if not exists chat boolean not null default false;
+alter table polls add column if not exists chat_cmd text not null default '';
+alter table polls add column if not exists chat_channel text not null default '';
 `;
 
 export type Db = pg.Pool;

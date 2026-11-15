@@ -26,6 +26,8 @@ export interface Ctx {
   st: ControllerState; eng: EngineState; wc: WildcardState; pv: WildcardState; run: Run; prepare: boolean;
   src: SourceDef; now: number; media: MediaState | null; mediaSkew: number;
   aud?: import('./audienceModules').AudCtx;
+  /** Studio Mode: configure only (no voting open / close, no reveal, nothing on air). */
+  studio?: boolean;
 }
 
 /** Live data: straight to the sources, or into the draft when "Prepare live data" is on. */
@@ -336,7 +338,7 @@ function GraphicsModule({ x }: { x: Ctx }) {
 }
 function BracketModule({ x }: { x: Ctx }) {
   const w = x.wc, op = (o: WcOp, l: string) => x.run({ c: 'op-wc', op: o }, l);
-  const name = (p: 1 | 2) => (p === 1 ? 'Upper + GF' : 'Lower + standings');
+  const name = (p: 1 | 2) => (p === 1 ? 'Upper + GF' : 'Lower bracket');
   return (
     <>
       <div className="flex items-center gap-2 text-[11px]">
@@ -346,7 +348,7 @@ function BracketModule({ x }: { x: Ctx }) {
       <Tag>Preview page (does not touch Program)</Tag>
       <div className="flex flex-wrap items-center gap-1">
         <Btn disabled={w.cue === 1} onClick={() => op({ k: 'cue', part: 1 }, 'Bracket preview: previous page')}>◀ Prev</Btn>
-        <Seg value={String(w.cue)} options={[['1', '1 · Upper + GF'], ['2', '2 · Lower + standings']]} onChange={v => op({ k: 'cue', part: Number(v) as 1 | 2 }, `Bracket preview page ${v}`)} />
+        <Seg value={String(w.cue)} options={[['1', '1 · Upper + GF'], ['2', '2 · Lower bracket']]} onChange={v => op({ k: 'cue', part: Number(v) as 1 | 2 }, `Bracket preview page ${v}`)} />
         <Btn disabled={w.cue === 2} onClick={() => op({ k: 'cue', part: 2 }, 'Bracket preview: next page')}>Next ▶</Btn>
       </div>
       <div className="flex flex-wrap items-center gap-1">

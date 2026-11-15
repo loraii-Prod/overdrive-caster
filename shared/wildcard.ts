@@ -1,4 +1,5 @@
 import { hiRes } from './assetRes';
+import { sanitizeFrames } from './portraits';
 import { MAJOR_TEAMS } from './major';
 import { MAJOR_MAPS, isMapId } from './maps';
 
@@ -82,13 +83,14 @@ export const WC_PARTS: Record<1 | 2, WcPart> = {
       { name: 'Grand final', x: 1440, w: 420, ids: [GRAND_FINAL], major: true },
     ],
   },
+  // The lower bracket uses the whole width (no standings column at the finals): same card size as the upper bracket.
   2: {
-    title: 'Lower bracket', top: 330, step: 250,
+    title: 'Lower bracket', top: 320, step: 320,
     cols: [
-      { name: 'Lower round 1', x: 60, w: 360, ids: ['R1_LB1', 'R1_LB2'] },
-      { name: 'Lower quarter-finals', x: 440, w: 360, ids: ['R2_LB1', 'R2_LB2'] },
-      { name: 'Lower semi-final', x: 820, w: 360, ids: ['R3_LB1'] },
-      { name: 'Lower final', x: 1200, w: 360, ids: ['R4_LB1'] },
+      { name: 'Lower round 1', x: 60, w: 420, ids: ['R1_LB1', 'R1_LB2'] },
+      { name: 'Lower quarter-finals', x: 520, w: 420, ids: ['R2_LB1', 'R2_LB2'] },
+      { name: 'Lower semi-final', x: 980, w: 420, ids: ['R3_LB1'] },
+      { name: 'Lower final', x: 1440, w: 420, ids: ['R4_LB1'] },
     ],
   },
 };
@@ -148,6 +150,8 @@ export interface WcShowcase {
   seconds: number;
   /** Player held on screen (normHandle), or null to rotate. */
   pin: string | null;
+  /** Producer's framing of each portrait (normHandle → crop / zoom / position), shared by every graphic. */
+  frames: Record<string, import('./portraits').PortraitFrame>;
 }
 /** Match intro (Warm-up screen): teams, optional label and road texts, seconds per player, start time (null = not playing). */
 /** A caster's / analyst's prediction for the intro match: winner and series score ("3-1", winner first). */
@@ -184,7 +188,7 @@ export function sanitizeIntro(v: any): WcIntro {
 export type WcDeskPanel = 'cams' | 'picks' | 'h2h' | 'player' | 'pickem';
 export const DESK_PANELS: WcDeskPanel[] = ['cams', 'picks', 'h2h', 'player', 'pickem'];
 
-export const defaultShowcase = (): WcShowcase => ({ photos: {}, team: '', seconds: 12, pin: null });
+export const defaultShowcase = (): WcShowcase => ({ photos: {}, team: '', seconds: 12, pin: null, frames: {} });
 export function sanitizeShowcase(v: any): WcShowcase {
   const d = defaultShowcase();
   if (!v || typeof v !== 'object') return d;
@@ -197,6 +201,7 @@ export function sanitizeShowcase(v: any): WcShowcase {
     team: typeof v.team === 'string' ? v.team.slice(0, 60) : '',
     seconds: Math.max(5, Math.min(120, Math.round(Number(v.seconds) || d.seconds))),
     pin: typeof v.pin === 'string' && v.pin ? v.pin.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 40) : null,
+    frames: sanitizeFrames(v.frames),
   };
 }
 
@@ -431,6 +436,8 @@ export type WcOp =
   | { k: 'replay' }
   | { k: 'showcase'; patch: Partial<Omit<WcShowcase, 'photos'>> }
   | { k: 'photo'; player: string; url: string | null }
+  /** Portrait framing (crop / zoom / position) of one player; null = back to the default fit. */
+  | { k: 'photo-frame'; player: string; frame: import('./portraits').PortraitFrame | null }
   | { k: 'intro'; patch: Partial<Omit<WcIntro, 'at' | 'picks'>> }
   | { k: 'pick'; slot: number; pick: WcPick | null }
   | { k: 'booth'; slots: number[] }

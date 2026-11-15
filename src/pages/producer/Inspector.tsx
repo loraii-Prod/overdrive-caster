@@ -76,11 +76,11 @@ const SEC_H = "mb-0.5 flex items-center gap-1.5 font-['Barlow_Condensed'] text-[
  * bar; then every property group and data binding of its package, laid out in columns that wrap (no
  * horizontal scrolling; each area scrolls vertically inside the 400 px control strip).
  */
-export function Inspector({ g, st, run, ctxBase }: { g: GfxInstance; st: ControllerState; eng?: EngineState; wc?: WildcardState; pv?: WildcardState; run: Run; ctxBase: Omit<Ctx, 'src'> }) {
+export function Inspector({ g, st, run, ctxBase, studio = false }: { g: GfxInstance; st: ControllerState; eng?: EngineState; wc?: WildcardState; pv?: WildcardState; run: Run; ctxBase: Omit<Ctx, 'src'>; /** Studio Mode: no IN / UPDATE / OUT / Publish here (configure only; Studio publishes from its own panel). */ studio?: boolean }) {
   const p = pkgById(g.pkg)!;
   const cur = g.draft ?? g.config;
   const [preset, setPreset] = useState('');
-  const groups = [...new Set(p.props.map(d => d.group ?? 'Properties'))];
+  const groups = [...new Set(p.props.filter(d => !d.internal).map(d => d.group ?? 'Properties'))];
   const h = st.gfxHealth?.[g.id];
   const conns = st.outputs.find(o => o.route === `g/${g.id}`)?.count ?? 0;
   const out = g.anim.action === 'out';
@@ -96,15 +96,15 @@ export function Inspector({ g, st, run, ctxBase }: { g: GfxInstance; st: Control
         </span>
       </div>
       <div className="flex h-[36px] flex-none items-center gap-1 border-b border-white/[0.08] px-2" data-anims>
-        {p.animations.map(a => (
+        {!studio && p.animations.map(a => (
           <B key={a.action} h={26} kind={a.action === 'in' ? 'in' : a.action === 'out' ? 'out' : 'default'} active={a.action === 'in' ? !out : a.action === 'out' ? out : false}
             title={a.action === 'in' ? 'Animate IN on its own source (F2)' : a.action === 'update' ? 'Play the UPDATE animation (F3)' : a.action === 'out' ? 'Animate OUT (F4)' : 'Back to package defaults'}
             onClick={() => run({ c: 'gfx-anim', id: g.id, action: a.action }, `${g.name} ${a.label}`)}>{a.label}</B>
         ))}
-        <span className="mx-1 h-5 w-px bg-white/10" />
-        <B h={26} kind="primary" disabled={!g.draft} onClick={() => run({ c: 'gfx-publish', id: g.id }, `Publish ${g.name}`)} title="Send this graphic's prepared changes to its source">Publish{changed ? ` ${changed}` : ''}</B>
+        {!studio && <span className="mx-1 h-5 w-px bg-white/10" />}
+        {!studio && <B h={26} kind="primary" disabled={!g.draft} onClick={() => run({ c: 'gfx-publish', id: g.id }, `Publish ${g.name}`)} title="Send this graphic's prepared changes to its source">Publish{changed ? ` ${changed}` : ''}</B>}
         <B h={26} disabled={!g.draft} onClick={() => run({ c: 'gfx-revert', id: g.id }, `Revert ${g.name}`)}>Revert</B>
-        {p.commands.map(c => <B key={c.id} h={26} onClick={() => run({ c: 'graphic', g: c.id as 'replay' }, c.label)}>{c.label}</B>)}
+        {!studio && p.commands.map(c => <B key={c.id} h={26} onClick={() => run({ c: 'graphic', g: c.id as 'replay' }, c.label)}>{c.label}</B>)}
         <span className="mx-1 h-5 w-px bg-white/10" />
         <select aria-label="Load preset" value="" disabled={!g.presets.length} onChange={e => e.target.value && run({ c: 'gfx-preset', id: g.id, op: 'load', name: e.target.value }, `Load preset ${e.target.value}`)} className="h-[26px] w-[118px] rounded-[2px] border border-white/15 bg-[#0b0b0c] px-1 text-[11.5px]">
           <option value="">{g.presets.length ? `Presets (${g.presets.length})…` : 'No presets'}</option>{g.presets.map(q => <option key={q.name} value={q.name}>{q.name}</option>)}
@@ -117,7 +117,7 @@ export function Inspector({ g, st, run, ctxBase }: { g: GfxInstance; st: Control
           {groups.map(gr => (
             <section key={gr} className={SECTION} data-prop-group={gr}>
               <div className={SEC_H}>{gr} <span className="rounded-[2px] px-1 text-[9.5px] text-black" style={{ background: WARN }} title="Prepared: Publish sends it to the source">DRAFT</span></div>
-              {p.props.filter(d => (d.group ?? 'Properties') === gr).map(d => <PropInput key={d.key} d={d} value={cur[d.key]} changed={!!g.draft && g.draft[d.key] !== g.config[d.key]} onChange={v => run({ c: 'gfx-set', id: g.id, patch: { [d.key]: v } }, `${g.name}: ${d.label}`)} />)}
+              {p.props.filter(d => !d.internal && (d.group ?? 'Properties') === gr).map(d => <PropInput key={d.key} d={d} value={cur[d.key]} changed={!!g.draft && g.draft[d.key] !== g.config[d.key]} onChange={v => run({ c: 'gfx-set', id: g.id, patch: { [d.key]: v } }, `${g.name}: ${d.label}`)} />)}
             </section>
           ))}
           {p.bindings.map((b, i) => (

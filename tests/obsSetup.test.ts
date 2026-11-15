@@ -36,7 +36,7 @@ const browserInputs = (m: MockObs) => [...m.inputs].filter(([, i]) => i.kind ===
   {
     const t = discoverTargets(sanitizeGraphics([]), defaultShow().obsScenes, { audio: true, gameCapture: true });
     const names = [...t.map(x => x.scene), ...t.map(x => x.input)];
-    check('discovery: every graphics instance and every registry source is a target', t.filter(x => x.kind === 'gfx').length === sanitizeGraphics([]).length && t.filter(x => x.kind !== 'gfx').length === 14, `${t.length} targets`);
+    check('discovery: every graphics instance and every registry source is a target', t.filter(x => x.kind === 'gfx').length === sanitizeGraphics([]).length && t.filter(x => x.kind !== 'gfx').length === 20, `${t.length} targets`);
     check('discovery: scene + source names unique across OBS name space', new Set(names).size === names.length);
     check('discovery: no target uses /output/program', t.every(x => !x.route.includes('/output/program')));
     check('discovery: legacy screens replaced by an engine graphic are marked (caster desk, analyst desk, gameplay, bracket, scoreboard)', ['s:caster-desk', 's:analyst-desk', 's:gameplay', 's:bracket', 's:scoreboard'].every(id => t.find(x => x.id === id)?.supersededBy));

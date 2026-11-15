@@ -5,7 +5,9 @@ import { teamLogo } from '../../shared/major';
 import './vote.css';
 
 interface Match { id: string; label: string; a: string; b: string; bestOf: number; scores: string[]; status: 'open' | 'locked' | 'final'; winner: string | null; score: string | null; split: { total: number; byTeam: Record<string, number> } | null }
-interface Poll { id: string; match: string; label: string; result: string; players: { handle: string; team: string; photo?: string }[]; status: 'open' | 'closed' | 'revealed'; closesAt?: number | null; frozen: { total: number; counts: Record<string, number> } | null }
+interface Poll { id: string; match: string; label: string; result: string; players: { handle: string; team: string; photo?: string }[]; status: 'open' | 'closed' | 'revealed'; closesAt?: number | null; frozen: { total: number; counts: Record<string, number> } | null;
+  /** Ways to vote (Twitch chat voting): missing = website only. */
+  web?: boolean; chat?: boolean; chatCmd?: string; chatChannel?: string }
 interface State { ok: boolean; session: string | null; name: string; signIn: boolean; dev?: boolean; matches: Match[]; champion: { locked: boolean; teams: string[] }; polls: Poll[]; accuracy: { played: number; right: number; points: number } }
 interface Me { name: string; picks: Record<string, { team: string; score: string }>; champion: string | null; votes: Record<string, string>; points: number; rank: number | null; ranked: number }
 
@@ -109,10 +111,12 @@ function App() {
         {tab === 'mvp' && (openPoll ? (() => { const mine = me?.votes[openPoll.id]; const over = left === 0; return <>
           <div className="live"><i />{over ? 'Voting closing…' : left != null ? <>Voting open · closes in <b className="cd">{mmss(left)}</b></> : 'Voting open · closes on air'}</div>
           <h1>Who was the MVP?</h1><p className="s">{openPoll.result || openPoll.label}</p>
-          <div className="pl" role="radiogroup" aria-label="MVP candidates">{openPoll.players.map(p => { const on = (mine ?? mvpChoice) === p.handle; return (
+          <div className="pl" role="radiogroup" aria-label="MVP candidates">{openPoll.players.map((p, i) => { const on = (mine ?? mvpChoice) === p.handle; return (
             <button key={p.handle} role="radio" className={'p' + (on ? ' on' : '')} aria-checked={on} disabled={!!mine || over} onClick={() => setMvpChoice(p.handle)}>
-              <Face src={p.photo} /><Logo team={p.team} size={26} /><b>{p.handle}</b><small>{p.team}</small></button>); })}</div>
+              <Face src={p.photo} /><Logo team={p.team} size={26} /><b>{p.handle}</b><small>{openPoll.chat && i < 4 ? `#${i + 1} · ` : ''}{p.team}</small></button>); })}</div>
+          {openPoll.chat && openPoll.web !== false && !mine && <p className="lock center" data-chat-tip>Watching on Twitch? You can also type <b>{openPoll.chatCmd || '!vote'} 1</b>–<b>{Math.min(4, openPoll.players.length)}</b> in chat (one vote per account, chat or here).</p>}
           {mine ? <p className="ok center" data-voted>✓ Vote received: {mine}. The result is revealed on stream.</p>
+            : openPoll.web === false ? <p className="ok center" data-chat-only>Voting is in Twitch chat: type <b>{openPoll.chatCmd || '!vote'} 1</b>–<b>{Math.min(4, openPoll.players.length)}</b> (the player's number{openPoll.chatChannel ? <> in twitch.tv/{openPoll.chatChannel}</> : null}).</p>
             : <button className="btn" disabled={!mvpChoice || over} onClick={() => me ? act('/v1/mvp', { poll: openPoll.id, player: mvpChoice }, `Vote received: ${mvpChoice}`) : say('Sign in with Twitch first', true)}>{over ? 'Voting closed' : mvpChoice ? `Vote ${mvpChoice}` : 'Choose a player'}</button>}
           <p className="lock center">One vote per Twitch account · results are revealed on stream</p>
         </>; })() : closedPoll ? (() => { const mine = me?.votes[closedPoll.id]; return <>

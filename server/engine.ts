@@ -19,6 +19,10 @@ import type { MediaState } from '../shared/media';
 import { REGISTRY, sanitizeStudio, type Studio } from '../shared/registry';
 import { checkProp, defaultsOf, pkgById, PACKAGES, sanitizeConfig, type GfxInstance } from '../shared/gfx';
 import { MAX_RUNDOWN, type Rundown, type RundownItem } from '../shared/rundown';
+import { randomBytes } from 'node:crypto';
+import { emptyStaffPicks, staffOp, type StaffPicks } from '../shared/staffPicks';
+import { REVEAL_STEPS, isMvpView, isRevealView, mergeRevealed, revealAllowed, withRevealed, type MvpFlowIn } from '../shared/mvpFlow';
+import { MAX_NOTES, MAX_RULES, MAX_SEGMENTS, actionLabel, emptyPlan, sanitizePlan, sanitizeRule, sanitizeSegment, segmentObsScene, starterPlan, triggerLabel, type AutoAction, type AutoRule, type ObsLookup, type ShowPlan, type Trigger } from '../shared/showplan';
 
 export interface EngineDb {
   preview: Scene; live: Scene; showPreview: Show; showLive: Show; wildcard: WildcardState; instant: boolean;
@@ -28,6 +32,10 @@ export interface EngineDb {
   studio?: Studio;
   graphics: GfxInstance[];
   rundown: Rundown;
+  /** Studio Mode 2.0 show plan (segments + automation). */
+  plan?: ShowPlan;
+  /** Internal staff pick'em. */
+  staffPicks?: StaffPicks;
 }
 
 export interface EngineDeps {
@@ -50,13 +58,19 @@ export interface EngineDeps {
   onGfxPublish?(g: GfxInstance): void;
   /** Talent / positions (hub owns the camera routing). Return an error message or null. */
   setSeat(seat: number, talent: string | null): string | null;
-  editTalent(id: string, patch: { name?: string; role?: 'caster' | 'analyst'; mode?: 'webrtc' | 'vdo'; camQuality?: import('../shared/talent').CamQuality }): string | null;
+  editTalent(id: string, patch: { name?: string; role?: 'caster' | 'analyst'; mode?: 'webrtc' | 'vdo'; camQuality?: import('../shared/talent').CamQuality; vdoId?: string }): string | null;
   regenTalent(id: string): string | null;
   resyncSeat(seat: number): string | null;
   /** OBS: switch Program scene with the given transition (undefined = OBS's current one). */
   obsSwitch(scene: string, transition?: TransitionKind): Promise<string | null>;
   /** OBS Scene Builder: returns an error, or a note for the ack. Never switches OBS. */
   obsSetup(cmd: Extract<ProducerCmd, { c: 'obs-setup' }>): Promise<{ error?: string; note?: string }>;
+  /** Show plan: how segment targets map to OBS scenes (Scene Builder, screen mapping, graphics mapping, OBS scene list). */
+  obsLookup?(): ObsLookup;
+  /** Show plan with crew sync on: mirror the segments (and the one on air) to the crew / caster run of show. */
+  syncCrew?(plan: ShowPlan): void;
+  /** MVP voting of the MVP graphic's match (hub → vote service). */
+  mvp?: { state(): MvpFlowIn & { match: string }; op(action: 'open' | 'close'): Promise<string | null> };
 }
 
 type Snap = { label: string; at: number; kind: 'stage' | 'take'; preview: Scene; showPreview: Show; stage: Stage; touched: boolean; draft: DraftCmd[];
@@ -68,7 +82,7 @@ const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b)
 export type Ack = { ok: true; version: number; note?: string } | { ok: false; version: number; error: string };
 
 /** Existing Major ops the console may send through the engine (setup/destructive ones stay in the Controller). */
-const WC_OPS = new Set(['score', 'wo', 'clear', 'live', 'time', 'air', 'cue', 'take', 'page-reset', 'opts', 'cast', 'showcase', 'intro', 'pick', 'champ', 'interview', 'veto', 'pb', 'pb-show', 'veto-undo', 'veto-reset', 'veto-order', 'pickem-reset', 'map', 'intro-play', 'intro-stop', 'replay', 'desk']);
+const WC_OPS = new Set(['score', 'wo', 'clear', 'live', 'time', 'air', 'cue', 'take', 'page-reset', 'opts', 'cast', 'showcase', 'photo', 'photo-frame', 'intro', 'pick', 'champ', 'interview', 'veto', 'pb', 'pb-show', 'veto-undo', 'veto-reset', 'veto-order', 'pickem-reset', 'map', 'intro-play', 'intro-stop', 'replay', 'desk']);
 const QUICK_OPS = new Set(['score', 'swap', 'reset-scores', 'game', 'timer-start', 'timer-add', 'timer-until', 'timer-stop', 'spotlight', 'spotlight-hide', 'active-player', 'music', 'next-match', 'matchup-casters', 'flag']);
 
 export function createEngine(d: EngineDeps) {
@@ -81,6 +95,8 @@ export function createEngine(d: EngineDeps) {
   let lastTake: EngineState['lastTake'] = null;
   const history: Snap[] = [];
   const draft = () => db.engine!.draft!;
+  db.plan ??= emptyPlan();
+  const plan = () => db.plan!;
 
   const programStage = (): Stage => ({ booth: [...db.wildcard.booth], desk: { slots: [...db.wildcard.desk.slots], guest: db.wildcard.desk.guest, panel: db.wildcard.desk.panel, strip: db.wildcard.desk.strip, clock: db.wildcard.desk.clock } });
   const stage = (): Stage => (db.engine!.touched && db.engine!.stage ? db.engine!.stage : programStage());
@@ -183,12 +199,34 @@ export function createEngine(d: EngineDeps) {
   const rdId = () => { let id: string; do id = Math.random().toString(36).slice(2, 10); while (rdIndex(id) >= 0); return id; };
   const anim = (g: GfxInstance, action: GfxInstance['anim']['action']) => { g.anim = { action, seq: g.anim.seq + 1, at: Date.now() }; };
   /** Published config changes on a graphic that is IN play its UPDATE animation (never other graphics). */
+  /**
+   * MVP graphic: publishing a reveal step IS the producer's authorization of that reveal for that match (the MVP &
+   * Awards reveal scenes draw only authorized reveals). A stale draft never takes an authorization back.
+   */
+  function mvpAuthorize(prev: GfxInstance['config'], next: GfxInstance['config']): GfxInstance['config'] {
+    const match = String(next.match || db.wildcard.cast || '');
+    const out = { ...next, revealed: mergeRevealed(prev, next, match) };
+    if ((REVEAL_STEPS as string[]).includes(String(next.step))) out.revealed = withRevealed(out, match, String(next.step));
+    return out;
+  }
   function gfxPublish(g: GfxInstance) {
     if (!g.draft) return;
+    if (g.pkg === 'od.mvp') g.draft = mvpAuthorize(g.config, g.draft);
     const changed = JSON.stringify(g.draft) !== JSON.stringify(g.config);
     g.config = g.draft; g.draft = null;
     if (changed && g.anim.action !== 'out') anim(g, 'update');
     if (changed) d.onGfxPublish?.(g);
+  }
+
+  /** MVP graphic → a reveal step for a match, on its source now (IN if it was out). The audience reveal follows. */
+  function mvpReveal(g: GfxInstance, match: string, step: string) {
+    const p = pkgById(g.pkg); if (!p) return;
+    const next = mvpAuthorize(g.config, sanitizeConfig(p, { ...g.config, match, step }));
+    g.config = next;
+    if (g.draft) g.draft = sanitizeConfig(p, { ...g.draft, match, step });
+    anim(g, g.anim.action === 'out' ? 'in' : 'update');
+    d.onGfxPublish?.(g);
+    d.save(); d.pushGfx();
   }
 
   // ---------------------------------------------------------------- media
@@ -208,6 +246,182 @@ export function createEngine(d: EngineDeps) {
     else if (md.auto && md.loop && md.playlist.length) mediaStart(0);
     else { md.status = 'stopped'; md.startedAt = null; md.seq++; }
     version++; d.save(); d.pushMedia(); d.pushState();
+    void fire('media-end');
+  }
+
+  // ---------------------------------------------------------------- show plan (Studio Mode 2.0)
+  const segIdx = (id: string) => plan().segments.findIndex(x => x.id === id);
+  const planId = () => { let id: string; do id = Math.random().toString(36).slice(2, 10); while (segIdx(id) >= 0 || plan().rules.some(r => r.id === id)); return id; };
+  const segName = (id: string) => plan().segments.find(x => x.id === id)?.label ?? 'a removed segment';
+  function planNote(text: string, level: 'info' | 'warn' | 'go' = 'info') {
+    plan().notes = [{ at: Date.now(), text: text.slice(0, 200), level }, ...plan().notes].slice(0, MAX_NOTES);
+  }
+  /** The segment after the one on air (or after the prepared one, or the first). */
+  function followingSeg(): string | null {
+    const p = plan(), base = p.onAir?.id ?? null;
+    if (!base) return p.segments[0]?.id ?? null;
+    const i = segIdx(base);
+    return p.segments[i + 1]?.id ?? null;
+  }
+  const crew = () => { if (plan().crewSync) d.syncCrew?.(plan()); };
+  const guard = (source: CmdSource): string | null => (source === 'auto' ? (autoHold ? 'Automation is on hold' : Date.now() - manualAt < MANUAL_GRACE_MS ? 'Manual change just happened: automation waits' : null) : null);
+
+  /**
+   * Before an MVP & Awards scene goes on air (TAKE or rundown GO): "Voting Closed" closes voting first; Voting Open /
+   * Closed make sure the MVP graphic shows the voting step of its match; a reveal scene needs a frozen result (or the
+   * desk's pick) and a producer action — that action authorizes the reveal, which then draws on its browser source.
+   * Automation never authorizes a reveal by itself (unless "Reveals need producer confirmation" is off).
+   */
+  async function mvpEnter(view: import('../shared/mvpFlow').MvpView, source: CmdSource): Promise<string | null> {
+    const g = gfx('mvp');
+    if (!g) return 'The MVP graphic no longer exists';
+    if (!d.mvp) return 'MVP voting is not available';
+    let st = d.mvp.state();
+    if (view === 'closed' && st.status === 'open') { const e = await d.mvp.op('close'); if (e) return `Voting could not be closed: ${e}`; st = d.mvp.state(); }
+    if (isRevealView(view)) {
+      const why = revealAllowed(view, st);
+      if (why) return `MVP reveal not ready: ${why}`;
+      if (source === 'auto' && g.config.confirmReveal !== false) return 'an MVP reveal goes on air only with the producer’s GO';
+      mvpReveal(g, st.match, view);
+      planNote(`MVP reveal authorized: ${view === 'desk' ? 'Analyst MVP' : view === 'compare' ? 'Community vs Analysts' : 'Community MVP'}`, 'go');
+      return null;
+    }
+    // Voting views: the graphic's match + the voting step on its source, shown (no reveal involved).
+    const p = pkgById(g.pkg)!;
+    if (String(g.config.step) !== 'voting' || String(g.config.match || '') !== st.match || g.anim.action === 'out') {
+      g.config = sanitizeConfig(p, { ...g.config, match: st.match, step: 'voting' });
+      if (g.draft) g.draft = sanitizeConfig(p, { ...g.draft, match: st.match, step: 'voting' });
+      anim(g, g.anim.action === 'out' ? 'in' : 'update');
+      d.save(); d.pushGfx();
+    }
+    return null;
+  }
+
+  /** GO: the prepared segment goes on air (OBS switch with its transition, its media). Returns an error or null. */
+  async function goSegment(source: CmdSource): Promise<{ error: string } | { note: string }> {
+    const p = plan();
+    const seg = p.next ? p.segments.find(x => x.id === p.next) : undefined;
+    if (!seg) return { error: 'Nothing prepared: prepare a segment first' };
+    const g = guard(source); if (g) return { error: g };
+    // MVP & Awards scenes: "Voting Closed" closes voting first; a reveal scene needs a frozen result (or the desk's
+    // pick) and the producer's GO — the GO authorizes the reveal, which then draws on its browser source.
+    const gv = seg.target?.startsWith('s:') ? REGISTRY.find(s => s.id === seg.target!.slice(2))?.gfxView : undefined;
+    const view = isMvpView(gv) ? gv : undefined;
+    if (view) { const e = await mvpEnter(view, source); if (e) return { error: e }; }
+    const scene = d.obsLookup ? segmentObsScene(seg, d.obsLookup()) : seg.obsScene;
+    let extra = view && isRevealView(view) ? ' · reveal authorized' : '';
+    if (scene) {
+      const e = await d.obsSwitch(scene, seg.transition === 'obs' ? undefined : seg.transition);
+      if (e) return { error: `${e}. Nothing changed: use “Mark on air” if you switched OBS yourself` };
+    } else extra = ' · no OBS scene mapped: OBS was not switched';
+    if (seg.media) {
+      const md = m();
+      let i = md.playlist.indexOf(seg.media);
+      if (i < 0 && md.playlist.length < 100) { md.playlist = [...md.playlist, seg.media]; i = md.playlist.length - 1; }
+      if (i >= 0 && !mediaStart(i)) { d.pushMedia(); extra += ' · media started'; }
+    }
+    p.onAir = { id: seg.id, at: Date.now() };
+    p.next = followingSeg();
+    p.pending = null;
+    endFired = null;
+    if (source === 'manual') manualAt = Date.now();
+    planNote(`ON AIR: ${seg.label}${scene ? ` (OBS → ${scene})` : ''}`, 'go');
+    crew();
+    return { note: `${seg.label} on air${scene ? ` · OBS → ${scene}` : ''}${extra}` };
+  }
+
+  /** Run automation steps. A 'confirm' step (or a refused automatic GO) parks the remaining steps as a pending GO. */
+  /** `goFirst`: the first step is the one the producer just confirmed with GO (a reveal there needs no second GO). */
+  async function runSteps(steps: AutoAction[], name: string, ruleId: string | null, source: CmdSource, goFirst = false): Promise<void> {
+    let lastText = '';
+    for (let i = 0; i < steps.length; i++) {
+      const a = steps[i];
+      const park = (text: string) => { plan().pending = { id: planId(), rule: ruleId, name, text, at: Date.now(), rest: steps.slice(i + (a.k === 'confirm' ? 1 : 0)), seg: plan().next }; };
+      switch (a.k) {
+        case 'prepare': {
+          const id = a.seg === 'next' ? followingSeg() : a.seg;
+          if (id && segIdx(id) >= 0) plan().next = id; else planNote(`${name}: nothing to prepare`, 'warn');
+          break;
+        }
+        case 'notify': lastText = a.text; planNote(a.text, 'info'); break;
+        case 'confirm': park(lastText || `${name}: ready for GO${plan().next ? ` · ${segName(plan().next!)}` : ''}`); planNote(`${name}: waiting for producer GO`, 'warn'); return;
+        case 'go': {
+          const r = await goSegment(source);
+          if ('error' in r) {
+            if (source === 'auto' && plan().next) { park(`${name}: automatic GO held (${r.error}). Press GO to continue.`); planNote(`${name}: automatic GO held: ${r.error}`, 'warn'); }
+            else planNote(`${name}: GO failed: ${r.error}`, 'warn');
+            return;
+          }
+          break;
+        }
+        case 'media': { const r = await run({ c: 'media', action: a.action }, `auto:${name}`, source); if (!r.ok) planNote(`${name}: media ${a.action} failed: ${r.error}`, 'warn'); break; }
+        case 'timer': { const r = await run({ c: 'op-quick', op: a.minutes ? { k: 'timer-start', minutes: a.minutes } : { k: 'timer-stop' } } as ProducerCmd, `auto:${name}`, source); if (!r.ok) planNote(`${name}: countdown failed: ${r.error}`, 'warn'); break; }
+        case 'gfx-next': { const r = await run({ c: 'rd-next' }, `auto:${name}`, source); if (!r.ok) planNote(`${name}: graphics TAKE NEXT failed: ${r.error}`, 'warn'); break; }
+        case 'obs': { const r = await run({ c: 'obs-switch', scene: a.scene, transition: a.transition }, `auto:${name}`, source); if (!r.ok) planNote(`${name}: OBS switch failed: ${r.error}`, 'warn'); break; }
+        case 'mvp': {
+          if (!d.mvp) { planNote(`${name}: MVP voting is not available`, 'warn'); return; }
+          if (a.action !== 'reveal') { const e = await d.mvp.op(a.action); if (e) { planNote(`${name}: MVP ${a.action} failed: ${e}`, 'warn'); return; } planNote(`MVP voting ${a.action === 'open' ? 'opened' : 'closed'}`, 'info'); break; }
+          const step = a.step ?? 'winner', st = d.mvp.state(), why = revealAllowed(step, st);
+          // Never a guess on air: without a frozen result (or analyst picks) the rule stops here, whoever runs it.
+          if (why) { planNote(`${name}: MVP reveal refused (${why})`, 'warn'); return; }
+          const g = gfx('mvp');
+          if (!g) { planNote(`${name}: the MVP graphic no longer exists`, 'warn'); return; }
+          const label = step === 'desk' ? 'Analyst MVP' : step === 'compare' ? 'Community vs Analysts' : 'Community MVP';
+          // Every reveal is confirmed on its own: a GO releases ONE reveal, never the ones after it.
+          const confirmed = goFirst && i === 0;
+          if (!confirmed && (g.config.confirmReveal !== false || guard(source))) {
+            park(`Reveal ${label}: press GO`); planNote(`${name}: ${label} ready, waiting for producer GO`, 'warn'); return;
+          }
+          mvpReveal(g, st.match, step);
+          if (source === 'manual') manualAt = Date.now();
+          planNote(`ON AIR: ${label}`, 'go');
+          break;
+        }
+      }
+    }
+  }
+
+  let firing = false, timerFired: number | null = null, endFired: number | null = null;
+  { const t = db.showLive?.timer?.target ?? null; if (t && t <= Date.now()) timerFired = t; }
+  const touch = () => { version++; d.save(); d.pushState(); };
+
+  /** An automation trigger happened: run every enabled rule that listens to it (and matches its segment). */
+  async function fire(kind: Trigger['k'], only?: AutoRule): Promise<number> {
+    const p = plan();
+    const rules = only ? [only] : p.rules.filter(r => r.on && r.when.k === kind && (!r.during || p.onAir?.id === r.during));
+    for (const r of rules) {
+      r.fired = Date.now();
+      planNote(`Automation: ${r.name} (${triggerLabel(r.when)})`, 'info');
+      await runSteps(r.then, r.name, r.id, 'auto');
+    }
+    if (rules.length) { crew(); touch(); }
+    return rules.length;
+  }
+
+  /** Called every ~500 ms by the hub: countdown end, segment time up (and auto-advance), clock rules. */
+  async function tick(now = Date.now()) {
+    if (firing) return;
+    firing = true;
+    try {
+      const t = db.showLive?.timer?.target ?? null;
+      if (t && t <= now && timerFired !== t) { timerFired = t; await fire('countdown-end'); }
+      const p = plan(), oa = p.onAir, seg = oa ? p.segments.find(x => x.id === oa.id) : undefined;
+      if (oa && seg && seg.dur > 0 && now >= oa.at + seg.dur * 1000 && endFired !== oa.at) {
+        endFired = oa.at;
+        const n = await fire('segment-end');
+        const nxt = p.next ? p.segments.find(x => x.id === p.next) : undefined;
+        if (seg.autoNext && nxt && !p.pending && p.onAir?.id === seg.id) {
+          if (nxt.confirm) { p.pending = { id: planId(), rule: null, name: `${seg.label}: time is up`, text: `${nxt.label} is next: press GO`, at: now, rest: [{ k: 'go' }], seg: nxt.id }; planNote(`${seg.label}: time is up, waiting for GO (${nxt.label})`, 'warn'); }
+          else { planNote(`${seg.label}: time is up, auto-advance`, 'info'); await runSteps([{ k: 'go' }], `${seg.label}: auto-advance`, null, 'auto'); }
+          touch();
+        } else if (!n) touch(); // the countdown display in Studio / Producer turns "over"
+      }
+      for (const r of p.rules) {
+        if (!r.on || r.when.k !== 'clock' || r.fired !== null || r.when.at > now) continue;
+        if (now - r.when.at > 60_000) { r.fired = now; planNote(`${r.name}: clock time passed while the server was off: not run`, 'warn'); touch(); continue; }
+        if (!r.during || p.onAir?.id === r.during) await fire('clock', r);
+      }
+    } finally { firing = false; }
   }
 
   async function run(cmd: ProducerCmd, by: string, source: CmdSource, base?: number): Promise<Ack> {
@@ -366,7 +580,7 @@ export function createEngine(d: EngineDeps) {
       }
       // ------------------------------------------------------------- talent
       case 'seat': { const e = d.setSeat(Number(cmd.seat), cmd.talent ?? null); if (e) return fail(e); break; }
-      case 'talent-edit': { const e = d.editTalent(String(cmd.id), { name: cmd.name, role: cmd.role, mode: cmd.mode, camQuality: cmd.camQuality }); if (e) return fail(e); break; }
+      case 'talent-edit': { const e = d.editTalent(String(cmd.id), { name: cmd.name, role: cmd.role, mode: cmd.mode, camQuality: cmd.camQuality, vdoId: cmd.vdoId }); if (e) return fail(e); break; }
       case 'talent-regen': { const e = d.regenTalent(String(cmd.id)); if (e) return fail(e); note = 'New link: the old one no longer works'; break; }
       case 'feed-resync': { const e = d.resyncSeat(Number(cmd.seat)); if (e) return fail(e); note = 'Feed renegotiated (talent did not have to do anything)'; break; }
       // ------------------------------------------------------------- OBS
@@ -437,6 +651,7 @@ export function createEngine(d: EngineDeps) {
         for (const [k, v] of Object.entries(cmd.patch ?? {})) {
           const def = p.props.find(x => x.key === k);
           if (!def) return fail(`${p.name} has no property "${k}"`);
+          if (def.internal) return fail(`${def.label} is set by the server (TAKE / GO / reveal), not edited`);
           const c = checkProp(def, v);
           if (!c.ok) return fail(c.error);
           next[k] = c.value;
@@ -619,6 +834,204 @@ export function createEngine(d: EngineDeps) {
         manualAt = Date.now();
         break;
       }
+      // ------------------------------------------------------------- show plan (Studio Mode 2.0)
+      case 'sp-seg-add': {
+        const p = plan();
+        if (p.segments.length >= MAX_SEGMENTS) return fail(`The show holds ${MAX_SEGMENTS} segments`);
+        const seg = sanitizeSegment(cmd.seg ?? {}, planId());
+        const at = typeof cmd.at === 'number' ? Math.max(0, Math.min(p.segments.length, Math.round(cmd.at))) : p.segments.length;
+        p.segments.splice(at, 0, seg);
+        if (!p.next && !p.onAir) p.next = seg.id;
+        crew(); d.save(); note = `Added: ${seg.label}`;
+        break;
+      }
+      case 'sp-seg-edit': {
+        const p = plan(), i = segIdx(String(cmd.id));
+        if (i < 0) return fail('Unknown segment');
+        const cur = p.segments[i];
+        if (cmd.patch && typeof cmd.patch.label === 'string' && !cmd.patch.label.trim()) return fail('The segment needs a name');
+        p.segments[i] = sanitizeSegment({ ...cur, ...(cmd.patch ?? {}), id: cur.id }, cur.id);
+        crew(); d.save();
+        break;
+      }
+      case 'sp-seg-remove': {
+        const p = plan(), i = segIdx(String(cmd.id));
+        if (i < 0) return fail('Unknown segment');
+        if (p.onAir?.id === cmd.id) return fail('This segment is on air: take another one first');
+        const [gone] = p.segments.splice(i, 1);
+        if (p.next === gone.id) p.next = p.segments[i]?.id ?? null;
+        for (const r of p.rules) if (r.during === gone.id) r.during = null;
+        if (p.pending?.seg === gone.id) p.pending = null;
+        crew(); d.save(); note = `Removed: ${gone.label}`;
+        break;
+      }
+      case 'sp-seg-move': {
+        const p = plan(), i = segIdx(String(cmd.id));
+        if (i < 0) return fail('Unknown segment');
+        const to = Math.round(Number(cmd.to));
+        if (!Number.isFinite(to)) return fail('Bad position');
+        const [it] = p.segments.splice(i, 1);
+        p.segments.splice(Math.max(0, Math.min(p.segments.length, to)), 0, it);
+        crew(); d.save();
+        break;
+      }
+      case 'sp-next': {
+        if (cmd.id !== null && segIdx(String(cmd.id)) < 0) return fail('Unknown segment');
+        plan().next = cmd.id; d.save();
+        if (cmd.id) note = `Prepared: ${segName(cmd.id)}`;
+        break;
+      }
+      case 'sp-go': {
+        const p = plan();
+        if (p.pending) {
+          const pend = p.pending; p.pending = null;
+          planNote(`Producer GO (${pend.name})`, 'go');
+          const before = p.onAir, steps = pend.rest.length ? pend.rest : [{ k: 'go' } as AutoAction];
+          await runSteps(steps, pend.name, pend.rule, source, true);
+          if (p.onAir && p.onAir !== before) note = `${segName(p.onAir.id)} on air`;
+          else if (!steps.some(a => a.k === 'go')) note = `${pend.name}: continued`;
+          else {
+            // The GO did not happen (OBS refused, nothing prepared…): keep waiting so the producer can fix it and retry.
+            p.pending ??= pend;
+            const why = p.notes[0]?.level === 'warn' ? p.notes[0].text : 'GO failed';
+            version++; d.save(); d.pushState();
+            return fail(why);
+          }
+          if (source === 'manual') manualAt = Date.now();
+          crew(); d.save();
+          break;
+        }
+        const r = await goSegment(source);
+        if ('error' in r) return fail(r.error);
+        note = r.note; d.save();
+        break;
+      }
+      case 'staff': {
+        const key = () => randomBytes(12).toString('base64url');
+        db.staffPicks ??= emptyStaffPicks(key());
+        const e = staffOp(db.staffPicks, cmd.op, key);
+        if (e) return fail(e);
+        note = cmd.op.k === 'new-key' ? 'New staff pick\'em link: the old one no longer works' : 'Staff pick\'em updated';
+        d.save(); d.pushState();
+        break;
+      }
+      case 'mvp-settings': {
+        const g = gfx('mvp'), p = g && pkgById(g.pkg);
+        if (!g || !p) return fail('The MVP graphic no longer exists');
+        const ALLOWED = ['match', 'countdown', 'revealPace', 'revealSweep', 'confirmReveal', 'liveOrder', 'liveCounts'];
+        const patch: Record<string, string | number | boolean> = {};
+        for (const [k, v] of Object.entries(cmd.patch ?? {})) {
+          if (!ALLOWED.includes(k)) return fail(`Not an MVP scene setting: ${k}`);
+          const def = p.props.find(x => x.key === k)!, c = checkProp(def, v);
+          if (!c.ok) return fail(c.error);
+          patch[k] = c.value;
+        }
+        if (!Object.keys(patch).length) return fail('Nothing to change');
+        // Another match: the MVP graphic goes back to its voting step (a reveal is never carried over to a new match).
+        if ('match' in patch && patch.match !== g.config.match) patch.step = 'voting';
+        g.config = { ...g.config, ...patch };
+        if (g.draft) g.draft = { ...g.draft, ...patch };
+        if ('match' in patch && g.anim.action !== 'out') anim(g, 'update');
+        d.save(); d.pushGfx();
+        note = 'MVP scene settings saved to this event';
+        break;
+      }
+      case 'mvp-take': {
+        // TAKE of an MVP & Awards scene from Producer Mode: MVP preparation (close / authorize) → OBS switch to the
+        // scene's own browser source → the rundown follows (its segment of that scene goes on air).
+        const src = isMvpView(cmd.view) ? REGISTRY.find(s => s.gfx === 'mvp' && s.gfxView === cmd.view) : undefined;
+        if (!src) return fail('Unknown MVP scene');
+        const g0 = guard(source); if (g0) return fail(g0);
+        const target = `s:${src.id}`, p = plan();
+        const seg = (p.next ? p.segments.find(x => x.id === p.next && x.target === target) : undefined)
+          ?? p.segments.slice(p.onAir ? segIdx(p.onAir.id) + 1 : 0).find(x => x.target === target);
+        const scene = d.obsLookup ? segmentObsScene({ obsScene: seg?.obsScene ?? null, target }, d.obsLookup()) : null;
+        if (!scene && !cmd.noObs) return fail(`No OBS scene for ${src.name}: build the MVP scenes in Studio → OBS & Outputs (or use “Mark on air”)`);
+        const e = await mvpEnter(cmd.view, source);
+        if (e) return fail(e);
+        const tr = cmd.transition ?? seg?.transition ?? 'obs';
+        if (scene && !cmd.noObs) { const er = await d.obsSwitch(scene, tr === 'obs' ? undefined : tr); if (er) return fail(`${er}. The MVP graphic is prepared; OBS was not switched`); }
+        if (seg) { p.onAir = { id: seg.id, at: Date.now() }; p.next = followingSeg(); p.pending = null; endFired = null; crew(); }
+        if (source === 'manual') manualAt = Date.now();
+        planNote(`ON AIR: ${src.name}${scene && !cmd.noObs ? ` (OBS → ${scene})` : ''}`, 'go');
+        note = `${src.name} on air${scene && !cmd.noObs ? ` · OBS → ${scene}` : ''}${seg ? ` · rundown: ${seg.label}` : ''}`;
+        d.save();
+        break;
+      }
+      case 'sp-cancel': {
+        const p = plan();
+        if (!p.pending) return fail('Nothing is waiting for GO');
+        planNote(`Cancelled: ${p.pending.name}`, 'warn');
+        p.pending = null; d.save(); note = 'Automation step cancelled: nothing changed on air';
+        break;
+      }
+      case 'sp-onair': {
+        const p = plan();
+        if (cmd.id !== null && segIdx(String(cmd.id)) < 0) return fail('Unknown segment');
+        p.onAir = cmd.id ? { id: cmd.id, at: Date.now() } : null;
+        endFired = null;
+        if (cmd.id) { p.next = followingSeg(); planNote(`Marked on air: ${segName(cmd.id)} (OBS not switched)`, 'go'); }
+        crew(); d.save();
+        break;
+      }
+      case 'sp-rule-set': {
+        const p = plan(), x = cmd.rule ?? {};
+        const i = typeof x.id === 'string' ? p.rules.findIndex(r => r.id === x.id) : -1;
+        if (i < 0 && p.rules.length >= MAX_RULES) return fail(`At most ${MAX_RULES} automations`);
+        const prev = i >= 0 ? p.rules[i] : undefined;
+        const r = sanitizeRule({ ...(prev ?? {}), ...x }, prev?.id ?? planId());
+        if (r.during && segIdx(r.during) < 0) r.during = null;
+        // Editing the trigger re-arms a one-shot clock rule.
+        if (prev && JSON.stringify(prev.when) !== JSON.stringify(r.when)) r.fired = null;
+        if (i >= 0) p.rules[i] = r; else p.rules.push(r);
+        d.save(); note = i >= 0 ? `Saved: ${r.name}` : `Automation added: ${r.name}`;
+        break;
+      }
+      case 'sp-rule-remove': {
+        const p = plan(), i = p.rules.findIndex(r => r.id === cmd.id);
+        if (i < 0) return fail('Unknown automation');
+        const [r] = p.rules.splice(i, 1);
+        if (p.pending?.rule === r.id) p.pending = null;
+        d.save(); note = `Removed: ${r.name}`;
+        break;
+      }
+      case 'sp-rule-run': {
+        const r = plan().rules.find(x => x.id === cmd.id);
+        if (!r) return fail('Unknown automation');
+        if (cmd.dry !== false) {
+          const p = plan(), during = r.during ? segName(r.during) : null;
+          const armed = r.on && (!r.during || p.onAir?.id === r.during);
+          note = `TEST (nothing changes): WHEN ${triggerLabel(r.when)}${during ? ` while ${during} is on air` : ''} → ${r.then.map(a => actionLabel(a, segName)).join(' → ') || 'no steps'} · ${!r.on ? 'disabled' : armed ? 'armed now' : `not armed (${during} is not on air)`}${autoHold ? ' · automation is held' : ''}`;
+          return { ok: true, version, note };
+        }
+        if (plan().pending) return fail('A GO is already pending: GO or cancel it first');
+        planNote(`Run by hand: ${r.name}`, 'info');
+        await runSteps(r.then, r.name, r.id, 'auto');
+        crew(); d.save(); note = plan().pending ? `${r.name}: waiting for GO` : `${r.name}: done`;
+        break;
+      }
+      case 'sp-starter': {
+        const p = plan();
+        if (p.segments.length || p.rules.length) return fail('The show plan is not empty');
+        const st = starterPlan(planId);
+        p.segments = st.segments; p.rules = st.rules; p.next = st.segments[0]?.id ?? null;
+        crew(); d.save(); note = `${st.segments.length} segments and ${st.rules.length} automation added`;
+        break;
+      }
+      case 'sp-import': {
+        const p = plan();
+        if (p.onAir) return fail('A segment is on air: import the show file before the show (or mark nothing on air first)');
+        const x = sanitizePlan({ segments: cmd.plan?.segments, rules: cmd.plan?.rules, crewSync: cmd.plan?.crewSync });
+        p.segments = x.segments; p.rules = x.rules.map(r => ({ ...r, fired: null })); p.next = x.segments[0]?.id ?? null; p.pending = null; p.crewSync = x.crewSync;
+        planNote(`Show file imported: ${x.segments.length} segments, ${x.rules.length} automations`, 'info');
+        crew(); d.save(); note = `${x.segments.length} segments and ${x.rules.length} automations imported`;
+        break;
+      }
+      case 'sp-opts': {
+        if (typeof cmd.crewSync === 'boolean') { plan().crewSync = cmd.crewSync; crew(); }
+        d.save();
+        break;
+      }
       case 'reload-outputs': { const n = d.reloadOutputs(); note = `${n} browser source${n === 1 ? '' : 's'} reloading`; break; }
       case 'automation': autoHold = cmd.hold === true; break;
       default: return fail('Unknown command');
@@ -629,7 +1042,7 @@ export function createEngine(d: EngineDeps) {
     return note ? { ok: true, version, note } : { ok: true, version };
   }
 
-  return { run, state, stage, mediaEnded, transition: () => transition() };
+  return { run, state, stage, mediaEnded, tick, fire, transition: () => transition() };
 }
 export type Engine = ReturnType<typeof createEngine>;
 export type { CasterId };

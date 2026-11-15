@@ -241,15 +241,18 @@ export function discoverTargets(graphics: GfxInstance[], obsScenes: Partial<Reco
   for (const g of graphics) {
     const p = pkgById(g.pkg);
     if (!p) continue;
+    const asScene = REGISTRY.find(s => s.gfx === g.id && !s.gfxView); // a graphic that IS a scene: the scene's name in OBS
     out.push({
       id: `g:${g.id}`, kind: 'gfx', name: g.name, route: `/g/${g.id}`,
-      scene: g.obsScene || `Overdrive · ${g.name}`, input: `Overdrive · ${g.name} · g/${g.id}`,
+      // The MVP graphic's own scene keeps its 2.0 name ("Overdrive · MVP"): it follows the MVP sequence as before.
+      scene: g.obsScene || `Overdrive · ${asScene ? asScene.name : g.id === 'mvp' ? 'MVP' : g.name}`, input: `Overdrive · ${g.name} · g/${g.id}`,
       width: p.resolution[0] * k, height: p.resolution[1] * k,
       gameCapture: opt.gameCapture && GAMEPLAY_RENDERERS.has(p.renderer), rerouteAudio: false, audio: opt.audio,
     });
   }
   for (const s of REGISTRY) {
-    const by = graphics.find(g => g.id === s.id || (defaultInstance(g) && !!s.obsKey && pkgById(g.pkg)?.obsKey === s.obsKey));
+    // MVP & Awards scenes are views with their own source (/g/mvp?view=…): never replaced by the graphic's scene.
+    const by = s.gfxView ? undefined : graphics.find(g => g.id === s.id || (defaultInstance(g) && !!s.obsKey && pkgById(g.pkg)?.obsKey === s.obsKey));
     const label = s.screen ? SCREEN_LABELS[s.screen] : s.name;
     out.push({
       id: `s:${s.id}`, kind: s.screen ? 'screen' : 'source', name: s.name, route: s.route,

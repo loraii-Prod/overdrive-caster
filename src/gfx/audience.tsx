@@ -4,12 +4,14 @@
  * the published reveal step, community splits only once a match is locked, MVP winners only from the result frozen
  * when voting closed. Anything not ready draws nothing rather than a guess.
  */
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import type { GfxInstance } from '../../shared/gfx';
 import { communityPick, pcts, teamRoster, type AudPlayer, type AudPoll, type MvpCard } from '../../shared/audience';
 import { matchName, wcResolve } from '../../shared/wildcard';
 import { normHandle, teamLogo } from '../../shared/major';
 import { BgVideo } from '../components/Brand';
+import { hiRes, outputScale } from '../../shared/assetRes';
+import { DEFAULT_FRAME, fitPortrait, portraitKey, type PortraitFrame } from '../../shared/portraits';
 import { Qr } from '../components/Qr';
 import type { GfxData } from './Graphic';
 import '../components/wildcard/wildcard.css';
@@ -149,21 +151,60 @@ function usePortraits(urls: string[]) {
 }
 const portraitUrl = (d: GfxData, handle: string) => d.wc?.state.showcase.photos[normHandle(handle)] || '';
 
-/** Never enlarged more than 1.25×: a smaller picture is drawn smaller (bottom-anchored), not stretched. */
-const MAX_UP = 1.25;
-function Portrait({ info, team, box, mirror, frameW = 640 }: { info: PInfo | null; team: string; box: { w: number; h: number }; mirror?: boolean; frameW?: number }) {
+const frameOf = (d: GfxData, handle: string): PortraitFrame => d.wc?.state.showcase.frames?.[portraitKey(handle)] ?? DEFAULT_FRAME;
+
+/**
+ * A player portrait in a box, the same way on every MVP graphic: the producer's framing (zoom / position), cut-outs
+ * standing on the bottom edge, photos covering the frame from the top. Never drawn larger than 1.25 device px per
+ * source px (2 device px per layout unit at 4K): a small file is drawn smaller, never stretched.
+ */
+function PortraitImg({ info, box, frame, mirror, className = '', scale }: { info: PInfo; box: { w: number; h: number }; frame: PortraitFrame; mirror?: boolean; className?: string; /** device scale override (Studio preview of a 4K show) */ scale?: number }) {
+  const f = fitPortrait({ w: info.w, h: info.h, cutout: info.cutout }, box, frame, scale ?? outputScale());
+  const W = info.cutout ? box.w : f.frameW, H = info.cutout ? box.h : f.frameH;
+  return (
+    <div className={`mv-box ${info.cutout ? 'cut' : 'photo'} ${className}`} style={{ width: W, height: H }} data-portrait-fit={f.capped ? 'capped' : 'native'} data-portrait-upscale={f.upscale.toFixed(2)}>
+      <img src={info.url} alt="" decoding="async" draggable={false}
+        style={{ position: 'absolute', left: f.left, top: info.cutout ? f.top : f.top, width: f.w, height: f.h, maxWidth: 'none', transform: mirror ? 'scaleX(-1)' : undefined }} />
+    </div>
+  );
+}
+
+/** Large portrait (reveals, comparison): cut-out in the whole box; a photo in a 3:4 frame of at most frameW. */
+function Portrait({ info, team, box, mirror, frameW = 640, frame = DEFAULT_FRAME, scale }: { info: PInfo | null; team: string; box: { w: number; h: number }; mirror?: boolean; frameW?: number; frame?: PortraitFrame; scale?: number }) {
   // Fallback: the team mark, kept small enough that today's 64 px logos are not blown up (larger once the official
   // vector logos are approved), under the outlined MVP.
   if (!info) return <div className="mv-fb" style={{ width: box.w, height: box.h }}><Logo team={team} size={Math.min(160, box.w * 0.25)} /><div className="mv-fbx">MVP</div></div>;
-  if (info.cutout) {
-    const s = Math.min(box.h / info.h, box.w / info.w, MAX_UP);
-    return <img className="mv-cut" src={info.url} alt="" style={{ width: info.w * s, height: info.h * s, transform: mirror ? 'scaleX(-1)' : undefined }} />;
-  }
-  // Framed 3:4, cropped from the top (faces stay in), never enlarged past the limit.
-  const fw = Math.min(box.w, box.h * 0.75, frameW), fh = fw / 0.75;
-  const s = Math.min(1, (MAX_UP * info.w) / fw, (MAX_UP * info.h) / fh);
-  return <div className="mv-frame" style={{ width: fw * s, height: fh * s }}><img src={info.url} alt="" /></div>;
+  if (info.cutout) return <PortraitImg info={info} box={box} frame={frame} mirror={mirror} className="mv-cutbox" scale={scale} />;
+  const fw = Math.min(box.w, box.h * 0.75, frameW);
+  return <div className="mv-frame"><PortraitImg info={info} box={{ w: fw, h: fw / 0.75 }} frame={frame} scale={scale} /></div>;
 }
+
+/**
+ * Studio: one portrait exactly as a graphic draws it (same component, same CSS, same fit), at a chosen device scale
+ * (2 = what a 4K show puts on air). Laid out on the 1920-grid size of its part of the graphic.
+ */
+export function PortraitPreview({ url, handle, team, frame, kind, scale }: { url: string; handle: string; team: string; frame: PortraitFrame; kind: 'card' | 'hero' | 'compare'; scale: number }) {
+  const pr = usePortraits(url ? [url] : []);
+  const info = url ? pr.info(url) : null;
+  if (kind === 'card') return (
+    <div className="aud" style={{ width: 300, height: 470 }} data-portrait-preview="card">
+      <div className="pc" style={{ position: 'absolute', inset: 0, animation: 'none' }}>
+        <div className="num">01</div><Logo team={team} size={70} />
+        {info ? <PortraitImg info={info} frame={frame} box={info.cutout ? { w: 280, h: 340 } : { w: 300, h: 360 }} className="pc-port" scale={scale} /> : <div className="sil" />}
+        <b>{handle}</b><small>{team}</small><div className="tm" />
+      </div>
+    </div>
+  );
+  const box = kind === 'hero' ? { w: 760, h: 980 } : { w: 640, h: 830 };
+  return (
+    <div className="aud" style={{ width: box.w, height: 1080, background: 'radial-gradient(closest-side, rgba(255,106,19,.35), #160A07)' }} data-portrait-preview={kind}>
+      <div className={kind === 'hero' ? 'mvx-pic' : 'mvc-pic'} style={{ position: 'absolute', left: 0, right: 'auto', bottom: 0, transform: 'none', animation: 'none' }}>
+        <Portrait info={info} team={team} box={box} frameW={kind === 'hero' ? 640 : 460} frame={frame} scale={scale} />
+      </div>
+    </div>
+  );
+}
+export { preload as preloadPortrait };
 
 function deskMvp(d: GfxData, matchId: string, roster: AudPlayer[]) {
   const picks = Object.values(d.aud?.staffMvp[matchId] ?? {});
@@ -179,13 +220,28 @@ function CardExtras({ card }: { card?: MvpCard }) {
   if (!card || (!card.stats.length && !card.achievements.length)) return null;
   return (
     <div className="mvx-extras" data-mvp-extras>
-      {card.stats.length > 0 && <div className="mvx-stats">{card.stats.map((x, i) => <div key={i} style={{ animationDelay: `${1.7 + i * 0.08}s` }}><b>{x.value}</b><small>{x.label}</small></div>)}</div>}
-      {card.achievements.length > 0 && <div className="mvx-ach">{card.achievements.map((x, i) => <span key={i} style={{ animationDelay: `${2.0 + i * 0.08}s` }}>{x}</span>)}</div>}
+      {card.stats.length > 0 && <div className="mvx-stats">{card.stats.map((x, i) => <div key={i} style={{ animationDelay: `${2.6 + i * 0.09}s` }}><b>{x.value}</b><small>{x.label}</small></div>)}</div>}
+      {card.achievements.length > 0 && <div className="mvx-ach">{card.achievements.map((x, i) => <span key={i} style={{ animationDelay: `${2.95 + i * 0.09}s` }}>{x}</span>)}</div>}
     </div>
   );
 }
 
+/**
+ * Reveal animation settings (MVP 1.2): the approved reveal sequence, played at a chosen pace (the browser's own
+ * animation clock: every beat keeps its order and relative timing) and optionally without its opening sweep.
+ */
+const PACE: Record<string, number> = { cinematic: 1, standard: 1.4, quick: 2 };
+function Paced({ rate, sweep, children }: { rate: number; sweep: boolean; children: ReactNode }) {
+  const el = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => { if (rate !== 1) el.current?.getAnimations({ subtree: true }).forEach(a => { if (a.playbackRate !== rate) a.playbackRate = rate; }); });
+  return <div ref={el} className={sweep ? undefined : 'mvx-nosweep'} style={{ position: 'absolute', inset: 0 }} data-reveal-pace={rate}>{children}</div>;
+}
 const mvp: R = ({ cfg, d }) => {
+  const step = String(cfg.step || 'voting');
+  if (step === 'voting') return <MvpInner cfg={cfg} d={d} />;
+  return <Paced rate={PACE[String(cfg.revealPace)] ?? 1} sweep={cfg.revealSweep !== false}><MvpInner cfg={cfg} d={d} /></Paced>;
+};
+const MvpInner: R = ({ cfg, d }) => {
   const m = matchOf(cfg, d);
   const step = String(cfg.step || 'voting');
   const poll = m ? d.aud?.polls.filter(p => p.match === m.id).pop() : undefined;
@@ -199,36 +255,44 @@ const mvp: R = ({ cfg, d }) => {
   const result = `${m.a} ${m.s1}–${m.s2} ${m.b}`;
   const label = m.label;
   if (step === 'voting') {
-    const players = poll?.players.length ? poll.players : roster;
+    const all = poll?.players.length ? poll.players : roster;
     const qr = d.aud?.qr.find(q => q.id === 'vote');
     const open = poll?.status === 'open', closed = poll?.status === 'closed' || poll?.status === 'revealed';
     // Mode A extras: a countdown when the producer set one; live totals only when the producer put them on air.
     const left = open && poll?.closesAt ? Math.max(0, Math.ceil((poll.closesAt - d.now) / 1000)) : null;
     const live = open && poll ? d.aud?.liveTotals?.[poll.id] : undefined;
-    const share = live ? pcts(players.slice(0, 4).map(p => live.counts[p.handle] ?? 0)) : null;
+    // Order: as prepared. Ranking by live votes only when the producer asked for it (and the totals are on air).
+    const players = (live && cfg.liveOrder === true ? [...all.slice(0, 4)].sort((p, q) => (live.counts[q.handle] ?? 0) - (live.counts[p.handle] ?? 0)) : all).slice(0, 4);
+    const share = live ? pcts(players.map(p => live.counts[p.handle] ?? 0)) : null;
+    const n = Math.max(1, players.length);
+    const chatCmd = poll?.chatCmd || '!vote';
     return (
       <div className={'aud' + (closed ? ' mv-closed' : '')} data-mvp-mode={open ? 'A' : closed ? 'B' : 'pre'}>
         <BgVideo /><div className="aud-dim" />
         <Head kick={`Community MVP · ${result}`} title={closed ? 'Voting closed' : 'Vote for the MVP'} />
-        <div className="aud-left mv">
-          {players.slice(0, 4).map((p, i) => {
+        {/* 1–4 candidates: same card size, centred in the four-card area (the QR box keeps its place). */}
+        <div className="aud-left mv" data-candidates={players.length} style={{ gridTemplateColumns: `repeat(${n}, 300px)`, width: 4 * 300 + 3 * 22, justifyContent: 'center' }}>
+          {players.map((p, i) => {
             const info = pr.info(portraitUrl(d, p.handle));
+            const num = (all.findIndex(x => x.handle === p.handle) + 1) || i + 1; // a candidate keeps its number when ranked
             return (
-              <div className={'pc' + (p.team === m.b ? ' b' : '')} key={p.handle} style={{ animationDelay: `${i * 70}ms` }}>
-                <div className="num">{String(i + 1).padStart(2, '0')}</div><Logo team={p.team} size={70} />
-                {info ? <img className={info.cutout ? 'pc-cut' : 'pc-photo'} src={info.url} alt="" /> : <div className="sil" />}
+              <div className={'pc' + (p.team === m.b ? ' b' : '')} key={p.handle} style={{ animationDelay: `${i * 70}ms` }} data-candidate={p.handle}>
+                <div className="num">{String(num).padStart(2, '0')}</div><Logo team={p.team} size={70} />
+                {info ? <PortraitImg info={info} frame={frameOf(d, p.handle)} box={info.cutout ? { w: 280, h: 340 } : { w: 300, h: 360 }} className="pc-port" /> : <div className="sil" />}
                 <b>{p.handle}</b><small>{p.team}</small>
-                {share && <div className="pc-live" data-live-total><span>{share[i]}%</span><i style={{ width: `${share[i]}%` }} /></div>}
+                {share && <div className="pc-live" data-live-total><span>{share[i]}%{cfg.liveCounts === true && <em> · {(live!.counts[p.handle] ?? 0).toLocaleString('en-US')}</em>}</span><i style={{ width: `${share[i]}%` }} /></div>}
                 <div className="tm" />
               </div>
             );
           })}
         </div>
-        {qr && !closed && <div className="qrbox"><Qr url={qr.url} size={300} /><b>Scan to vote</b><span>{qr.url.replace(/^https:\/\//, '')}</span></div>}
+        {/* Ways to vote: website (QR), Twitch chat, or both — as the producer opened this vote. */}
+        {!closed && poll?.chat && poll.web === false ? <div className="qrbox chat" data-chat-box><span className="k">Vote in Twitch chat</span><b className="cmd">{chatCmd} 1–{n}</b><span>Type the player's number{poll.chatChannel ? <> in <em>twitch.tv/{poll.chatChannel}</em></> : null}</span></div>
+          : qr && !closed && <div className="qrbox"><Qr url={qr.url} size={300} /><b>Scan to vote</b><span>{qr.url.replace(/^https:\/\//, '')}</span>{poll?.chat && <span className="chatline" data-chat-line>or type <em>{chatCmd} 1–{n}</em> in chat</span>}</div>}
         {closed && <div className="qrbox done"><div className="lock" /><b>Votes are in</b><span>{poll?.frozen ? `${poll.frozen.total.toLocaleString('en-US')} votes counted` : 'Counting'}</span></div>}
         <div className="status"><div className={'live' + (open ? '' : ' off')}><i />{open ? 'VOTING OPEN' : closed ? 'VOTING CLOSED' : 'VOTING OPENS SOON'}</div>
           {left != null && <div className="cd" data-countdown>{left > 0 ? <>Closes in <b>{Math.floor(left / 60)}:{String(left % 60).padStart(2, '0')}</b></> : <b>Closing…</b>}</div>}
-          <div className="t">{closed ? 'The MVP is revealed on air' : live ? `Live count · ${live.total.toLocaleString('en-US')} votes · one vote per viewer` : 'One vote per viewer · results revealed on air'}</div></div>
+          <div className="t">{closed ? 'The MVP is revealed on air' : live ? `Live count · ${live.total.toLocaleString('en-US')} votes · one vote per viewer` : poll?.chat ? 'One vote per Twitch account · results revealed on air' : 'One vote per viewer · results revealed on air'}</div></div>
       </div>
     );
   }
@@ -237,11 +301,14 @@ const mvp: R = ({ cfg, d }) => {
   const hero = (who: { handle: string; team: string }, badges: ReactNode, body: ReactNode, tint?: 'desk') => {
     const info = pr.info(portraitUrl(d, who.handle));
     return (
-      <div className={'aud mvx' + (tint ? ' mvx-desk' : '') + (wait ? ' mvx-wait' : '')} data-mvp-portrait={info ? (info.cutout ? 'cutout' : 'framed') : 'fallback'}>
+      <div className={'aud mvx mvx-seq' + (tint ? ' mvx-desk' : '') + (wait ? ' mvx-wait' : '')} data-mvp-portrait={info ? (info.cutout ? 'cutout' : 'framed') : 'fallback'}>
         <BgVideo /><div className="mvx-dim" />
+        {/* 1. red angular sweep · 2. MVP title · 3. portrait · 4. name · 5. team · 6–7. share + votes · 8. stats · 9. brand */}
+        <div className="mvx-wipe" aria-hidden><i /><i /><i /></div>
         <div className="mvx-glow" />
         <div className="mvx-ghost">MVP</div>
-        <div className="mvx-pic"><Portrait info={info} team={who.team} box={{ w: 760, h: 980 }} /></div>
+        <div className="mvx-pic"><Portrait info={info} team={who.team} box={{ w: 760, h: 980 }} frame={frameOf(d, who.handle)} /><div className="mvx-flare" /></div>
+        <div className="mvx-brand" data-mvp-brand><img src={hiRes('/brand/overdrive/logo.png')} alt="Overdrive" draggable={false} /></div>
         <div className="mvx-L">
           <div className="mvx-badges">{badges}</div>
           <div className="mvx-name">{who.handle}</div>
@@ -257,7 +324,7 @@ const mvp: R = ({ cfg, d }) => {
     const win = res.top[0];
     return hero(win, <div className="mvx-badge"><small>Community</small>MVP</div>, <>
       <div className="mvx-res">{label} · <b>{result}</b></div>
-      <div className="mvx-share"><div className="lbl"><span>Community vote · {res.total.toLocaleString('en-US')} votes</span><b>{win.pct}%</b></div><div className="bar"><i style={{ ['--w' as string]: `${win.pct}%` }} /></div></div>
+      <div className="mvx-share"><div className="lbl"><span>Community vote<em className="mvx-votes" data-mvp-total> · {res.total.toLocaleString('en-US')} votes</em></span><b>{win.pct}%</b></div><div className="bar"><i style={{ ['--w' as string]: `${win.pct}%` }} /></div></div>
       <div className="mvx-rest">{res.rows.filter(r => !res.top.includes(r)).slice(0, 3).map(r => <div key={r.handle}><b>{r.handle}</b><span>{r.pct}%</span></div>)}</div>
       {extras(win.handle)}
     </>);
@@ -284,7 +351,7 @@ const mvp: R = ({ cfg, d }) => {
   const half = (side: 'l' | 'r', who: { handle: string; team: string }, tag: string, line: string) => (
     <div className={`mvc-half ${side}`}>
       <div className="mvc-glow" />
-      <div className="mvc-pic"><Portrait info={pr.info(portraitUrl(d, who.handle))} team={who.team} box={{ w: 640, h: 830 }} mirror={side === 'r'} frameW={460} /></div>
+      <div className="mvc-pic"><Portrait info={pr.info(portraitUrl(d, who.handle))} team={who.team} box={{ w: 640, h: 830 }} mirror={side === 'r'} frameW={460} frame={frameOf(d, who.handle)} /></div>
       <div className="mvc-plate"><span className="who">{tag}</span><div className="n">{who.handle}</div><div className="m"><Logo team={who.team} size={40} />{who.team}<span> · {line}</span></div></div>
     </div>
   );
@@ -302,14 +369,35 @@ const mvp: R = ({ cfg, d }) => {
 
 // ------------------------------------------------------------------ QR
 
+/**
+ * Analyst desk: the MVP vote's state next to the code (open + countdown, candidates, closed). The winner only once the
+ * producer REVEALED it on air (poll status 'revealed') and only when the desk asks for it: never from a closed vote.
+ */
+function deskVote(d: GfxData, winner: boolean) {
+  const wc = d.wc?.state, polls = d.aud?.polls ?? [];
+  const poll = (wc?.cast ? polls.filter(p => p.match === wc.cast).pop() : undefined) ?? polls.filter(p => p.status !== 'draft').pop();
+  if (!poll || poll.status === 'draft') return null;
+  if (poll.status === 'open') {
+    const left = poll.closesAt ? Math.max(0, Math.ceil((poll.closesAt - d.now) / 1000)) : null;
+    return { state: 'open' as const, line: left != null ? `Voting open · closes ${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}` : 'Voting open', who: poll.players.slice(0, 4).map(p => p.handle) };
+  }
+  const res = poll.status === 'revealed' && winner ? mvpResult(poll) : null;
+  if (res?.top.length) return { state: 'winner' as const, line: `Community MVP · ${res.top[0].handle} ${res.top[0].pct}%`, who: [] };
+  return { state: 'closed' as const, line: 'Voting closed · MVP revealed on air', who: [] };
+}
+const DeskVote = ({ v, who }: { v: ReturnType<typeof deskVote>; who: boolean }) => !v ? null : (
+  <div className={`qr-st ${v.state}`} data-desk-vote={v.state}><i />{v.line}{who && v.who.length > 0 && <small>{v.who.join(' · ')}</small>}</div>
+);
+
 const qr: R = ({ cfg, d }) => {
   const link = d.aud?.qr.find(q => q.id === String(cfg.qr || 'vote'));
   if (!link) return null; // invalid, expired or not approved: draw nothing
   const pos = String(cfg.position || 'lower-third'), title = String(cfg.title || ''), url = link.url.replace(/^https:\/\//, '');
   if (pos === 'corner') return <div className="aud"><div className="qr-corner"><div className="q"><Qr url={link.url} size={170} /></div><b>{title || link.label}</b></div></div>;
   // Inside the Analyst Desk graphic: smaller, in the band between the camera boxes and the ticker (never over a camera).
-  if (pos === 'desk-inline-solo') return <div className="aud"><div className="qr-corner in-desk-solo"><div className="q"><Qr url={link.url} size={176} /></div><b>{title || link.label}</b></div></div>;
-  if (pos === 'desk-inline') return <div className="aud"><div className="qr-desk in-desk"><div className="q"><Qr url={link.url} size={160} /></div><div className="tx"><b>{title || link.label}</b>{cfg.showUrl !== false && <span>{url}</span>}</div></div></div>;
+  const v = pos.startsWith('desk-inline') ? deskVote(d, cfg.winner === true) : null;
+  if (pos === 'desk-inline-solo') return <div className="aud"><div className="qr-corner in-desk-solo"><div className="q"><Qr url={link.url} size={176} /></div><b>{title || link.label}</b><DeskVote v={v} who={false} /></div></div>;
+  if (pos === 'desk-inline') return <div className="aud"><div className="qr-desk in-desk"><div className="q"><Qr url={link.url} size={160} /></div><div className="tx"><b>{title || link.label}</b>{cfg.showUrl !== false && <span>{url}</span>}<DeskVote v={v} who /></div></div></div>;
   if (pos === 'desk') return <div className="aud"><div className="qr-desk"><div className="q"><Qr url={link.url} size={200} /></div><div className="tx"><b>{title || link.label}</b>{cfg.showUrl !== false && <span>{url}</span>}</div></div></div>;
   return (
     <div className="aud">

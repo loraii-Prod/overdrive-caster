@@ -11,5 +11,9 @@ export function Qr({ url, size, dark = '#121212', light = '#ffffff' }: { url: st
     return () => { on = false; };
   }, [url, dark, light]);
   if (!svg) return null;
-  return <div data-qr={url} style={{ width: size, height: size, lineHeight: 0 }} className="[&>svg]:h-full [&>svg]:w-full" dangerouslySetInnerHTML={{ __html: svg }} />;
+  // Whole pixels per module (1080p grid; exactly twice that at 4K): every module edge on a pixel boundary, so the code
+  // stays crisp in the source AND after OBS scales a 4K canvas down to a 1080p / 720p stream. Within ±n/2 px of `size`.
+  const n = Number(/viewBox="0 0 (\d+)/.exec(svg)?.[1]) || 0;
+  const px = n ? Math.max(n, Math.round(size / n) * n) : size;
+  return <div data-qr={url} data-qr-modules={n || undefined} style={{ width: px, height: px, lineHeight: 0, imageRendering: 'pixelated' }} className="[&>svg]:h-full [&>svg]:w-full" dangerouslySetInnerHTML={{ __html: svg }} />;
 }

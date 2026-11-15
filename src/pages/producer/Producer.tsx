@@ -15,22 +15,24 @@ import { StorageBanner } from '../../components/StorageBanner';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import type { CasterId, ControllerState, ScreenId } from '../../../shared/types';
 import { applyDraft, draftLabel, type EngineState, type ProducerCmd } from '../../../shared/engine';
-import { AUD_SOURCES, REGISTRY, sourceById, studioFor } from '../../../shared/registry';
+import { AUD_SOURCES, REGISTRY, outputRouteOf, sourceById, studioFor } from '../../../shared/registry';
 import type { AudOp } from '../../../shared/audience';
 import { ScreenView } from '../../components/show/Program';
 import { Scoreboard } from '../../components/show/Overlays';
-import { WcBracket } from '../../components/wildcard/Wildcard';
 import { MediaView } from '../../components/media/MediaView';
 import { useAudience, useAudPrivate, useConnState, useMatchData, useMedia, useNow, useSocket, useTournament, useViewer, useWildcard } from '../../lib/hooks';
 import type { Socket } from '../../lib/socket';
 import { ModuleView, Seg, type Ack, type Ctx } from './modules';
 import { Inspector } from './Inspector';
 import { Library, libraryOrder, obsSceneOfGfx, obsSceneOfSource } from './Library';
+import { MvpSceneControls } from './MvpScene';
 import { RundownPanel } from './RundownPanel';
 import { StudioMode, type StudioTab } from './Studio';
 import { B, C, Dot, DraftBadge, Kbd, LABEL, PanelHead, Splitter, VisBadge, useColumns, useFitCanvas } from './ws';
 import { GraphicHost } from '../../gfx/Graphic';
 import { pkgById } from '../../../shared/gfx';
+import { StudioWorkspace } from '../studio/StudioWorkspace';
+import { fmtDur } from '../../../shared/showplan';
 
 const W = 1920, H = 1480;
 type LogLine = { at: number; ok: boolean; text: string };
@@ -73,9 +75,11 @@ type Mode = 'live' | 'studio';
 const ls = { get: (k: string, d: string) => { try { return localStorage.getItem(k) ?? d; } catch { return d; } }, set: (k: string, v: string) => { try { localStorage.setItem(k, v); } catch {} } };
 
 /** OBS scene → the Overdrive output that owns it (Scene Builder mapping, then graphic / screen mappings). */
-function targetOfObsScene(scene: string | undefined, st: ControllerState): string | null {
+export function targetOfObsScene(scene: string | undefined, st: ControllerState): string | null {
   if (!scene) return null;
   for (const [id, e] of Object.entries(st.obsSetup?.map ?? {})) if (e.scene === scene && id !== 'support:audio') return id;
+  const mv = REGISTRY.find(x => x.gfxView && `Overdrive · ${x.name}` === scene); // view scenes first (exact names)
+  if (mv) return `s:${mv.id}`;
   const g = (st.graphics ?? []).find(x => obsSceneOfGfx(x, st) === scene);
   if (g) return `g:${g.id}`;
   const s = REGISTRY.find(x => obsSceneOfSource(x, st) === scene);
@@ -89,7 +93,7 @@ const selOfTarget = (t: string) => (t.startsWith('g:') ? t : t.replace(/^s:/, ''
  * dock = 'follow' it shows whichever Overdrive scene OBS has in Preview (Studio Mode) or Program: it follows OBS,
  * it never switches OBS. A dock never writes the shared localStorage (OBS docks share one storage).
  */
-export function Producer({ onLogout, dock }: { onLogout: () => void; dock?: string }) {
+export function Producer({ onLogout, dock, studio = false }: { onLogout: () => void; dock?: string; /** open in Studio Mode (/studio) */ studio?: boolean }) {
   const sock = useSocket({ role: 'controller' });
   useEffect(() => feedPerf(sock), [sock]);
   const conn = useConnState(sock);
@@ -116,7 +120,10 @@ export function Producer({ onLogout, dock }: { onLogout: () => void; dock?: stri
   const fit = useFitCanvas(W, H);
   const follow = dock === 'follow';
   const [sel, setSel] = useState(() => { if (dock && !follow) return selOfTarget(dock); const v = ls.get('od2.sel', 'g:caster-desk'); return v === 'caster-desk' ? 'g:caster-desk' : v; });
-  const [mode, setModeRaw] = useState<Mode>(() => (!dock && ls.get('od2.mode', 'live') === 'studio' ? 'studio' : 'live'));
+  const [mode, setModeRaw] = useState<Mode>(() => (!dock && (studio || ls.get('od2.mode', 'live') === 'studio') ? 'studio' : 'live'));
+  // Studio Mode 2.0 asks for every camera position while its Talent & Cameras section is open.
+  const [studioCams, setStudioCams] = useState<number[]>([]);
+  const setCams = useCallback((ids: number[]) => setStudioCams(ids), []);
   const setMode = (m: Mode) => { if (!dock) setModeRaw(m); };
   const [studioTab, setStudioTab] = useState<StudioTab>(() => (ls.get('od2.studioTab', 'instances') as StudioTab));
   const [modSrc, setModSrc] = useState('caster-desk');
@@ -172,7 +179,7 @@ export function Producer({ onLogout, dock }: { onLogout: () => void; dock?: stri
     if (src.screen === 'gameplay' && st.showLive.gameplay.cams) [1, 2, 3].forEach(i => ids.add(i));
     return [...ids].sort().join(',');
   }, [st, eng, wc, src, view, gInst, gPkg]);
-  useEffect(() => { const ids = camKey.split(',').filter(Boolean).map(Number) as CasterId[]; viewer.setWanted(new Map(ids.map(id => [id, { video: true, audio: false }]))); }, [viewer, camKey]);
+  useEffect(() => { const ids = [...new Set([...camKey.split(',').filter(Boolean).map(Number), ...(mode === 'studio' ? studioCams : [])])] as CasterId[]; viewer.setWanted(new Map(ids.map(id => [id, { video: true, audio: false }]))); }, [viewer, camKey, studioCams, mode]);
 
   // Keyboard: graphics operations on the selected graphic + global publish/undo/rundown. Never while typing.
   const keyState = useRef({ st, gInst, sel, mode, dock });
@@ -184,12 +191,16 @@ export function Producer({ onLogout, dock }: { onLogout: () => void; dock?: stri
       const { st, gInst, sel } = keyState.current;
       const mod = e.ctrlKey || e.metaKey;
       const act = (fn: () => void) => { e.preventDefault(); fn(); };
+      const studioMode = keyState.current.mode === 'studio';
+      // Studio Mode configures: on-air shortcuts (publish, IN / UPDATE / OUT, TAKE NEXT, show GO) only act in Live graphics.
+      if (studioMode && (e.key === 'F2' || e.key === 'F3' || e.key === 'F4' || e.key === 'F8' || e.key === 'F9' || (mod && e.key === 'Enter'))) return;
       if (mod && e.key === 'Enter') return act(() => run({ c: 'publish' }, 'Publish all'));
       if (mod && e.key.toLowerCase() === 'z') return act(() => run({ c: 'undo' }, 'Undo'));
       if (e.altKey && (e.key === '1' || e.key === '2')) return act(() => setMode(e.key === '1' ? 'live' : 'studio'));
       if (e.altKey && (e.key === 'ArrowDown' || e.key === 'ArrowUp') && st && !keyState.current.dock) return act(() => { const o = libraryOrder(st); const i = o.indexOf(sel); setSel(o[(i + (e.key === 'ArrowDown' ? 1 : -1) + o.length) % o.length]); });
       if (mod || e.altKey) return;
       if (e.key === 'F8') return act(() => run({ c: 'rd-next' }, 'TAKE NEXT'));
+      if (e.key === 'F9') return act(() => run({ c: 'sp-go' }, 'Show GO'));
       if (gInst && e.key === 'F2') return act(() => run({ c: 'gfx-anim', id: gInst.id, action: 'in' }, `${gInst.name} IN`));
       if (gInst && e.key === 'F3') return act(() => (gInst.draft ? run({ c: 'gfx-publish', id: gInst.id }, `Publish ${gInst.name}`) : run({ c: 'gfx-anim', id: gInst.id, action: 'update' }, `${gInst.name} UPDATE`)));
       if (gInst && e.key === 'F4') return act(() => run({ c: 'gfx-anim', id: gInst.id, action: 'out' }, `${gInst.name} OUT`));
@@ -211,7 +222,7 @@ export function Producer({ onLogout, dock }: { onLogout: () => void; dock?: stri
   const ctx: Ctx = { st, eng, wc: wc.state, pv: draft.wc.state, run, prepare, src, now, media: media?.media ?? null, mediaSkew: media?.skew ?? 0, aud: { aud, priv: audPriv, op: audOp } };
   const layout = src.id.startsWith('aud-') ? { modules: src.modules, pinned: [] as typeof src.modules } : studioFor(st.studio, src.id);
   const mods = [...layout.pinned, ...layout.modules.filter(m => !layout.pinned.includes(m))];
-  const selConns = gInst ? (st.outputs.find(o => o.route === `g/${gInst.id}`)?.count ?? 0) : outputs(src.route);
+  const selConns = gInst ? (st.outputs.find(o => o.route === `g/${gInst.id}`)?.count ?? 0) : src.gfx ? (st.outputs.find(o => o.route === outputRouteOf(src))?.count ?? 0) : outputs(src.route);
   const selDraft = gInst ? !!gInst.draft : eng.dirty;
   const gfxOut = st.outputs.filter(o => o.route.startsWith('g/'));
   const gfxWithSrc = (st.graphics ?? []).filter(g => gfxOut.some(o => o.route === `g/${g.id}`)).length;
@@ -223,6 +234,32 @@ export function Producer({ onLogout, dock }: { onLogout: () => void; dock?: stri
   const dockIdle = follow && !followTarget;
   const selectGfx = (id: string) => setSel(`g:${id}`);
 
+  if (mode === 'studio' && !dock) {
+    /** One renderer for Studio's Preview and Program monitors: the same components the browser sources use. */
+    const renderTarget = (key: string, v: 'draft' | 'live') => {
+      const g = key.startsWith('g:') ? st.graphics?.find(x => x.id === key.slice(2)) : undefined;
+      const dr = v === 'draft';
+      if (g) return <GraphicHost key={`${v}-${g.id}`} inst={g} preview forceShow={dr} cfgOverride={dr ? g.draft : null} d={{ scene: st.live, show: st.showLive, wc, aud, now, tournament, bnl, viewer, monitor: true }} />;
+      const s = sourceById(key.replace(/^s:/, ''));
+      if (!s) return null;
+      if (s.gfx) { const sg = st.graphics?.find(x => x.id === s.gfx); return sg ? <GraphicHost key={`${v}-scene-${s.id}`} inst={sg} preview forceShow={dr} cfgOverride={dr ? sg.draft : null} view={s.gfxView} gate={!dr} d={{ scene: st.live, show: st.showLive, wc, aud, now, tournament, bnl, viewer, monitor: true }} /> : null; }
+      const sc = dr ? draft.scene : st.live, sh = dr ? draft.show : st.showLive, w = dr ? draft.wc : wc;
+      return <>
+        {s.screen && <ScreenView key={`${v}-${s.screen}`} id={s.screen} scene={{ ...sc, screen: s.screen }} show={sh} now={now} tournament={tournament} viewer={viewer} monitor bnl={bnl} wc={w} />}
+        {s.view === 'scoreboard' && <Scoreboard show={sh} />}
+        {s.view === 'media' && <MediaView media={media?.media ?? null} skew={media?.skew ?? 0} preview />}
+      </>;
+    };
+    const pk = targetOfObsScene(obsProgram, st);
+    return (
+      <>
+        {!dock && <StorageBanner />}
+        <StudioWorkspace st={st} eng={eng} ctx={ctx} run={run} log={log} conn={conn} rtt={rtt} busy={busy} now={now} viewer={viewer} sel={sel} setSel={setSel}
+          renderTarget={renderTarget} programKey={pk ? selOfTarget(pk) : null} onProducer={() => setMode('live')} onLogout={onLogout} setCams={setCams} />
+      </>
+    );
+  }
+
   return (
     <div className="fixed inset-0 overflow-hidden" style={{ background: '#000' }}>
       {!dock && <StorageBanner />}
@@ -232,8 +269,8 @@ export function Producer({ onLogout, dock }: { onLogout: () => void; dock?: stri
           {gInst && <GraphicHost key={gInst.id} inst={gInst} preview forceShow={showDraft} cfgOverride={showDraft ? gInst.draft : null} d={{ scene: st.live, show: st.showLive, wc, aud, now, tournament, bnl, viewer, monitor: true }} />}
           {!gInst && src.screen && <ScreenView key={src.screen} id={src.screen} scene={{ ...scene, screen: src.screen }} show={show} now={now} tournament={tournament} viewer={viewer} monitor bnl={bnl} wc={wcv} />}
           {!gInst && src.view === 'scoreboard' && <Scoreboard show={show} />}
-          {!gInst && src.view === 'standings' && <WcBracket wc={wcv.state} part={2} />}
           {!gInst && src.view === 'media' && <MediaView media={media?.media ?? null} skew={media?.skew ?? 0} preview />}
+          {!gInst && src.gfx && (() => { const g = st.graphics?.find(x => x.id === src.gfx); return g ? <GraphicHost key={`scene-${src.id}`} inst={g} preview forceShow={showDraft} cfgOverride={showDraft ? g.draft : null} view={src.gfxView} gate={!showDraft} d={{ scene: st.live, show: st.showLive, wc, aud, now, tournament, bnl, viewer, monitor: true }} /> : null; })()}
           {guides && <SafeGuides />}
           {(dockMissing || dockIdle) && (
             <div className="absolute inset-0 grid place-items-center bg-black/80 text-center" data-dock-message>
@@ -296,10 +333,11 @@ export function Producer({ onLogout, dock }: { onLogout: () => void; dock?: stri
                 {!gInst && (
                   <div className="flex min-h-0 flex-1 flex-col" data-scene-panel={src.id}>
                     <PanelHead label="Scene controls" info={<>{src.name} · <span className="font-mono">{src.route}</span>{src.note ? ` · ${src.note}` : ''}</>}>
-                      <span className="text-[10.5px] text-white/35">scene source (not migrated to the graphics engine yet)</span>
+                      <span className="text-[10.5px] text-white/35">{src.gfx ? `scene drawn by the ${st.graphics?.find(g => g.id === src.gfx)?.name ?? src.gfx} graphic` : 'scene source (not migrated to the graphics engine yet)'}</span>
                       {!dock && <B h={20} kind="ghost" onClick={() => { setMode('studio'); setStudioTab('modules'); setModSrc(src.id); }}>Modules…</B>}
                       <B h={20} kind="ghost" onClick={() => navigator.clipboard?.writeText(location.origin + src.route)}>Copy URL</B>
                     </PanelHead>
+                    {src.gfx === 'mvp' && src.gfxView && ctx.aud && <MvpSceneControls x={ctx} a={ctx.aud} src={src} obsTr={obsTr} />}
                     <div className="min-h-0 flex-1 overflow-y-auto" data-modules={src.id}>
                       <div className="grid" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(400px, 1fr))', gridAutoRows: 312 }}>
                         {mods.map(m => <div key={m} className="flex min-h-0 min-w-0 [&>section]:w-full [&>section]:min-w-0">{<ModuleView id={m} x={ctx} pinned={layout.pinned.includes(m)} />}</div>)}
@@ -314,13 +352,40 @@ export function Producer({ onLogout, dock }: { onLogout: () => void; dock?: stri
             {mode === 'live' && !dock && <><Splitter onPointerDown={cols.start(1, -1, fit.s)} onDoubleClick={cols.reset} /><RundownPanel st={st} run={run} sel={gInst} onSelect={selectGfx} /></>}
             <Splitter onPointerDown={cols.start(2, -1, fit.s)} onDoubleClick={cols.reset} />
             <PublishPanel st={st} eng={eng} wc={wc.state} run={run} prepare={prepare} setPrepare={setPrepare} obsTr={obsTr} setObsTr={setObsTr} selObs={selObs} selName={gInst ? gInst.name : src.name}
-              log={log} onInstant={() => sock.send({ t: 'set-instant', on: !st.instant })} onLogout={onLogout} />
+              log={log} onInstant={() => sock.send({ t: 'set-instant', on: !st.instant })} onLogout={onLogout} showGo={dock ? null : <ShowGo st={st} run={run} now={now} />} />
           </div>
         </div>
 
         {details && <DetailsPopover st={st} eng={eng} rtt={rtt} conn={conn} onClose={() => setDetails(false)} />}
         {help && <HelpOverlay onClose={() => setHelp(false)} />}
       </div>
+    </div>
+  );
+}
+
+/**
+ * Studio Mode 2.0 show rundown in Producer Mode: what is on air, what GO takes next, and the GO an automation is
+ * waiting for. GO switches OBS to the prepared segment's scene (with its transition). Compact on purpose.
+ */
+function ShowGo({ st, run, now }: { st: ControllerState; run: (c: ProducerCmd, l: string) => Promise<Ack>; now: number }) {
+  const p = st.plan;
+  if (!p || (!p.segments.length && !p.pending)) return null;
+  const air = p.onAir ? p.segments.find(s => s.id === p.onAir!.id) : undefined, nxt = p.next ? p.segments.find(s => s.id === p.next) : undefined;
+  const el = p.onAir ? Math.round((now - p.onAir.at) / 1000) : 0, over = !!air?.dur && el > air.dur;
+  return (
+    <div className="mx-2 mt-1.5 flex flex-none items-center gap-1.5 border-t pt-1.5 text-[11px]" style={{ borderColor: C.line }} data-show-go>
+      <span className={`${LABEL} text-[12px] text-white/80`}>Show</span>
+      {air && <span className="min-w-0 max-w-[120px] truncate" title={`On air: ${air.label}`}><span style={{ color: C.pgm }}>●</span> {air.label} <span className="font-mono" style={{ color: over ? C.pgm : 'rgba(255,255,255,.45)' }}>{fmtDur(el)}{air.dur ? `/${fmtDur(air.dur)}` : ''}</span></span>}
+      {p.pending ? (
+        <>
+          <button type="button" onClick={() => run({ c: 'sp-go' }, `GO · ${p.pending!.name}`)} title={`${p.pending.text} (F9)`} data-show-go-btn="pending"
+            className={`${LABEL} h-[22px] min-w-0 flex-1 animate-pulse truncate rounded-[2px] px-2 text-[12px] text-white`} style={{ background: C.brand }}>GO · {nxt?.label ?? p.pending.name}</button>
+          <button type="button" onClick={() => run({ c: 'sp-cancel' }, 'Cancel automation step')} className={`${LABEL} h-[22px] rounded-[2px] border border-white/20 px-1.5 text-[11px] text-white/70`} data-show-cancel>Cancel</button>
+        </>
+      ) : nxt ? (
+        <button type="button" onClick={() => run({ c: 'sp-go' }, `GO · ${nxt.label}`)} title="Take the next segment: OBS switches to its scene with its transition (F9)" data-show-go-btn="next"
+          className={`${LABEL} h-[22px] min-w-0 flex-1 truncate rounded-[2px] border px-2 text-[12px]`} style={{ borderColor: C.pvw, color: C.pvw }}>GO · {nxt.label}</button>
+      ) : <span className="text-white/35">end of rundown</span>}
     </div>
   );
 }
@@ -341,9 +406,9 @@ function SafeGuides() {
 }
 
 /** Area E: publish, OBS (explicit only), recovery and the command acknowledgments. */
-function PublishPanel({ st, eng, wc, run, prepare, setPrepare, obsTr, setObsTr, selObs, selName, log, onInstant, onLogout }: {
+function PublishPanel({ st, eng, wc, run, prepare, setPrepare, obsTr, setObsTr, selObs, selName, log, onInstant, onLogout, showGo }: {
   st: ControllerState; eng: EngineState; wc: import('../../../shared/wildcard').WildcardState; run: (c: ProducerCmd, l: string) => Promise<Ack>; prepare: boolean; setPrepare: (v: boolean) => void;
-  obsTr: 'obs' | 'stinger' | 'fade' | 'cut'; setObsTr: (v: 'obs' | 'stinger' | 'fade' | 'cut') => void; selObs?: string; selName: string; log: LogLine[]; onInstant: () => void; onLogout: () => void;
+  obsTr: 'obs' | 'stinger' | 'fade' | 'cut'; setObsTr: (v: 'obs' | 'stinger' | 'fade' | 'cut') => void; selObs?: string; selName: string; log: LogLine[]; onInstant: () => void; onLogout: () => void; /** Studio Mode 2.0 show rundown GO row */ showGo?: ReactNode;
 }) {
   const obsProgram = st.obs.currentScene;
   const prepared = [...draftDiff(st, wc, eng), ...eng.draft.map(draftLabel), ...(st.graphics ?? []).filter(g => g.draft).map(g => `${g.name} (graphic)`)];
@@ -376,6 +441,7 @@ function PublishPanel({ st, eng, wc, run, prepare, setPrepare, obsTr, setObsTr, 
         </div>
       </div>
 
+      {showGo}
       <div className="mx-2 mt-1.5 grid flex-none grid-cols-3 gap-1 border-t pt-1.5" style={{ borderColor: C.line }} data-recovery>
         <B h={22} kind="danger" onClick={() => run({ c: 'panic' }, 'Clear graphics')} title="Map card, badges, popups, PB panel, Champions off">Clear GFX</B>
         <B h={22} onClick={() => run({ c: 'reload-outputs' }, 'Reload sources')} title="Every browser source reloads and resyncs">Reload srcs</B>
@@ -430,11 +496,11 @@ function HelpOverlay({ onClose }: { onClose: () => void }) {
         <div className={`${LABEL} mb-3 text-[18px]`}>Workstation shortcuts</div>
         <div className="grid grid-cols-2 gap-x-10">
           <div>
-            <K k="F2" d="Selected graphic IN" /><K k="F3" d="Selected graphic UPDATE (publishes its draft)" /><K k="F4" d="Selected graphic OUT" /><K k="F8" d="Rundown: TAKE NEXT" />
+            <K k="F2" d="Selected graphic IN" /><K k="F3" d="Selected graphic UPDATE (publishes its draft)" /><K k="F4" d="Selected graphic OUT" /><K k="F8" d="Rundown: TAKE NEXT" /><K k="F9" d="Show rundown: GO (next segment / pending automation)" />
             <K k="Ctrl+Enter" d="Publish all prepared changes" /><K k="Ctrl+Z" d="Undo" />
           </div>
           <div>
-            <K k="Alt+↑ / Alt+↓" d="Previous / next graphic" /><K k="Alt+1 / Alt+2" d="Live graphics / Studio" /><K k="D" d="Preview: Draft ↔ Live" /><K k="G" d="Safe-area guides" /><K k="?" d="This help" /><K k="Esc" d="Close" />
+            <K k="Alt+↑ / Alt+↓" d="Previous / next graphic" /><K k="Alt+1 / Alt+2" d="Producer (live graphics) / Studio Mode" /><K k="D" d="Preview: Draft ↔ Live" /><K k="G" d="Safe-area guides" /><K k="?" d="This help" /><K k="Esc" d="Close" />
           </div>
         </div>
         <div className={`${LABEL} mb-2 mt-4 text-[14px] text-white/80`}>States</div>

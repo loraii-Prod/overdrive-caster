@@ -19,6 +19,7 @@ import path from 'node:path';
 import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { audit, openDb, tx, type Db } from './db';
+import { recordChatVotes } from './chatVotes';
 import { MAJOR_TEAMS } from '../shared/major';
 import { PICK_SCORES_BO5, communityPick, isMajorTeam, matchStatus, pickScore, teamRoster, type AudAccuracy, type AudMatchIn, type AudMatchTotals, type AudPoll, type AudSessionIn, type AudSummary } from '../shared/audience';
 
@@ -181,12 +182,13 @@ const POINTS_SQL = `select v.id, v.name, sum(case when p.team = m.winner then ca
 
 async function polls(session: string, priv: boolean): Promise<AudPoll[]> {
   const r = await db.query('select * from polls where session = $1 order by created', [session]);
-  const c = priv ? await db.query('select v.poll, v.player, count(*)::int n from mvp_votes v join polls p on p.id = v.poll where p.session = $1 group by v.poll, v.player', [session]) : { rows: [] as any[] };
+  const c = priv ? await db.query('select v.poll, v.player, v.source, count(*)::int n from mvp_votes v join polls p on p.id = v.poll where p.session = $1 group by v.poll, v.player, v.source', [session]) : { rows: [] as any[] };
   return r.rows.map(p => {
-    const counts: Record<string, number> = {};
-    for (const x of c.rows) if (x.poll === p.id) counts[x.player] = x.n;
-    const base: AudPoll = { id: p.id, match: p.match, label: p.label, result: p.result, players: p.players, status: p.status, openedAt: p.opened_at ? +p.opened_at : null, closedAt: p.closed_at ? +p.closed_at : null, closesAt: p.closes_at && p.status === 'open' ? +p.closes_at : null, frozen: p.frozen };
-    return priv ? { ...base, counts, total: Object.values(counts).reduce((a, b) => a + b, 0) } : base;
+    const counts: Record<string, number> = {}, bySource = { web: 0, chat: 0 };
+    for (const x of c.rows) if (x.poll === p.id) { counts[x.player] = (counts[x.player] ?? 0) + x.n; bySource[x.source === 'chat' ? 'chat' : 'web'] += x.n; }
+    const base: AudPoll = { id: p.id, match: p.match, label: p.label, result: p.result, players: p.players, status: p.status, openedAt: p.opened_at ? +p.opened_at : null, closedAt: p.closed_at ? +p.closed_at : null, closesAt: p.closes_at && p.status === 'open' ? +p.closes_at : null, frozen: p.frozen,
+      web: p.web !== false, chat: p.chat === true, chatCmd: p.chat_cmd || undefined, chatChannel: p.chat_channel || undefined };
+    return priv ? { ...base, counts, total: Object.values(counts).reduce((a, b) => a + b, 0), bySource } : base;
   });
 }
 
@@ -277,9 +279,10 @@ app.post('/v1/mvp', limit(IP_WRITES), async (req, res) => {
   if (typeof poll !== 'string' || typeof player !== 'string') return bad(res, 'Invalid vote', 400);
   try {
     const out = await tx(db, async (c): Promise<{ error: string; code: number } | { player: string; already?: boolean }> => {
-      const p = (await c.query('select status, players, closes_at from polls where id = $1 for share', [poll])).rows[0];
+      const p = (await c.query('select status, players, closes_at, web, chat, chat_cmd, chat_channel from polls where id = $1 for share', [poll])).rows[0];
       if (!p) return { error: 'Unknown vote', code: 400 };
       if (p.status !== 'open' || (p.closes_at && +p.closes_at <= Date.now())) return { error: 'Voting is closed', code: 409 };
+      if (p.web === false) return { error: p.chat ? `This vote is in Twitch chat: type ${p.chat_cmd || '!vote'} and the player's number${p.chat_channel ? ` in twitch.tv/${p.chat_channel}` : ''}` : 'Voting is closed', code: 409 };
       if (!p.players.some((x: any) => x.handle === player)) return { error: 'That player is not eligible', code: 400 };
       const ins = await c.query('insert into mvp_votes(poll, viewer, player) values ($1,$2,$3) on conflict (poll, viewer) do nothing returning player', [poll, v.id, player]);
       if (ins.rowCount) return { player };
@@ -367,6 +370,33 @@ app.post('/internal/poll/:id/timer', internal, async (req, res) => {
   fresh(); res.json({ ok: true });
 });
 
+/** Which ways an open or prepared vote accepts votes; the chat command / channel are shown to viewers. */
+function methodsOf(b: any): { web: boolean; chat: boolean; cmd: string; channel: string } | null {
+  if (!b || typeof b !== 'object' || typeof b.web !== 'boolean' || typeof b.chat !== 'boolean') return null;
+  if (!b.web && !b.chat) return null;
+  const cmd = typeof b.cmd === 'string' && /^![a-z0-9_]{2,20}$/.test(b.cmd) ? b.cmd : '!vote';
+  const channel = typeof b.channel === 'string' && /^[a-z0-9_]{1,25}$/.test(b.channel) ? b.channel : '';
+  return { web: b.web, chat: b.chat, cmd, channel };
+}
+app.post('/internal/poll/:id/methods', internal, async (req, res) => {
+  const id = String(req.params.id), m = methodsOf(req.body);
+  if (!m) return bad(res, 'Choose at least one way to vote', 400);
+  const r = await db.query("update polls set web = $2, chat = $3, chat_cmd = $4, chat_channel = $5 where id = $1 and status in ('draft','open') returning id", [id, m.web, m.chat, m.cmd, m.channel]);
+  if (!r.rowCount) return bad(res, 'Voting is closed');
+  await audit(db, actor(req), 'mvp-methods', id, null, m);
+  fresh(); res.json({ ok: true });
+});
+
+/** Twitch chat votes read by the broadcast server: one batch for one poll. */
+app.post('/internal/poll/:id/chat-votes', internal, async (req, res) => {
+  const id = String(req.params.id), votes = req.body?.votes;
+  if (!Array.isArray(votes)) return bad(res, 'bad votes', 400);
+  try {
+    const results = await tx(db, c => recordChatVotes((sql, params) => c.query(sql, params as any[]), id, votes));
+    res.json({ ok: true, results });
+  } catch (e) { console.error('[vote] chat votes', e); bad(res, 'Voting is paused, try again shortly', 503); }
+});
+
 app.post('/internal/poll/:id/:action', internal, async (req, res) => {
   const id = String(req.params.id), action = String(req.params.action);
   const flow: Record<string, [string, string]> = { open: ['draft', 'open'], close: ['open', 'closed'], reveal: ['closed', 'revealed'] };
@@ -380,6 +410,8 @@ app.post('/internal/poll/:id/:action', internal, async (req, res) => {
     if (action === 'open') {
       const sec = Number(req.body?.seconds);
       await c.query("update polls set status = 'open', opened_at = now(), closes_at = $2 where id = $1", [id, Number.isFinite(sec) && sec >= 10 ? new Date(Date.now() + Math.min(3600, sec) * 1000) : null]);
+      const m = methodsOf(req.body?.methods);
+      if (m) await c.query('update polls set web = $2, chat = $3, chat_cmd = $4, chat_channel = $5 where id = $1', [id, m.web, m.chat, m.cmd, m.channel]);
     }
     else if (action === 'close') {
       // Freeze the result in the same transaction that stops voting: what is revealed is exactly what was counted.

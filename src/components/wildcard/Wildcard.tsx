@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 
 import './wildcard.css';
 import { usePageFlip } from '../../lib/pageFlip';
 import {
-  GRAND_FINAL, STARTING_SOON, WC_IDS, WC_PARTS, realTeam, WC_QUALIFIERS, WC_TEAMS, WINS_NEEDED, castId, colTime, countdownText, doneList, matchName, matchStart,
+  STARTING_SOON, WC_IDS, WC_PARTS, realTeam, WC_QUALIFIERS, WC_TEAMS, WINS_NEEDED, castId, colTime, countdownText, doneList, matchName, matchStart,
   nextFrom, nextMatchId, wcLayout, wcLogo, wcResolve, type WcPop, type WcResolved, type WildcardState,
 } from '../../../shared/wildcard';
 
@@ -67,7 +67,7 @@ function Lines({ part, R }: { part: 1 | 2; R: Record<string, WcResolved> }) {
   );
 }
 
-/** One part of the bracket (1 = upper, 2 = lower + the four qualified teams). `frame={false}` leaves the title to a stable frame. */
+/** One part of the bracket (1 = upper + grand final, 2 = lower bracket; the finals have no qualified-teams column). `frame={false}` leaves the title to a stable frame. */
 export function WcStage({ wc, part, enter = false, pin, frame = true }: { wc: WildcardState; part: 1 | 2; enter?: boolean; pin?: string | null; frame?: boolean }) {
   const P = WC_PARTS[part], R = wcResolve(wc.matches, wc.teams), pos = wcLayout(part), o = wc.opts, cast = castId(wc, R, pin);
   const box = `rgba(33,26,24,${o.opacity / 100})`;
@@ -77,17 +77,6 @@ export function WcStage({ wc, part, enter = false, pin, frame = true }: { wc: Wi
       {frame && <><div className="hdr"><h1>{P.title}</h1></div><div className="dash" /></>}
       {o.lines && <Lines part={part} R={R} />}
       {P.cols.map((col, ci) => <div key={col.name} data-c={ci} className="colh" style={{ left: col.x, top: Math.min(...col.ids.map(id => pos[id].y)) - 40, width: col.w }}>{col.name}</div>)}
-      {part === 2 && (
-        <div className="qcol" data-c={P.cols.length} style={{ left: 1600, top: 290 }}>
-          <div className="qt">Final standings</div>
-          {([[GRAND_FINAL, 'winner', 'Grand final winner'], [GRAND_FINAL, 'loser', 'Grand final loser'], ['R4_LB1', 'loser', 'Lower final loser'], ['R3_LB1', 'loser', 'Lower semi-final loser']] as const).map(([id, k, open], i) => {
-            const w = R[id][k];
-            return realTeam(w)
-              ? <div key={i} className="qi"><span className="n">{i + 1}</span><Img name={w} /><b>{w}</b></div>
-              : <div key={i} className="qi open"><span className="n">{i + 1}</span><b>{open} · TBD</b></div>;
-          })}
-        </div>
-      )}
       {Object.entries(pos).map(([id, p]) => {
         const st = wc.matches[id], r = R[id], col = P.cols[p.c];
         const live = st.live && !r.winner, onCast = cast === id;

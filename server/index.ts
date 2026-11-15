@@ -12,6 +12,7 @@ import { createHub } from './hub';
 import { controlApi, media, music, pluginDownload, uploads } from './api';
 import { assetsApi, importSeed, migrate } from './assets';
 import { persistApi } from './persistApi';
+import { staffPicksApi } from './staffPicksApi';
 
 const app = express();
 app.disable('x-powered-by');
@@ -27,6 +28,7 @@ app.use(persistApi());
 app.use(music());
 app.use(media());
 app.use(pluginDownload());
+app.use(staffPicksApi(() => hub.api.staffChanged()));
 
 app.get('/api/health', (_req, res) => res.json({ ok: true, uptime: process.uptime() }));
 // Which build is actually running: check this before testing anything on a deployed instance.

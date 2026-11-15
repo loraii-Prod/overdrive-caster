@@ -17,9 +17,14 @@ import { Audience } from './audience';
 import { tag } from './assets';
 import { playerIdOf } from '../shared/playerIds';
 import { Twitch } from './twitch';
+import { TwitchChat } from './twitchChat';
+import { ChatVoting } from './chatVoting';
+import type { ChatOp } from '../shared/twitchChat';
 import { ObsBridge } from './obs';
 import { createObsSetup } from './obsSetup';
 import { pkgById } from '../shared/gfx';
+import { REGISTRY } from '../shared/registry';
+import { parseVdoId } from '../shared/talent';
 import { createEvent, deleteEvent, renameEvent, switchEvent } from './events';
 import { applyFeatured, syncSheet } from './sheet';
 import { parseSheetUrl } from '../shared/sheet';
@@ -101,11 +106,59 @@ export function createHub(server: Server) {
   const tw = new Twitch(db.twitch, save, () => pushState(), () => each(c => c.role === 'output' || c.role === 'controller' || c.role === 'crew', { t: 'twitch', tw: tw.pub }));
   // Audience interaction: the vote service is reached in the background; its outages never block this server.
   const aud = new Audience(db.audience, save, () => db.wildcard, () => pushAud());
-  function pushAud() {
-    each(c => c.role === 'output' || c.role === 'controller' || c.role === 'crew', { t: 'aud', aud: aud.pub() });
-    each(c => c.role === 'controller', { t: 'aud-private', aud: aud.priv() });
+  // MVP automation trigger: a vote that closed with a frozen result fires "MVP voting closes" once per poll.
+  // Polls already closed when the server starts are known, so a restart never fires old ones again.
+  let mvpSeen: Set<string> | null = null;
+  function mvpClosedCheck() {
+    const polls = aud.priv().summary?.polls ?? [];
+    const closed = polls.filter(p => (p.status === 'closed' || p.status === 'revealed') && p.frozen).map(p => p.id);
+    if (!mvpSeen) { mvpSeen = new Set(closed); return; }
+    for (const id of closed) if (!mvpSeen.has(id)) { mvpSeen.add(id); engine?.fire('mvp-closed').catch(e => console.warn('[plan] mvp-closed:', e)); }
   }
+  function pushAud() {
+    mvpClosedCheck();
+    each(c => c.role === 'output' || c.role === 'controller' || c.role === 'crew', { t: 'aud', aud: aud.pub() });
+    each(c => c.role === 'controller', { t: 'aud-private', aud: audPriv() });
+  }
+  // Twitch chat MVP voting. The reading account's tokens stay in db.twitchChat (server only): the producer gets
+  // chatVoting.status(), which has none; outputs and the public vote page only learn "chat voting on, !vote, channel".
+  const audPriv = () => ({ ...aud.priv(), chat: chatVoting.status() });
+  let chatPushT: NodeJS.Timeout | null = null, chatRefreshAt = 0;
+  const pushChat = () => { if (chatPushT) return; chatPushT = setTimeout(() => { chatPushT = null; each(c => c.role === 'controller', { t: 'aud-private', aud: audPriv() }); }, 250); };
+  const twChat = new TwitchChat(db.twitchChat, save, pushChat, m => chatVoting.onMessage(m), { fallbackClientId: () => db.twitch.clientId });
+  const chatVoting = new ChatVoting(twChat, {
+    openPoll: () => aud.openPoll(), call: (method, path, body) => aud.internal(method, path, body), configured: () => aud.configured, onChange: pushChat,
+    // Stored votes: refresh the producer's live totals (at most once a second).
+    onStored: () => { const now = Date.now(); if (now - chatRefreshAt < 1000) return; chatRefreshAt = now; aud.tick().catch(() => {}); },
+  });
+  async function chatOp(op: ChatOp): Promise<string | null> {
+    switch (op?.k) {
+      case 'client-id': twChat.setClientId(String(op.clientId ?? '')); break;
+      case 'connect': await twChat.connect(); break;
+      case 'disconnect': twChat.signOut(); break;
+      case 'reconnect': twChat.restart(); break;
+      case 'clear': chatVoting.clear(); break;
+      case 'config': {
+        if (!op.patch || typeof op.patch !== 'object') return 'Invalid settings';
+        const before = JSON.stringify(chatVoting.methods());
+        await twChat.configure(op.patch);
+        // Ways to vote changed while a vote is open: tell the vote service now (the website and graphic follow).
+        const p = aud.openPoll(), m = chatVoting.methods();
+        if (p && JSON.stringify(m) !== before) { try { await aud.internal('POST', `/internal/poll/${encodeURIComponent(p.id)}/methods`, m, 'producer'); await aud.tick(); } catch (e) { return `Saved, but the open vote was not updated: ${(e as Error).message}`; } }
+        break;
+      }
+      default: return 'Unknown Twitch chat command';
+    }
+    pushChat(); return null;
+  }
+  aud.chatHooks = {
+    methods: () => chatVoting.methods(),
+    beforeClose: poll => chatVoting.beforeClose(poll),
+    op: chatOp,
+  };
   aud.start();
+  chatVoting.start();
+  twChat.start().catch(e => console.warn('[twitch-chat]', (e as Error).message));
 
   // ---------- helpers ----------
   const send = (c: Client | undefined, m: ServerMsg) => {
@@ -144,6 +197,7 @@ export function createHub(server: Server) {
       showLive: db.showLive,
       apiToken: db.apiToken,
       crewKey: db.crewKey,
+      staffPicks: db.staffPicks,
       lanUrls: lanUrls(),
       ros: db.ros,
       players: db.players,
@@ -168,6 +222,7 @@ export function createHub(server: Server) {
       studio: db.studio,
       graphics: db.graphics,
       rundown: db.rundown,
+      plan: db.plan,
       gfxHealth,
     };
   }
@@ -324,8 +379,20 @@ export function createHub(server: Server) {
     if (r.winner && wc.intro.a === r.t1 && wc.intro.b === r.t2) wc.pickem = { ...wc.pickem, [id]: { ...wc.intro.picks } };
   }
 
+  /** "Match ends" automation trigger: a match gets its result (once per match; results known at start never fire). */
+  let resultsSeen: Set<string> | null = null;
+  function matchEndCheck() {
+    const R = wcResolve(db.wildcard.matches, db.wildcard.teams);
+    const done = WC_IDS.filter(id => R[id].winner && R[id].winner !== 'BYE' && R[id].t1 !== 'BYE' && R[id].t2 !== 'BYE');
+    if (!resultsSeen) { resultsSeen = new Set(done); return; }
+    for (const id of done) if (!resultsSeen.has(id)) { resultsSeen.add(id); engine?.fire('match-end').catch(e => console.warn('[plan] match-end:', e)); }
+    for (const id of [...resultsSeen]) if (!done.includes(id)) resultsSeen.delete(id); // a corrected result can end again
+  }
+  matchEndCheck(); // results already known at start are never "new"
+
   function wcChanged(popups = true) {
     pickemArchive();
+    matchEndCheck();
     if (castSync()) broadcastLive();
     updateDone(db.wildcard);
     const snap = wcSnapshot(db.wildcard);
@@ -422,7 +489,13 @@ export function createHub(server: Server) {
       }
       case 'test': wcPop(demoEvent(wc, op.kind === 'match' ? 'match' : 'map')); return;
       case 'replay': if (wcLastPop) wcPop(wcLastPop); return;
-      case 'showcase': wc.showcase = sanitizeShowcase({ ...wc.showcase, ...(op.patch ?? {}), photos: wc.showcase.photos }); break;
+      case 'showcase': wc.showcase = sanitizeShowcase({ ...wc.showcase, ...(op.patch ?? {}), photos: wc.showcase.photos, frames: wc.showcase.frames }); break;
+      case 'photo-frame': {
+        const key = String(op.player ?? '').toLowerCase().replace(/[^a-z0-9]/g, '');
+        if (!key) return;
+        wc.showcase = sanitizeShowcase({ ...wc.showcase, frames: { ...wc.showcase.frames, [key]: op.frame ?? undefined } });
+        break;
+      }
       case 'intro': {
         const next = sanitizeIntro({ ...wc.intro, ...(op.patch ?? {}), picks: wc.intro.picks, at: wc.intro.at });
         // New teams: the predictions were for the old match.
@@ -475,6 +548,7 @@ export function createHub(server: Server) {
     pushRos();
     pushMatchData();
     wcSnap = wcSnapshot(db.wildcard);
+    resultsSeen = null; matchEndCheck(); // another event: its results are not "new"
     each(wcAudience, wcMsg());
     each(c => c.role === 'output' || c.role === 'controller' || c.role === 'admin' || c.role === 'crew', { t: 'tournament', tournament: db.tournament });
     obs.apply(db.live, db.showLive.theme);
@@ -704,7 +778,7 @@ export function createHub(server: Server) {
     return null;
   }
 
-  function editTalent(id: string, patch: { name?: string; role?: 'caster' | 'analyst'; mode?: 'webrtc' | 'vdo'; camQuality?: CamQuality }): string | null {
+  function editTalent(id: string, patch: { name?: string; role?: 'caster' | 'analyst'; mode?: 'webrtc' | 'vdo'; camQuality?: CamQuality; vdoId?: string }): string | null {
     const i = db.talent.findIndex(p => p.id === id);
     if (i < 0) return 'Unknown talent';
     const t = { ...db.talent[i] };
@@ -712,6 +786,13 @@ export function createHub(server: Server) {
     if (patch.role === 'caster' || patch.role === 'analyst') t.role = patch.role;
     if (patch.mode === 'webrtc' || patch.mode === 'vdo') t.mode = patch.mode;
     if (patch.camQuality === '720p' || patch.camQuality === '1080p') t.camQuality = patch.camQuality;
+    if (typeof patch.vdoId === 'string') {
+      // A pasted VDO.Ninja link (or bare stream ID): their camera comes from that stream from now on.
+      const v = parseVdoId(patch.vdoId);
+      if (!v) return 'Not a VDO.Ninja link or stream ID (it needs push=… or view=…)';
+      if (db.talent.some((p, j) => j !== i && p.vdoId === v)) return 'Another talent already uses this VDO.Ninja stream';
+      t.vdoId = v; t.mode = 'vdo';
+    }
     db.talent = db.talent.map((p, j) => (j === i ? t : p));
     const seat = seatOfTalent(id);
     if (seat) { const before = pubOf(seat); applySeat(seat as Seat); reroute(seat, before); broadcastLive(); }
@@ -817,7 +898,7 @@ export function createHub(server: Server) {
     if (c.role !== 'contributor') { send(c, { t: 'tournament', tournament: db.tournament }); send(c, matchDataMsg()); }
     if (wcAudience(c)) { send(c, wcMsg()); send(c, { t: 'twitch', tw: tw.pub }); }
     if (c.role === 'output' || c.role === 'controller' || c.role === 'crew') send(c, { t: 'aud', aud: aud.pub() });
-    if (c.role === 'controller') send(c, { t: 'aud-private', aud: aud.priv() });
+    if (c.role === 'controller') send(c, { t: 'aud-private', aud: audPriv() });
     if (c.role === 'contributor') { if (c.talent) registerTalent(c); else registerPublisher(c, c.slot!); }
     pushState();
   }
@@ -1125,7 +1206,7 @@ export function createHub(server: Server) {
     goLive,
     airProgram,
     broadcastLive,
-    pushWc: () => { db.wildcard.rev = Date.now(); save(); each(wcAudience, wcMsg()); },
+    pushWc: () => { db.wildcard.rev = Date.now(); save(); each(wcAudience, wcMsg()); matchEndCheck(); },
     wcOp,
     quickBadge: kind => act({ t: 'badge', kind }),
     clearPopups: () => wcPop({ kind: 'clear', id: '', side: 0 } as Omit<WcPop, 'seq'>),
@@ -1154,6 +1235,30 @@ export function createHub(server: Server) {
       }
       return { error: 'Unknown OBS Setup action' };
     },
+    mvp: {
+      state: () => mvpFlowState(),
+      op: async action => {
+        const s = mvpFlowState();
+        if (!s.pollId) return 'No MVP vote prepared for this match (Producer → Community MVP → Prepare)';
+        const sec = Number(db.graphics.find(x => x.id === 'mvp')?.config.countdown) || 0; // Studio's default countdown
+        return aud.op(action === 'open' ? { k: 'mvp-open', poll: s.pollId, ...(sec >= 10 ? { seconds: sec } : {}) } : { k: 'mvp-close', poll: s.pollId });
+      },
+    },
+    obsLookup: () => ({
+      setupMap: obsSetup.state().map ?? {},
+      screenMap: db.showLive.obsScenes as Record<string, string | undefined>,
+      graphics: db.graphics,
+      registry: REGISTRY,
+      scenes: obs.status.connected ? obs.status.scenes : [],
+      pkgObsKey: pkg => pkgById(pkg)?.obsKey,
+    }),
+    syncCrew: plan => {
+      // Mirror the show plan to the crew / caster run of show (only when the producer turned crew sync on).
+      const items = plan.segments.map(sg => ({ id: sg.id, time: '', title: sg.label, minutes: Math.round(sg.dur / 60), who: '', notes: sg.notes }));
+      const cur = plan.onAir ? plan.segments.findIndex(sg => sg.id === plan.onAir!.id) : -1;
+      db.ros = sanitizeRos({ ...db.ros, items, current: cur >= 0 ? cur : null, startedAt: cur >= 0 ? plan.onAir!.at : null });
+      pushRos();
+    },
     obsSwitch: async (scene, t) => {
       if (!obs.status.connected) return obs.status.enabled ? `OBS is not connected (${obs.status.error ?? 'offline'})` : 'OBS is not set up (Settings → OBS)';
       if (!obs.status.scenes.includes(scene)) return `OBS has no scene named "${scene}"`;
@@ -1161,12 +1266,26 @@ export function createHub(server: Server) {
     },
   });
 
+  /** The MVP graphic's match (its own setting, else the cast match) and where its vote stands. */
+  function mvpFlowState() {
+    const g = db.graphics.find(x => x.id === 'mvp');
+    const match = String(g?.config.match || db.wildcard.cast || '');
+    const poll = (aud.priv().summary?.polls ?? []).filter(p => p.match === match).pop();
+    return { match, pollId: poll?.id ?? null, status: poll?.status ?? null, frozen: !!poll?.frozen, desk: Object.keys(db.audience.staffMvp?.[match] ?? {}).length > 0, published: String(g?.config.step ?? '') };
+  }
+
+  // Show plan automation (Studio Mode 2.0): countdown end, segment time up / auto-advance, clock rules.
+  const planTick = setInterval(() => { engine?.tick().catch(e => console.warn('[plan] automation tick failed:', e)); }, 500);
+  wss.on('close', () => clearInterval(planTick));
+
   const api = {
     /** Overdrive 2.0 engine for HTTP automation (Stream Deck, Companion): same commands and acks. */
     engine: (cmd: ProducerCmd, source: 'manual' | 'auto' = 'auto') => engine!.run(cmd, 'api', source),
     act,
     tournamentOp,
     spectate,
+    /** Staff pick'em changed from the staff page: refresh the producer's view. */
+    staffChanged: () => pushState(),
     state: () => ({
       screen: db.live.screen, previewScreen: db.preview.screen, layout: db.live.layout, instant: db.instant, dirty: !sameScene(db.live, db.preview) || JSON.stringify(db.showLive) !== JSON.stringify(db.showPreview),
       casters: db.live.casters.map(c => ({ id: c.id, enabled: c.enabled, name: c.name, cameraOn: c.cameraOn, showName: c.showName, connected: contributorStatus(c.id).publishing })),

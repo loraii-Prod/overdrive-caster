@@ -1,4 +1,5 @@
 import { emptyRundown, sanitizeRundown, type Rundown } from '../shared/rundown';
+import { emptyPlan, sanitizePlan, type ShowPlan } from '../shared/showplan';
 import { defaultObsSetup, sanitizeObsSetup, type ObsSetupStore } from '../shared/obsSetup';
 import { sanitizeGraphics, type GfxInstance } from '../shared/gfx';
 import { emptySeats, isPlaceholderName, sanitizeSeats, sanitizeTalent, type Seats, type TalentProfile } from '../shared/talent';
@@ -18,6 +19,8 @@ import { majorSheet, sanitizeSheet, type SheetState } from '../shared/sheet';
 import { MAJOR_TICKER, WC_BRACKET, WILDCARD_SHEET_ID, defaultWildcard, sanitizeWildcard, type WildcardState } from '../shared/wildcard';
 import { emptyTwitchStore, sanitizeTwitchStore, type TwitchStore } from './twitch';
 import { emptyAudStore, sanitizeAudStore, type AudStore } from './audience';
+import { emptyChatStore, sanitizeChatStore, type ChatStore } from './twitchChat';
+import { emptyStaffPicks, sanitizeStaffPicks, type StaffPicks } from '../shared/staffPicks';
 import { onSaved } from './durable';
 import { emptyAssets, sanitizeAssets, type AssetsStore } from './assets';
 
@@ -33,6 +36,8 @@ export interface Persisted {
   graphics: GfxInstance[];
   /** Graphics rundown (items referencing instances + their data or preset). */
   rundown: Rundown;
+  /** Studio Mode 2.0 show plan: segments, automation rules (a pending GO is never restored). */
+  plan: ShowPlan;
   /** OBS Scene Builder: options + Overdrive output ↔ OBS scene/source mapping. */
   obsSetup: ObsSetupStore;
   /** Overdrive 2.0 engine: staged Preview (desk/booth) and default transition. */
@@ -67,6 +72,10 @@ export interface Persisted {
   twitch: TwitchStore;
   /** Audience interaction (Pick'ems + Community MVP): producer-side state; votes live in the vote service. */
   audience: AudStore;
+  /** Twitch chat MVP voting: the reading account's sign-in (server only) + settings. */
+  twitchChat: ChatStore;
+  /** Internal staff pick'em (staff list, picks, locks, private link key). */
+  staffPicks: StaffPicks;
   /** Asset registry (portraits, logos, media, music): durable copies live in the storage bucket. */
   assets: AssetsStore;
   /** Game feed for casters (stream server WHEP + caster login). */
@@ -109,7 +118,7 @@ function freshOverdrive() {
 
 function fresh(): Persisted {
   const od = freshOverdrive();
-  return { ui: 3, talent: sanitizeTalent([], () => newKey(), newVdoId), seats: emptySeats(), media: defaultMedia(), graphics: sanitizeGraphics([]), rundown: emptyRundown(), obsSetup: defaultObsSetup(),
+  return { ui: 3, talent: sanitizeTalent([], () => newKey(), newVdoId), seats: emptySeats(), media: defaultMedia(), graphics: sanitizeGraphics([]), rundown: emptyRundown(), plan: emptyPlan(), obsSetup: defaultObsSetup(),
     preview: clone(od.scene),
     live: clone(od.scene),
     showPreview: clone(od.show),
@@ -131,6 +140,8 @@ function fresh(): Persisted {
     wildcard: defaultWildcard(true),
     twitch: emptyTwitchStore(),
     audience: emptyAudStore(),
+    twitchChat: emptyChatStore(),
+    staffPicks: emptyStaffPicks(newKey(12)),
     assets: emptyAssets(),
     gameFeed: defaultGameFeed(),
     events: [{ id: 'overdrive', name: 'Overdrive Grand League', createdAt: Date.now() }],
@@ -193,6 +204,7 @@ function load(): Persisted {
       studio: sanitizeStudio(raw.studio),
       graphics: sanitizeGraphics(raw.graphics),
       rundown: sanitizeRundown(raw.rundown),
+      plan: sanitizePlan(raw.plan),
       obsSetup: sanitizeObsSetup(raw.obsSetup),
       instant: !!raw.instant,
       apiToken: typeof raw.apiToken === 'string' && raw.apiToken ? raw.apiToken : base.apiToken,
@@ -211,6 +223,8 @@ function load(): Persisted {
       wildcard: sanitizeWildcard(raw.wildcard, true),
       twitch: sanitizeTwitchStore(raw.twitch),
       audience: sanitizeAudStore(raw.audience),
+      twitchChat: sanitizeChatStore(raw.twitchChat),
+      staffPicks: sanitizeStaffPicks(raw.staffPicks, base.staffPicks.key),
       assets: sanitizeAssets(raw.assets),
       gameFeed: sanitizeGameFeed(raw.gameFeed),
       events: Array.isArray(raw.events) && raw.events.length ? raw.events.map((e: any) => ({ id: String(e.id).replace(/[^\w-]/g, '').slice(0, 40), name: String(e.name ?? 'Event').slice(0, 60), createdAt: Number(e.createdAt) || Date.now() })) : base.events,

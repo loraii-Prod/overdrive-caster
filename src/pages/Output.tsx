@@ -13,6 +13,7 @@ import { ThemeProvider } from '../lib/theme';
 import { useAudience, useGraphics, useMatchData, useConnState, useLive, useNow, useSocket, useTournament, useViewer, useWantedCameras, useWildcard, query } from '../lib/hooks';
 import { GraphicHost } from '../gfx/Graphic';
 import { pkgById } from '../../shared/gfx';
+import { isBracketView, isMvpView } from '../../shared/mvpFlow';
 import { WcBracket, WcCasters, WcPopups, WcWaiting } from '../components/wildcard/Wildcard';
 import { TwitchCard } from '../components/wildcard/Twitch';
 import { SceneDock } from './controller/SceneDock';
@@ -220,7 +221,9 @@ export function AudioOutput() {
 export function GraphicOutput() {
   const id = useParams().id ?? '';
   useTransparentPage();
-  const sock = useSocket({ role: 'output', route: `g/${id}`, key: query().get('key') ?? undefined });
+  // MVP & Awards scenes: /g/mvp?view=winner etc. (one graphic, several sources); anything else ignores `view`.
+  const v = query().get('view'), view = id === 'mvp' && isMvpView(v) ? v : id === 'bracket' && isBracketView(v) ? v : undefined;
+  const sock = useSocket({ role: 'output', route: `g/${id}${view ? `?view=${view}` : ''}`, key: query().get('key') ?? undefined });
   const state = useConnState(sock);
   const live = useLive(sock);
   const tournament = useTournament(sock);
@@ -247,7 +250,7 @@ export function GraphicOutput() {
       <ScaledCanvas output>
         <ThemeProvider theme={live?.show.theme ?? 'bnl'} brand={live?.show.brand ?? null}>
           <div className="od-stage relative h-[1080px] w-[1920px] overflow-hidden" data-theme={live?.show.theme ?? 'bnl'}>
-            {inst && live && <GraphicHost inst={inst} d={{ scene: live.scene, show: live.show, wc, aud, now, tournament, bnl, viewer }} onHealth={health} />}
+            {inst && live && <GraphicHost inst={inst} d={{ scene: live.scene, show: live.show, wc, aud, now, tournament, bnl, viewer }} onHealth={health} view={view} />}
           </div>
         </ThemeProvider>
       </ScaledCanvas>

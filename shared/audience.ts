@@ -50,6 +50,14 @@ export interface AudPoll {
   closedAt: number | null;
   /** Voting closes automatically at this time (ms epoch; votes after it are refused). null = closed by hand. */
   closesAt?: number | null;
+  /** Ways this vote accepts votes (missing = website only, the 1.x behaviour). */
+  web?: boolean;
+  chat?: boolean;
+  /** Chat command and channel shown to viewers ("!vote", "overdrive_tm"). */
+  chatCmd?: string;
+  chatChannel?: string;
+  /** PRIVATE: how many of the votes came from chat / the website. */
+  bySource?: { web: number; chat: number };
   /** Live counts: PRIVATE (producer only, never on air, never public). */
   total?: number;
   counts?: Record<string, number>;
@@ -107,6 +115,8 @@ export type AudOp =
   | { k: 'lock-match'; match: string; locked: boolean }
   | { k: 'lock-champion'; locked: boolean }
   | { k: 'mvp-prepare'; match: string; players: string[] }
+  /** Twitch chat voting: sign-in, channel, command, voting methods (server answers like any other command). */
+  | { k: 'chat'; op: import('./twitchChat').ChatOp }
   | { k: 'mvp-open'; poll: string; /** Countdown: voting closes by itself after this many seconds (optional). */ seconds?: number }
   | { k: 'mvp-close'; poll: string }
   /** Change or clear the countdown of an open vote. */

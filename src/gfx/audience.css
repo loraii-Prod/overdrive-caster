@@ -215,3 +215,67 @@
 .aud .qr-corner.in-desk-solo{right:80px;bottom:230px}
 .aud .qr-corner.in-desk-solo .q{padding:12px}
 .aud .qr-corner.in-desk-solo b{max-width:200px;font-size:24px}
+
+/* ---------- MVP package 1.1 (native 4K): one portrait fit everywhere, award-style reveal timeline, desk vote line ---------- */
+/* Portraits: positioned by fitPortrait() (shared/portraits.ts): never more than 1.25 device px per source px. */
+.aud .mv-box{position:relative;flex:none}
+.aud .mv-box.photo{overflow:hidden}
+.aud .mv-box img{display:block;user-select:none}
+.aud .pc .mv-box.pc-port.cut{position:absolute;left:10px;bottom:110px}
+.aud .pc .mv-box.pc-port.photo{position:absolute;left:0;top:0;opacity:.85;-webkit-mask-image:linear-gradient(180deg,#000 60%,transparent);mask-image:linear-gradient(180deg,#000 60%,transparent)}
+.aud .pc .pc-live span em{font:700 italic 18px 'WC Montserrat';color:rgba(255,255,255,.75);font-style:italic}
+.aud .pc .pc-live i{transition:width .8s var(--ease)}
+/* Grounding shadow for cut-outs WITHOUT a CSS filter: a drop-shadow on a 1520×1900 device-px picture was re-filtered
+   every frame of the reveal (measured 1.7 fps vs 12.5 fps in software rendering at 4K). A gradient is drawn once. */
+.aud .mv-box.mv-cutbox::before{content:'';position:absolute;left:4%;right:4%;bottom:0;height:38%;background:radial-gradient(ellipse 50% 60% at 50% 100%,rgba(0,0,0,.6),transparent 72%);pointer-events:none}
+.aud .mv-frame .mv-box img{inset:auto}
+
+/* Reveal timeline (.mvx-seq): 1 red angular sweep → 2 MVP title → 3 portrait → 4 name → 5 team → 6 share → 7 votes
+   → 8 stats → 9 Overdrive brand. Transforms + opacity only (composited: cheap at 4K). */
+.aud .mvx-wipe{position:absolute;inset:0;z-index:7;pointer-events:none;overflow:hidden}
+.aud .mvx-wipe i{position:absolute;top:0;bottom:0;width:50%;left:-62%;transform:skewX(-18deg);background:var(--red);animation:mvx-sweep .95s cubic-bezier(.7,0,.2,1) both}
+.aud .mvx-wipe i:nth-child(2){animation-delay:.09s;background:#3a0906;width:38%}
+.aud .mvx-wipe i:nth-child(3){animation-delay:.18s;width:12%;background:var(--or)}
+/* Fixed travel (layout px): every bar leaves the 1920 frame whatever its width; the layer is then removed. */
+@keyframes mvx-sweep{0%{transform:translateX(0) skewX(-18deg)}100%{transform:translateX(3900px) skewX(-18deg)}}
+.aud .mvx-wipe{animation:mvx-gone 0s 1.35s forwards}
+@keyframes mvx-gone{to{visibility:hidden}}
+.aud.mvx-seq .mvx-glow{animation-delay:.5s}
+.aud.mvx-seq .mvx-ghost{animation:mv-gh 1s .45s var(--ease) both}
+.aud.mvx-seq .mvx-badge{animation-delay:.62s}.aud.mvx-seq .mvx-badge+.mvx-badge{animation-delay:.74s}
+.aud.mvx-seq .mvx-pic{animation:mv-fg 1.1s .85s var(--ease) both}
+.aud .mvx-flare{position:absolute;left:-30%;visibility:visible;top:0;bottom:0;width:30%;background:linear-gradient(100deg,transparent,rgba(255,255,255,.22) 50%,transparent);transform:skewX(-14deg);opacity:0;animation:mvx-flare 1s 1.55s ease-out both;pointer-events:none}
+@keyframes mvx-flare{0%{opacity:1;transform:translateX(0) skewX(-14deg)}99%{opacity:0;transform:translateX(480%) skewX(-14deg)}100%{opacity:0;visibility:hidden}}
+.aud.mvx-seq .mvx-name{animation:mv-nm .75s 1.25s var(--ease) both}
+.aud.mvx-seq .mvx-tm{animation-delay:1.65s}
+.aud.mvx-seq .mvx-res{animation-delay:1.8s}
+.aud.mvx-seq .mvx-share{animation-delay:2s}
+.aud.mvx-seq .mvx-share .bar i{animation-delay:2.15s}
+.aud .mvx-votes{font-style:inherit;animation:aud-fade .4s 2.45s both}
+.aud.mvx-seq .mvx-quote{animation-delay:2s}.aud.mvx-seq .mvx-quote-by{animation-delay:2.2s}
+.aud.mvx-seq .mvx-rest div:nth-child(1){animation-delay:2.8s}.aud.mvx-seq .mvx-rest div:nth-child(2){animation-delay:2.9s}.aud.mvx-seq .mvx-rest div:nth-child(3){animation-delay:3s}
+/* 378 layout units = the logo file's own 756 px at 4K: pixel-native, no upscaling. */
+.aud .mvx-brand{position:absolute;right:90px;bottom:70px;z-index:6;animation:mvx-brand .7s 3.3s var(--ease) both}
+.aud .mvx-brand img{display:block;width:378px;height:auto}
+@keyframes mvx-brand{from{opacity:0;transform:translateX(60px)}to{opacity:1;transform:none}}
+.aud.mvx-wait .mvx-wipe,.aud.mvx-wait .mvx-brand{visibility:hidden}
+
+/* Analyst desk: the MVP vote next to the code */
+.aud .qr-st{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:10px;font:800 italic 16px 'WC Montserrat';color:var(--steel);text-transform:uppercase;letter-spacing:.04em;white-space:nowrap}
+.aud .qr-st i{width:11px;height:11px;border-radius:50%;background:#6E625C;flex:none}
+.aud .qr-st.open{color:#fff}.aud .qr-st.open i{background:var(--red);box-shadow:0 0 0 4px rgba(227,38,27,.3);animation:aud-pulse 1.6s ease-in-out infinite}
+.aud .qr-st.winner{color:var(--ember)}.aud .qr-st.winner i{background:var(--or)}
+.aud .qr-st small{flex-basis:100%;font:700 italic 14px 'WC Montserrat';color:var(--steel)}
+.aud .qr-corner .qr-st{margin:0;justify-content:center;background:var(--char);padding:6px 10px;max-width:200px;font-size:13px;white-space:normal;text-align:center}
+
+/* Twitch chat voting (2.1): a line under the QR, or the chat box in the QR's place when the website is off. */
+.aud .qrbox .chatline{font:800 17px 'WC Montserrat';color:#121212;margin-top:10px;letter-spacing:.01em}
+.aud .qrbox .chatline em{font-style:normal;color:var(--or)}
+.aud .qrbox.chat{justify-content:center;text-align:center;gap:14px}
+.aud .qrbox.chat .k{font:800 20px 'WC Montserrat';color:#6E625C;letter-spacing:.12em;text-transform:uppercase}
+.aud .qrbox.chat .cmd{font:400 96px/1 'WC Anton';color:var(--or);text-transform:none;margin:0}
+.aud .qrbox.chat span:last-child{font:800 19px/1.35 'WC Montserrat';color:#121212}
+.aud .qrbox.chat em{font-style:normal;color:var(--or)}
+
+/* Reveal without the opening sweep + flare (MVP 1.2 option). */
+.mvx-nosweep .mvx-wipe,.mvx-nosweep .mvx-flare{display:none}
