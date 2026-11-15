@@ -158,12 +158,14 @@ export const PACKAGES: PackageDef[] = [
     permissions: ['cameras', 'match-data'],
   },
   {
-    id: 'od.bracket', name: 'Tournament Bracket', version: '2.1.0', collection: 'Overdrive Major', category: 'Bracket', renderer: 'bracket', obsKey: 'bracket',
+    id: 'od.bracket', name: 'Tournament Bracket', version: '2.2.0', collection: 'Overdrive Major', category: 'Bracket', renderer: 'bracket', obsKey: 'bracket',
     description: 'The approved Major bracket (upper bracket + grand final / lower bracket) or the matches board, with automatic cycling.',
     resolution: [1920, 1080],
     props: [
       { key: 'view', label: 'Display', type: 'select', default: 'bracket', group: 'Display', options: [{ value: 'bracket', label: 'Bracket' }, { value: 'matches', label: 'Matches board' }] },
-      { key: 'part', label: 'Bracket half', type: 'select', default: '1', group: 'Display', options: [{ value: '1', label: 'Upper + Grand Final' }, { value: '2', label: 'Lower bracket' }], help: 'Ignored while cycling.' },
+      { key: 'style', label: 'Bracket style', type: 'select', default: 'clean', group: 'Display', options: [{ value: 'clean', label: 'Clean (admin bracket view, connector lines)' }, { value: 'classic', label: 'Classic (Major cards)' }] },
+      { key: 'bracketBg', label: 'Background (clean style)', type: 'select', default: 'brand', group: 'Display', options: [{ value: 'brand', label: 'Overdrive animated background' }, { value: 'dark', label: 'Plain dark' }, { value: 'none', label: 'Transparent' }], help: 'Transparent: to layer the bracket over another background in OBS.' },
+      { key: 'part', label: 'Bracket half', type: 'select', default: '1', group: 'Display', options: [{ value: '1', label: 'Upper + Grand Final' }, { value: '2', label: 'Lower bracket' }, { value: 'full', label: 'Full bracket (one page)' }], help: 'Ignored while cycling.' },
       { key: 'cycle', label: 'Cycle halves', type: 'boolean', default: false, group: 'Cycling' },
       { key: 'cycleSec', label: 'Cycle every (s)', type: 'number', default: 20, min: 5, max: 300, group: 'Cycling' },
       ...MOTION('crossfade', 350),

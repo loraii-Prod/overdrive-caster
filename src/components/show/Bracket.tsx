@@ -20,12 +20,12 @@ function column(m: BMatch, t: Tournament) {
   return m.round === 1 ? 0 : 2 * m.round - 3;
 }
 
-function layout(t: Tournament, res: Map<string, Resolved>, view: 'full' | 'upper' | 'lower') {
+function layout(t: Tournament, res: Map<string, Resolved>, view: 'full' | 'upper' | 'lower', withFinal = false) {
   const R = Math.log2(t.size);
   const visible = t.matches.filter(m => {
     const r = res.get(m.id)!;
     if (m.id === 'GF-2' && r.skipped) return false;
-    if (view === 'upper') return m.side === 'UB';
+    if (view === 'upper') return m.side === 'UB' || (withFinal && m.side === 'GF');
     if (view === 'lower') return m.side === 'LB';
     return true;
   });
@@ -52,7 +52,7 @@ function layout(t: Tournament, res: Map<string, Resolved>, view: 'full' | 'upper
     let cy: number;
     if (m.side === 'GF') {
       const ub = boxes.get(`UB-${R}-0`), lb = boxes.get(`LB-${2 * (R - 1)}-0`);
-      cy = ub && lb ? (ub.y + ub.h / 2 + lb.y + lb.h / 2) / 2 : AREA.y + AREA.h / 2;
+      cy = ub && lb ? (ub.y + ub.h / 2 + lb.y + lb.h / 2) / 2 : ub ? ub.y + ub.h / 2 : AREA.y + AREA.h / 2;
     } else {
       const sec = sections[m.side];
       const n = count(m.side, m.round);
@@ -112,10 +112,13 @@ function MatchBox({ b, t, i }: { b: Box; t: Tournament; i: number }) {
   );
 }
 
-/** Full bracket graphic. `view` lets big brackets be shown per side. */
-export function BracketView({ t, view = 'full', transparent = false }: { t: Tournament; view?: 'full' | 'upper' | 'lower'; transparent?: boolean }) {
-  const res = useMemo(() => resolve(t), [t]);
-  const L = useMemo(() => layout(t, res, view), [t, res, view]);
+/**
+ * Full bracket graphic. `view` lets big brackets be shown per side. `res` = results already resolved by another
+ * engine (the Major's rules); `withFinal` adds the grand final to the upper view; `title` replaces the line under it.
+ */
+export function BracketView({ t, view = 'full', transparent = false, res: given, withFinal = false, subtitle }: { t: Tournament; view?: 'full' | 'upper' | 'lower'; transparent?: boolean; res?: Map<string, Resolved>; withFinal?: boolean; subtitle?: string }) {
+  const res = useMemo(() => given ?? resolve(t), [t, given]);
+  const L = useMemo(() => layout(t, res, view, withFinal), [t, res, view, withFinal]);
   const champ = champion(t, res);
 
   // Winner-path connectors (same-side feeds + finals into the grand final).
@@ -152,7 +155,7 @@ export function BracketView({ t, view = 'full', transparent = false }: { t: Tour
             {theme !== 'bnl' && <Logo height={80} />}
             <div>
               <div className="font-display font-bold uppercase text-white" style={{ fontSize: 44, letterSpacing: '0.02em' }}>{view === 'lower' ? 'Lower Bracket' : view === 'upper' ? 'Upper Bracket' : 'Bracket'}</div>
-              <div className="mt-1 font-sans font-semibold uppercase text-white/45" style={{ fontSize: 14, letterSpacing: '0.3em' }}>{t.name} · {t.format === 'double' ? 'Double elimination' : 'Single elimination'}</div>
+              <div className="mt-1 font-sans font-semibold uppercase text-white/45" style={{ fontSize: 14, letterSpacing: '0.3em' }}>{subtitle ?? `${t.name} · ${t.format === 'double' ? 'Double elimination' : 'Single elimination'}`}</div>
             </div>
           </div>
         </Rise>
@@ -173,10 +176,10 @@ export function BracketView({ t, view = 'full', transparent = false }: { t: Tour
         {lines.map((d, i) => <path key={i} d={d} fill="none" stroke="rgba(255,255,255,0.22)" strokeWidth={1.5} />)}
       </svg>
       {L.boxes.map((b, i) => <MatchBox key={b.m.id} b={b} t={t} i={i} />)}
-      {gf && view === 'full' && (
+      {gf && (view === 'full' || withFinal) && (
         <div className="absolute font-sans font-bold uppercase text-white/50" style={{ left: L.byId.get('GF-1')!.x, top: L.byId.get('GF-1')!.y - 44, fontSize: 11, letterSpacing: '0.22em' }}>Grand Final</div>
       )}
-      {champ && gf && view === 'full' && (
+      {champ && gf && (view === 'full' || withFinal) && (
         <motion.div className="absolute flex flex-col items-center rounded-[6px] border border-white/25 text-center" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, ease: EASE }}
           style={{ left: gf.x, top: gf.y + gf.h + 36, width: gf.w, padding: '20px 16px', background: 'rgba(18,18,18,0.94)' }}>
           <Mark height={34} />

@@ -1,0 +1,20 @@
+// The Major bracket drawn with the admin bracket view: npx tsx tests/majorBracket.test.ts
+import { majorAsTournament } from '../shared/majorTournament';
+import { defaultWildcard } from '../shared/wildcard';
+let ok = 0, bad = 0;
+const check = (n: string, c: boolean, x = '') => { c ? ok++ : bad++; console.log((c ? 'PASS ' : 'FAIL ') + n + (x ? '  ' + x : '')); };
+const wc = defaultWildcard(true);
+wc.teams = ['BIG', 'FUT Esports', 'COOK', 'Airwalkers', 'Ragnarok', 'Natus Vincere', 'RNBOI', 'All Gamers Global'];
+for (const id of Object.keys(wc.matches)) wc.matches[id] = { ...wc.matches[id], s1: '', s2: '', live: false };
+wc.matches.R1_UB1 = { ...wc.matches.R1_UB1, s1: '3', s2: '1' };
+wc.matches.R1_UB2 = { ...wc.matches.R1_UB2, s1: 'FF', s2: 'W' };
+wc.matches.R1_UB3 = { ...wc.matches.R1_UB3, s1: '1', s2: '1', live: true };
+const { t, res } = majorAsTournament(wc);
+check('14 matches (no reset final), admin ids', t.matches.length === 14 && ['UB-1-0', 'UB-2-1', 'UB-3-0', 'LB-1-1', 'LB-4-0', 'GF-1'].every(id => t.matches.some(m => m.id === id)), String(t.matches.length));
+check('feeds follow the Major (crossed lower drop-ins)', JSON.stringify(t.matches.find(m => m.id === 'LB-2-0')!.a) === '{"k":"lose","m":"UB-2-1"}' && JSON.stringify(t.matches.find(m => m.id === 'LB-4-0')!.a) === '{"k":"lose","m":"UB-3-0"}');
+check('result: BIG wins 3-1, advances', res.get('UB-1-0')!.winner === 'A' && (res.get('UB-2-0')!.a as any)?.name === 'BIG' && (res.get('LB-1-0')!.a as any)?.name === 'FUT Esports');
+check('walkover: winner highlighted', res.get('UB-1-1')!.winner === 'B' && t.matches.find(m => m.id === 'UB-1-1')!.scoreB > t.matches.find(m => m.id === 'UB-1-1')!.scoreA);
+check('live match marked live', t.matches.find(m => m.id === 'UB-1-2')!.status === 'live');
+check('unknown teams stay TBD (never BYE)', res.get('UB-3-0')!.a === null && !res.get('UB-3-0')!.auto);
+check('best of 5 (first to 3)', t.matches.every(m => m.bestOf === 5));
+console.log(`\n${ok} passed, ${bad} failed`); process.exit(bad ? 1 : 0);

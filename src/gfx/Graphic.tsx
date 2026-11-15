@@ -12,6 +12,10 @@ import type { MatchData } from '../../shared/protocol';
 import type { Tournament } from '../../shared/tournament';
 import type { GfxInstance } from '../../shared/gfx';
 import { pkgById } from '../../shared/gfx';
+import { BracketView } from '../components/show/Bracket';
+import { SkinVideo } from '../components/show/Skin';
+import { skinOf } from '../../shared/skins';
+import { majorAsTournament } from '../../shared/majorTournament';
 import { VIEW_STEP, isBracketView, isMvpView, isRevealView, viewAllowed, type GfxView } from '../../shared/mvpFlow';
 import type { RtcViewer } from '../lib/rtcViewer';
 import type { AudLive, WcLive } from '../lib/hooks';
@@ -54,9 +58,25 @@ export const RENDERERS: Record<string, Renderer> = {
   bracket: ({ cfg, d }) => {
     // Cycling is computed from the server-synced clock: every copy of the source shows the same half.
     const sec = Math.max(5, Number(cfg.cycleSec) || 20);
-    const part: 1 | 2 = cfg.cycle === true ? ((Math.floor(d.now / (sec * 1000)) % 2) + 1) as 1 | 2 : cfg.part === '2' ? 2 : 1;
+    const part: 1 | 2 | 0 = cfg.cycle === true ? ((Math.floor(d.now / (sec * 1000)) % 2) + 1) as 1 | 2 : cfg.part === '2' ? 2 : cfg.part === 'full' ? 0 : 1;
     const view = cfg.view === 'matches' ? 'matches' : 'bracket';
-    const wc = d.wc && { ...d.wc, state: { ...d.wc.state, air: part, opts: { ...d.wc.state.opts, inBracket: true, rotate: false } } };
+    // Clean style: the tournament admin's bracket view, fed with the Major's results.
+    if (view === 'bracket' && cfg.style !== 'classic' && d.wc) {
+      const { t, res } = majorAsTournament(d.wc.state);
+      // The event's animated background (the Overdrive loop, as behind the classic bracket) stays put while the
+      // halves change; plain dark if the event has no animated background.
+      const bg = String(cfg.bracketBg || 'brand'), skin = skinOf(d.show.brand.skin);
+      return (
+        <>
+          {bg === 'brand' && skin ? <><SkinVideo src={skin.loop} /><div className="absolute inset-0" style={{ background: 'rgba(8,8,9,0.42)' }} /></> /* light shade: small labels and lines stay readable over the loop */
+            : bg !== 'none' ? <div className="absolute inset-0" style={{ background: 'radial-gradient(ellipse 90% 80% at 50% 40%, #17171a 0%, #0c0c0d 100%)' }} /> : null}
+          <Swap k={`clean-${part}`}>
+            <BracketView t={t} res={res} view={part === 2 ? 'lower' : part === 1 ? 'upper' : 'full'} withFinal={part === 1} subtitle="OverDrive Major · Double elimination" />
+          </Swap>
+        </>
+      );
+    }
+    const wc = d.wc && { ...d.wc, state: { ...d.wc.state, air: part === 0 ? 1 : part, opts: { ...d.wc.state.opts, inBracket: true, rotate: false } } };
     return (
       <Swap k={view}>
         <ScreenView id={view} scene={{ ...d.scene, screen: view }} show={d.show} now={d.now} tournament={d.tournament} viewer={d.viewer} monitor={d.monitor} bnl={d.bnl} wc={wc} />
