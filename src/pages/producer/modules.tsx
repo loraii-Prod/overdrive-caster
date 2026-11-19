@@ -16,6 +16,7 @@ import { SEAT_LABELS, talentLabel, type Seat } from '../../../shared/talent';
 import { mediaName, type MediaState } from '../../../shared/media';
 import { sectionFor, DEFAULT_LEVELS } from '../../../shared/music';
 import { MvpModule, PickemsModule, QrModule } from './audienceModules';
+import { TrackModule } from './TrackModule';
 import { uploadWarning } from '../../components/StorageBanner';
 
 export const PGM = '#e5484d', PVW = '#2fbf71', WARN = '#f5a524';
@@ -57,6 +58,7 @@ export function ModuleView({ id, x, pinned }: { id: ModuleId; x: Ctx; pinned: bo
       case 'pickems': return x.aud ? <PickemsModule x={x} a={x.aud} /> : null;
       case 'mvp': return x.aud ? <MvpModule x={x} a={x.aud} /> : null;
       case 'qr': return x.aud ? <QrModule x={x} a={x.aud} /> : null;
+      case 'track': return <TrackModule x={x} />;
     }
   })();
   return (
@@ -324,7 +326,7 @@ function GraphicsModule({ x }: { x: Ctx }) {
   return (
     <>
       <Tag live>Map card (gameplay)</Tag>
-      <div className="flex flex-wrap gap-1">{MAJOR_MAPS.map(m => <Btn key={m.id} active={x.wc.map.id === m.id} onClick={() => x.run({ c: 'graphic', g: 'map-card', map: m.id }, `Map card ${m.country}`)}>{m.flag} {m.country}</Btn>)}</div>
+      <div className="flex flex-wrap gap-1">{MAJOR_MAPS.map(m => <Btn key={m.id} active={x.wc.map.id === m.id} onClick={() => x.run({ c: 'graphic', g: 'map-card', map: m.id }, `Map card ${m.country}`)}><Flag c={m.flag} /> {m.country}</Btn>)}</div>
       <Tag live>Badges & popups</Tag>
       <div className="flex flex-wrap gap-1">
         <Btn active={x.st.showLive.badge.kind === 'replay'} onClick={() => x.run({ c: 'graphic', g: 'replay' }, 'Replay')}>Replay</Btn>
@@ -394,10 +396,10 @@ function VetoModule({ x }: { x: Ctx }) {
         </select>
       </div>
       <div className="text-[12px]">{step ? <>Next: <b>{step.by === 'a' ? x.wc.intro.a || 'Team A' : step.by === 'b' ? x.wc.intro.b || 'Team B' : 'Decider'}</b> {step.act}</> : 'Veto complete'}</div>
-      <div className="flex flex-wrap gap-1">{MAJOR_MAPS.map(m => { const done = rows.find(r => r.map === m.id); return <Btn key={m.id} disabled={!!done || !step} onClick={() => op({ k: 'veto', map: m.id }, `Veto ${m.country}`)}>{m.flag} {m.country}{done ? ` · ${done.step.act}` : ''}</Btn>; })}</div>
+      <div className="flex flex-wrap gap-1">{MAJOR_MAPS.map(m => { const done = rows.find(r => r.map === m.id); return <Btn key={m.id} disabled={!!done || !step} onClick={() => op({ k: 'veto', map: m.id }, `Veto ${m.country}`)}><Flag c={m.flag} /> {m.country}{done ? ` · ${done.step.act}` : ''}</Btn>; })}</div>
       <div className="flex gap-1"><Btn disabled={!v.done.length} onClick={() => op({ k: 'veto-undo' }, 'Veto undo')}>Undo</Btn><Btn disabled={!v.done.length} onClick={() => op({ k: 'veto-reset' }, 'Veto reset')}>Reset</Btn></div>
       <Tag live>Team PBs panel</Tag>
-      <div className="flex flex-wrap gap-1">{MAJOR_MAPS.map(m => <Btn key={m.id} active={v.pb.map === m.id} onClick={() => op({ k: 'pb-show', map: m.id }, `PBs ${m.country}`)}>{m.flag}</Btn>)}<Btn onClick={() => op({ k: 'pb-show', map: null }, 'Hide PBs')}>Hide</Btn></div>
+      <div className="flex flex-wrap gap-1">{MAJOR_MAPS.map(m => <Btn key={m.id} active={v.pb.map === m.id} onClick={() => op({ k: 'pb-show', map: m.id }, `PBs ${m.country}`)}><Flag c={m.flag} /> {m.country}</Btn>)}<Btn onClick={() => op({ k: 'pb-show', map: null }, 'Hide PBs')}>Hide</Btn></div>
     </>
   );
 }
@@ -458,8 +460,13 @@ function FlagRow({ x, label, flag, pvw, pgm }: { x: Ctx; label: string; flag: im
 export function Tag({ children, live }: { children: ReactNode; live?: boolean }) {
   return <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-[0.14em] text-white/50">{children}<span className="rounded-[2px] px-1 text-[8.5px] tracking-[0.08em]" style={live ? { background: PGM, color: '#fff' } : { background: PVW, color: '#000' }} title={live ? 'Goes straight to the sources' : 'Prepared: PUBLISH sends it'}>{live ? 'LIVE' : 'PVW'}</span></span>;
 }
-export function Btn({ children, onClick, disabled, active, danger, title }: { children: ReactNode; onClick: () => unknown; disabled?: boolean; active?: boolean; danger?: boolean; title?: string }) {
-  return <button type="button" title={title} disabled={disabled} onClick={() => onClick()} className={`rounded-[2px] border px-2 py-1 text-[12px] font-bold disabled:opacity-35 ${active ? 'border-white bg-white text-black' : danger ? 'border-[#e5484d]/60 text-[#ff8a8d] hover:bg-[#e5484d]/20' : 'border-white/15 hover:border-white/40'}`}>{children}</button>;
+type DataAttrs = { [k: `data-${string}`]: string | undefined };
+export function Btn({ children, onClick, disabled, active, danger, title, ...data }: { children: ReactNode; onClick: () => unknown; disabled?: boolean; active?: boolean; danger?: boolean; title?: string } & DataAttrs) {
+  return <button type="button" {...data} title={title} disabled={disabled} onClick={() => onClick()} className={`rounded-[2px] border px-2 py-1 text-[12px] font-bold disabled:opacity-35 ${active ? 'border-white bg-white text-black' : danger ? 'border-[#e5484d]/60 text-[#ff8a8d] hover:bg-[#e5484d]/20' : 'border-white/15 hover:border-white/40'}`}>{children}</button>;
+}
+/** A map's flag as three small colour bars (the map data holds its colours). */
+function Flag({ c }: { c: string[] }) {
+  return <span className="mr-1 inline-flex h-[10px] w-[15px] overflow-hidden rounded-[1px] align-[-1px]" aria-hidden>{c.map((x, i) => <i key={i} className="flex-1" style={{ background: x }} />)}</span>;
 }
 export function Tiny({ children, onClick, disabled, title }: { children: ReactNode; onClick: () => unknown; disabled?: boolean; title?: string }) {
   return <button type="button" title={title} disabled={disabled} onClick={() => onClick()} className="grid h-6 min-w-6 place-items-center rounded-[2px] border border-white/15 px-1 text-[11px] hover:border-white/40 disabled:opacity-25">{children}</button>;

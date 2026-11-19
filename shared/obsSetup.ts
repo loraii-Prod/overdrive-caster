@@ -13,8 +13,11 @@ import { REGISTRY } from './registry';
 import { SCREEN_LABELS } from './defaults';
 import type { ScreenId } from './types';
 import { CANVAS, DEFAULT_PROFILE, profileOf, type OutputProfileId } from './layout';
+import { MAIN_SCENES, mainSceneName, placeOf, type LayerRole, type MainKey, type ObsLayoutMode } from './obsLayout';
+/** 3.3 Preview identity of a unified scene ('pvw:<key>'): its route (same renderer, Preview identity). */
+export const pvwRoute = (gfx: string) => `/g/${gfx}?id=pvw`;
 
-export type TargetKind = 'gfx' | 'screen' | 'source' | 'support';
+export type TargetKind = 'gfx' | 'screen' | 'source' | 'support' | 'preview';
 
 /** One Overdrive output = one OBS scene. */
 export interface ObsTarget {
@@ -38,6 +41,9 @@ export interface ObsTarget {
   supersededBy?: string;
   /** Legacy screen id, for the old screen → OBS scene mapping. */
   screen?: ScreenId;
+  /** Main-scenes layout: the main scene holding this output, and its role there. */
+  main?: MainKey;
+  role?: LayerRole;
 }
 
 export interface ObsSetupOptions {
@@ -55,6 +61,8 @@ export interface ObsSetupOptions {
   suspendOffAir: boolean;
   /** Live performance monitor: outputs report frame timing, OBS reports render/encode stats. Off by default. */
   perfMonitor: boolean;
+  /** 3.2: 'main' = nine broadcast scenes, every other output a layer inside one (default); 'per-output' = one scene per output (≤ 3.1). */
+  layout: ObsLayoutMode;
 }
 
 /** Persistent mapping: Overdrive output ↔ OBS objects. */
@@ -66,12 +74,31 @@ export interface ObsMapEntry {
   itemId?: number;
   url: string;
   at: number;
+  /** Main-scenes layout: the main scene key and the layer role of this output. */
+  main?: MainKey;
+  role?: LayerRole;
+}
+
+/** One operator confirmation, pinned to the Overdrive configuration it was made under. */
+export interface ValidationConfirm { checked: boolean; at: number; configHash: string }
+/** Past confirmation/un-confirmation events, newest last — never cleared by a new session or a config change. */
+export interface ValidationHistoryEntry { id: string; at: number; checked: boolean; session: string; configHash: string }
+export interface ValidationStore {
+  /** The current pre-event check. "Start New Pre-Event Check" rotates this without touching `history`. */
+  session: string;
+  sessionAt: number;
+  /** This session's confirmations only (cleared by a new session; items missing here were not (re)confirmed this session). */
+  items: Record<string, ValidationConfirm>;
+  /** Every confirmation/un-confirmation ever made, across every session — the historical record. Capped; oldest trimmed. */
+  history: ValidationHistoryEntry[];
 }
 
 export interface ObsSetupStore {
   options: ObsSetupOptions;
   map: Record<string, ObsMapEntry>;
   results: Record<string, { at: number; ok: boolean; lines: string[] }>;
+  /** 3.7 pre-event validation checklist: operator confirmations against REAL OBS (never computed, never assumed). */
+  validation: ValidationStore;
 }
 
 export type TargetStatus = 'ok' | 'missing' | 'incomplete' | 'outdated' | 'conflict' | 'error' | 'unknown';
@@ -91,9 +118,11 @@ export interface TargetReport {
   supersededBy?: string;
   /** Included by Build All. */
   inAll: boolean;
+  main?: MainKey;
+  role?: LayerRole;
 }
 
-export type OpKind = 'create-scene' | 'create-input' | 'add-item' | 'set-settings' | 'transform' | 'enable' | 'order' | 'nest-audio' | 'add-capture' | 'mark';
+export type OpKind = 'create-scene' | 'create-input' | 'add-item' | 'set-settings' | 'transform' | 'enable' | 'order' | 'nest-audio' | 'add-capture' | 'mark' | 'mute' | 'cam-input' | 'cam-scene';
 
 export interface PlanOp {
   target: string;
@@ -134,9 +163,102 @@ export interface ObsSetupState {
   controllerLeaks: { input: string; url: string }[];
   /** Picture-quality findings (read-only): anything that makes OBS resample an Overdrive picture. */
   quality: QualityIssue[];
+  /** Main-scenes layout: the nine scenes, their layers and which layers OBS shows right now. */
+  mains: MainSceneReport[];
+  /** Last dry-run cleanup report (never removes anything by itself). */
+  cleanup: CleanupReport | null;
+  /** Last real-OBS duplicate-source audit (read-only — never changes anything). */
+  audit: AuditReport | null;
+  /** 3.7 pre-event validation checklist (auto findings + operator confirmations). */
+  validation: ValidationReport;
+}
+
+/**
+ * Read-only, whole-collection duplicate-source audit: EVERY browser-source input in OBS (not just ones Overdrive
+ * already mapped), grouped by what it actually points at. More than one input for the same route/overdrive_id is
+ * exactly the "duplicate mic/camera/graphic" symptom the Scene Builder is designed to prevent — this is the check
+ * that proves it, directly against the live OBS connection, instead of trusting the builder's own bookkeeping.
+ */
+export interface AuditDuplicate { route: string; inputs: string[] }
+export interface AuditReport { at: number; checked: number; duplicates: AuditDuplicate[]; foreignManagedLooking: string[] }
+
+export interface MainLayer { target: string; name: string; input: string; role: LayerRole; itemId?: number; on: boolean }
+export interface MainSceneReport { key: MainKey; label: string; scene: string; exists: boolean; onAir: boolean; preview: boolean; layers: MainLayer[] }
+
+/** What the cleanup would do with one OBS scene. */
+export type CleanupClass = 'main' | 'consolidate' | 'keep' | 'not-overdrive';
+export interface CleanupScene {
+  scene: string;
+  cls: CleanupClass;
+  /** Why (shown to the operator). */
+  reasons: string[];
+  /** Overdrive outputs in this scene and the main scene that now holds each of them. */
+  moved: { input: string; to: string }[];
+  /** Items Overdrive does not manage. */
+  unmanaged: string[];
+  /** References that would be repointed to the main scene on removal (rundown, screen mapping, graphics). */
+  refs: string[];
+  onAir: boolean;
+}
+export interface CleanupReport {
+  hash: string;
+  at: number;
+  scenes: CleanupScene[];
+  /** Main scenes that still nest the old shared audio scene (can be replaced by direct audio sources). */
+  nestedAudio: string[];
+  /** 3.3: retired per-view sources still placed in a main scene (its one dynamic source draws them now). */
+  redundant: { scene: string; input: string; itemId: number; reason: string }[];
+  /**
+   * 3.6: main scenes still using the OLD flat composition (the 6 mics + music, or just music, as 7/1 direct scene
+   * items) instead of the one reusable "Audio (All)" / "Audio (Music only)" nested scene. Same audio sources
+   * either way — never recreated — this only changes how many scene items clutter each main scene.
+   */
+  flatAudio: { scene: string; kind: 'all' | 'music' }[];
 }
 
 export interface QualityIssue { where: string; issue: string; fix: string }
+
+/**
+ * 3.7 pre-event validation checklist. Two kinds of item, never blurred together:
+ *  - 'auto'   — Overdrive computed this just now, from its own scan/quality/audit data. Can be wrong about things
+ *               it cannot see (actual pixels on screen, actual sound), but needs no operator action to produce.
+ *  - 'manual' — only a human looking at real OBS (picture and sound) can confirm this. Overdrive can point at what
+ *               to check and why, but never marks these confirmed on its own, and never infers them from a mock test.
+ * An 'auto' item's `autoStatus` is a hint, not a verdict on the 'manual' item next to it — e.g. "no quality issues
+ * found" does not mean "camera alignment is correct," only that nothing about source sizing looks wrong.
+ */
+export type ValidationAutoStatus = 'ok' | 'issue' | 'n/a';
+export interface ValidationItem {
+  id: string;
+  category: string;
+  label: string;
+  /** What this item is actually checking, in plain language. */
+  detail: string;
+  /** Manual items only: concrete steps to do the check on real OBS. */
+  steps?: string[];
+  /** What Overdrive's own data says right now (always present; 'n/a' when nothing computable applies). */
+  autoStatus: ValidationAutoStatus;
+  autoNote: string;
+  /** Whether this item additionally needs a human looking at real OBS/audio before it counts as validated. */
+  needsManual: boolean;
+  /** Confirmed THIS session, under the current Overdrive configuration. Never set by Overdrive itself. */
+  confirmed: boolean;
+  /** Was confirmed at some point, but the OBS scene collection, source mapping, audio routing or Overdrive
+   *  configuration has changed since — the old confirmation is kept as history, but no longer counts. */
+  needsRevalidation: boolean;
+  /** When this item was last confirmed, ever (current session or a past one) — shown even while stale. */
+  confirmedAt?: number;
+}
+export interface ValidationReport {
+  at: number;
+  items: ValidationItem[];
+  autoIssues: number;
+  manualTotal: number;
+  manualConfirmed: number;
+  /** The current pre-event check: when "Start New Pre-Event Check" was last used. */
+  session: string;
+  sessionAt: number;
+}
 
 /**
  * Native OBS browser-source size of an Overdrive page under an output profile: every picture output is the 1920×1080
@@ -201,8 +323,21 @@ export function canvasQuality(v: { w: number; h: number; ow?: number; oh?: numbe
 
 export const AUDIO_SCENE = 'Overdrive · Caster audio';
 export const GAME_CAPTURE = 'Overdrive Game capture';
+/**
+ * 3.6: main-scenes layout audio composition. Instead of 7 flat direct scene items (6 mics + music) cluttering
+ * EVERY main scene, the same existing inputs sit once each inside one of these two small reusable scenes, which
+ * is itself nested as a single scene item into every main scene that needs it. Same sources, same independent
+ * volume/mute/monitoring/sync per talent (those are input-level properties in OBS, unaffected by nesting) — just
+ * one item per scene to look at instead of seven.
+ */
+export const AUDIO_ALL_SCENE = 'Overdrive · Audio (All)';
+export const AUDIO_MUSIC_SCENE = 'Overdrive · Audio (Music only)';
 
-export const defaultObsSetup = (): ObsSetupStore => ({ options: { audio: true, gameCapture: true, legacy: false, baseUrl: '', profile: DEFAULT_PROFILE, suspendOffAir: false, perfMonitor: false }, map: {}, results: {} });
+/** Isomorphic (no node:crypto import): unique enough for a session marker, never used for anything security-sensitive. */
+export function newValidationSessionId(): string { return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`; }
+export const MAX_VALIDATION_HISTORY = 500;
+
+export const defaultObsSetup = (): ObsSetupStore => ({ options: { audio: true, gameCapture: true, legacy: false, baseUrl: '', profile: DEFAULT_PROFILE, suspendOffAir: false, perfMonitor: false, layout: 'main' }, map: {}, results: {}, validation: { session: newValidationSessionId(), sessionAt: Date.now(), items: {}, history: [] } });
 
 export function sanitizeObsSetup(v: any): ObsSetupStore {
   const o = v?.options ?? {};
@@ -211,20 +346,37 @@ export function sanitizeObsSetup(v: any): ObsSetupStore {
     if (typeof k !== 'string' || k.length > 80 || typeof e?.scene !== 'string' || typeof e?.input !== 'string') continue;
     map[k] = { scene: e.scene.slice(0, 200), input: e.input.slice(0, 200), url: typeof e.url === 'string' ? e.url.slice(0, 500) : '', at: Number(e.at) || 0,
       ...(typeof e.sceneUuid === 'string' ? { sceneUuid: e.sceneUuid.slice(0, 64) } : {}), ...(typeof e.inputUuid === 'string' ? { inputUuid: e.inputUuid.slice(0, 64) } : {}),
-      ...(Number.isInteger(e.itemId) ? { itemId: e.itemId } : {}) };
+      ...(Number.isInteger(e.itemId) ? { itemId: e.itemId } : {}),
+      ...(MAIN_SCENES.some(m => m.key === e.main) ? { main: e.main } : {}), ...(['base', 'panel', 'overlay', 'state', 'pvw'].includes(e.role) ? { role: e.role } : {}) };
   }
   const results: ObsSetupStore['results'] = {};
   for (const [k, r] of Object.entries(v?.results ?? {}) as [string, any][]) {
     if (Array.isArray(r?.lines)) results[k] = { at: Number(r.at) || 0, ok: r.ok === true, lines: r.lines.slice(0, 40).map((l: unknown) => String(l).slice(0, 300)) };
   }
+  const vv = v?.validation ?? {};
+  const vItems: ValidationStore['items'] = {};
+  for (const [k, r] of Object.entries(vv?.items ?? {}) as [string, any][]) {
+    if (typeof k === 'string' && k.length <= 60 && r?.checked === true) vItems[k] = { checked: true, at: Number(r.at) || 0, configHash: typeof r.configHash === 'string' ? r.configHash.slice(0, 64) : '' };
+  }
+  const vHistory: ValidationStore['history'] = Array.isArray(vv?.history)
+    ? vv.history.filter((h: any) => typeof h?.id === 'string' && h.id.length <= 60)
+        .slice(-MAX_VALIDATION_HISTORY)
+        .map((h: any) => ({ id: String(h.id).slice(0, 60), at: Number(h.at) || 0, checked: h.checked === true, session: typeof h.session === 'string' ? h.session.slice(0, 40) : '', configHash: typeof h.configHash === 'string' ? h.configHash.slice(0, 64) : '' }))
+    : [];
+  const validation: ObsSetupStore['validation'] = {
+    session: typeof vv.session === 'string' && vv.session ? vv.session.slice(0, 40) : newValidationSessionId(),
+    sessionAt: Number(vv.sessionAt) || Date.now(),
+    items: vItems, history: vHistory,
+  };
   return {
     options: {
       audio: o.audio !== false, gameCapture: o.gameCapture !== false, legacy: o.legacy === true,
       baseUrl: typeof o.baseUrl === 'string' && /^https?:\/\/[^\s/?#]+$/i.test(o.baseUrl.trim().replace(/\/$/, '')) ? o.baseUrl.trim().replace(/\/$/, '') : '',
       profile: o.profile === 'uhd' ? 'uhd' : DEFAULT_PROFILE,
       suspendOffAir: o.suspendOffAir === true, perfMonitor: o.perfMonitor === true,
+      layout: o.layout === 'per-output' ? 'per-output' : 'main',
     },
-    map, results,
+    map, results, validation,
   };
 }
 
@@ -234,7 +386,7 @@ const GAMEPLAY_RENDERERS = new Set(['gameplay']);
  * Every Overdrive output, discovered from the graphics engine and the registry (no hardcoded scene list).
  * Names are made unique across scenes AND inputs (OBS shares one namespace for both).
  */
-export function discoverTargets(graphics: GfxInstance[], obsScenes: Partial<Record<ScreenId, string>>, opt: Pick<ObsSetupOptions, 'audio' | 'gameCapture'> & { profile?: OutputProfileId }): ObsTarget[] {
+export function discoverTargets(graphics: GfxInstance[], obsScenes: Partial<Record<ScreenId, string>>, opt: Pick<ObsSetupOptions, 'audio' | 'gameCapture'> & { profile?: OutputProfileId; layout?: ObsLayoutMode }): ObsTarget[] {
   const out: ObsTarget[] = [];
   const k = profileOf(opt.profile ?? DEFAULT_PROFILE).scale;
   const defaultInstance = (g: GfxInstance) => { const p = pkgById(g.pkg); return !!p && p.id.replace(/^od\./, '') === g.id; };
@@ -265,8 +417,24 @@ export function discoverTargets(graphics: GfxInstance[], obsScenes: Partial<Reco
   // unique names across scenes + inputs (earlier targets keep theirs; graphics-engine instances come first)
   const used = new Set<string>([AUDIO_SCENE, GAME_CAPTURE]);
   const uniq = (n: string, id: string) => { let x = n; if (used.has(x)) x = `${n} (${id.replace(/^\w+:/, '')})`; let i = 2; while (used.has(x)) x = `${n} (${i++})`; used.add(x); return x; };
-  for (const t of out) { t.scene = uniq(t.scene, t.id); t.input = uniq(t.input, t.id); }
-  return out;
+  if (opt.layout !== 'main') { for (const t of out) { t.scene = uniq(t.scene, t.id); t.input = uniq(t.input, t.id); } return out; }
+  // Main-scenes layout: nine scene names are reserved; every output keeps its own (unique) browser source name and
+  // becomes a layer of its main scene. Bases first, then panels, then overlays (build order = stacking order).
+  for (const m of MAIN_SCENES) used.add(mainSceneName(m.key));
+  const rank = { base: 0, panel: 1, overlay: 2, state: 3, pvw: 4 } as const;
+  for (const t of out) {
+    t.input = uniq(t.input, t.id);
+    const pl = placeOf(t.id, graphics);
+    t.main = pl.main; t.role = pl.role; t.scene = mainSceneName(pl.main);
+    t.gameCapture = t.gameCapture && pl.role === 'base';
+  }
+  // 3.3 unified scenes: their internal Preview identity (one muted source in its own scene, never in a main scene)
+  for (const m of MAIN_SCENES) if (m.unified && graphics.some(g => g.id === m.unified!.gfx)) {
+    const g = graphics.find(x => x.id === m.unified!.gfx)!, p = pkgById(g.pkg);
+    out.push({ id: `pvw:${m.key}`, kind: 'preview', name: `${m.label} · Preview identity`, route: pvwRoute(g.id), scene: m.unified.preview, input: uniq(`Overdrive · ${m.label} · Preview identity`, `pvw:${m.key}`),
+      width: (p?.resolution[0] ?? 1920) * k, height: (p?.resolution[1] ?? 1080) * k, gameCapture: false, rerouteAudio: true, audio: false, main: m.key, role: 'pvw' });
+  }
+  return out.sort((a, b) => rank[a.role!] - rank[b.role!]);
 }
 
 /** The URL OBS loads: base + route + output key (keeps an existing query string intact). */

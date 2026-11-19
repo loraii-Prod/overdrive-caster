@@ -187,7 +187,7 @@ export function Controller({ onLogout, dockOnly = false, dockAll = false }: { on
 
   // OBS "everything" dock (/controller/dock/all): shared match controls once, then every scene with its own GO + controls.
   if (dockAll) {
-    const dockProps = { live: st.live.screen, preview: preview.screen, show: st.showLive, wc, now, send: (m: ClientMsg) => { flushPending(); sock.send(m); }, quick, twConnected: !!st.twitch?.connected, casters: st.live.casters };
+    const dockProps = { live: st.live.screen, preview: preview.screen, show: st.showLive, wc, now, send: (m: ClientMsg) => { flushPending(); sock.send(m); }, quick, twConnected: !!st.twitch?.connected, casters: st.live.casters, camEngines: st.camEngines };
     return (
       <div className="min-h-screen space-y-2 bg-[#101010] p-2 text-white">
         <div className="sticky top-0 z-10 -mx-2 -mt-2 space-y-2 bg-[#101010] px-2 pb-2 pt-2 shadow-[0_8px_16px_rgba(0,0,0,.5)]">
@@ -227,7 +227,7 @@ export function Controller({ onLogout, dockOnly = false, dockAll = false }: { on
         })}
       </div>
       <SceneDock live={st.live.screen} preview={preview.screen} show={st.showLive} wc={wc} now={now} send={m => { flushPending(); sock.send(m); }} quick={quick}
-        twConnected={!!st.twitch?.connected} onMore={() => window.open('/controller', '_blank')} casters={st.live.casters} />
+        twConnected={!!st.twitch?.connected} onMore={() => window.open('/controller', '_blank')} casters={st.live.casters} camEngines={st.camEngines} />
       <RosBar ros={st.ros} now={now} send={m => sock.send(m)} onOpen={() => window.open('/controller', '_blank')} />
     </div>
   );
@@ -317,7 +317,7 @@ export function Controller({ onLogout, dockOnly = false, dockAll = false }: { on
             </div>
             {/* Controls for the screen on air, always in sight (no scrolling during the show). */}
             <SceneDock live={st.live.screen} preview={preview.screen} show={st.showLive} wc={wc} now={now} send={m => { flushPending(); sock.send(m); }} quick={quick}
-              twConnected={!!st.twitch?.connected} onMore={setSection} casters={st.live.casters} />
+              twConnected={!!st.twitch?.connected} onMore={setSection} casters={st.live.casters} camEngines={st.camEngines} />
             <RosBar ros={st.ros} now={now} send={m => sock.send(m)} onOpen={() => setSection('ros')} />
           </div>
           <div className="space-y-5">
@@ -595,6 +595,12 @@ export function Controller({ onLogout, dockOnly = false, dockAll = false }: { on
                     <Switch on={preview.layout === 'mixed'} onChange={v => setScene({ layout: v ? 'mixed' : 'auto' })} label="Mixed mode (cards for cameras that are off)" />
                     <Switch on={preview.showBackground} onChange={v => setScene({ showBackground: v })} label="Background behind cameras" />
                   </div>
+                  {(preview.screen === 'casters' || preview.screen === 'analysis') && (
+                    <div className="mt-3 flex flex-wrap items-center gap-6 border-t border-white/[0.06] pt-3">
+                      <Switch on={preview.obsCams} onChange={v => setScene({ obsCams: v })} label="Cameras composited in OBS (3.4 Desk Camera Engine)" />
+                      <span className="text-[11px] text-white/40">Leaves the camera holes transparent here; OBS shows its own persistent cameras underneath. Stage, then TAKE — the on-air source keeps embedding cameras until you do.</span>
+                    </div>
+                  )}
                 </Block>
                 <Block title="OBS WebSocket" note="Connect + one-click scene import"><ObsPanel st={st} send={m => sock.send(m)} /></Block>
                 <Block title="Stream Deck / Companion & scene mapping"><IntegrationsTab {...showProps} /></Block>

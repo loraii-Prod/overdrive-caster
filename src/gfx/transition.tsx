@@ -14,11 +14,12 @@
  */
 import { hiRes } from '../../shared/assetRes';
 import { createContext, useContext, useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
+import { DEFAULT_GFX_TRANSITION_MS } from '../../shared/gfx';
 
 export type TransitionKind = 'crossfade' | 'slide' | 'wipe' | 'scale' | 'cut';
 export interface GfxTransition { kind: TransitionKind; ms: number }
 export const TRANSITION_KINDS: TransitionKind[] = ['crossfade', 'slide', 'wipe', 'scale', 'cut'];
-export const DEFAULT_TRANSITION: GfxTransition = { kind: 'crossfade', ms: 300 };
+export const DEFAULT_TRANSITION: GfxTransition = { kind: 'crossfade', ms: DEFAULT_GFX_TRANSITION_MS };
 
 const Ctx = createContext<GfxTransition>(DEFAULT_TRANSITION);
 export const TransitionProvider = ({ value, children }: { value: GfxTransition; children: ReactNode }) => <Ctx.Provider value={value}>{children}</Ctx.Provider>;

@@ -24,8 +24,21 @@ const PKG_CAT: Record<string, Category> = { Desk: 'Desks', Game: 'Gameplay', Ove
 export const gfxCategory = (g: GfxInstance): Category => (g.pkg === 'od.mvp' ? 'MVP & Awards' : PKG_CAT[pkgById(g.pkg)?.category ?? ''] ?? 'Utility');
 export const sourceCategory = (s: SourceDef): Category => (s.category === 'MVP & Awards' ? 'MVP & Awards' : SOURCE_CAT[s.id] ?? 'Utility');
 
+/** 3.2: the Scene Builder's main-scenes mapping (a layer's main scene), when OBS has that scene. */
+export function setupScene(target: string, st: ControllerState): string | undefined {
+  const e = st.obsSetup?.map?.[target];
+  return e?.main && st.obs.scenes.includes(e.scene) ? e.scene : undefined;
+}
+/** 3.2: the layer of an output in its main scene, as OBS shows it now (null: not a layer / per-output layout). */
+export function layerOf(target: string, st: ControllerState): { scene: string; role: string; on: boolean } | null {
+  const e = st.obsSetup?.map?.[target];
+  if (!e?.main) return null;
+  const l = st.obsSetup?.mains?.find(m => m.key === e.main)?.layers.find(x => x.target === target);
+  return { scene: e.scene, role: e.role ?? 'base', on: !!l?.on };
+}
 /** OBS scene of a scene source: the "Build scenes in OBS" mapping or a scene named like it. */
 export function obsSceneOfSource(src: SourceDef, st: ControllerState): string | undefined {
+  const mapped = setupScene(`s:${src.id}`, st); if (mapped) return mapped;
   if (src.gfxView) return st.obs.scenes.find(n => n === `Overdrive · ${src.name}`) ?? st.obs.scenes.find(n => n.toLowerCase().includes(src.name.toLowerCase()));
   if (src.gfx) { const g = st.graphics?.find(x => x.id === src.gfx); if (g) return obsSceneOfGfx(g, st); }
   const map = st.showLive.obsScenes as Record<string, string | undefined>;
@@ -35,6 +48,7 @@ export function obsSceneOfSource(src: SourceDef, st: ControllerState): string | 
 }
 /** OBS scene of a graphic: its Studio Mode mapping, else the scene of the matching scene source, else by name. */
 export function obsSceneOfGfx(g: GfxInstance, st: ControllerState): string | undefined {
+  const mapped = setupScene(`g:${g.id}`, st); if (mapped) return mapped;
   if (g.obsScene) return g.obsScene;
   const key = pkgById(g.pkg)?.obsKey;
   const src = key ? REGISTRY.find(s => s.obsKey === key) : undefined;

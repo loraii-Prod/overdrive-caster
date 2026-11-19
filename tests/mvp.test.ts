@@ -170,6 +170,20 @@ const RULE = { name: 'MVP results', when: { k: 'mvp-closed' }, then: [{ k: 'noti
     check('mvp-settings refuses a reveal step', !(await run({ c: 'mvp-settings', patch: { step: 'winner' } })).ok);
   }
   {
+    // 3.3 TAKE safety: OBS refuses the switch → the MVP Program source goes back to what it showed (rollback)
+    // make the OBS switch fail through the engine's dependency
+    const R = rig2(F({ status: 'closed', frozen: true }));
+    const fails = createEngine({ db: R.db, save() {}, goLive() {}, airProgram() {}, broadcastLive() {}, pushWc() {}, wcOp() {}, quick() {}, quickBadge() {}, clearPopups() {}, reloadOutputs() { return 0; }, pushState() {}, pushMedia() {}, pushGfx() {},
+      onGfxPublish() {}, setSeat() { return null; }, editTalent() { return null; }, regenTalent() { return null; }, resyncSeat() { return null; },
+      async obsSetup() { return {}; }, async obsSwitch() { return 'OBS refused the scene switch'; },
+      obsLookup: () => ({ setupMap: {}, screenMap: {}, graphics: R.db.graphics, registry: REGISTRY, scenes: ['Overdrive · MVP', ...VIEWS.map(s => `Overdrive · ${s.name}`)], pkgObsKey: (p: string) => pkgById(p)?.obsKey }),
+      mvp: { state: () => ({ ...R.st, match: 'R1_UB1' }), async op() { return null; } } });
+    const gR = () => R.db.graphics.find((x: any) => x.id === 'mvp');
+    const cfg0 = JSON.stringify(gR().config);
+    const t = await fails.run({ c: 'mvp-take', view: 'winner' } as any, 'A', 'manual');
+    check('TAKE whose OBS switch fails: refused AND rolled back (the reveal is not left authorized on the Program source)', !t.ok && /Rolled back/.test((t as any).error ?? '') && JSON.stringify(gR().config) === cfg0 && !viewAllowed('winner', gR().config, 'R1_UB1'), (t as any).error);
+  }
+  {
     // A stale draft published later never takes an authorization back.
     const { g, run } = rig2(F({ status: 'closed', frozen: true }));
     await run({ c: 'gfx-set', id: 'mvp', patch: { liveCounts: true } }); // draft made BEFORE the reveal

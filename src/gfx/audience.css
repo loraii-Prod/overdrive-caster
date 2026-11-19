@@ -279,3 +279,7 @@
 
 /* Reveal without the opening sweep + flare (MVP 1.2 option). */
 .mvx-nosweep .mvx-wipe,.mvx-nosweep .mvx-flare{display:none}
+
+/* 3.0 MVP rehearsal tag (demo event only) */
+.mv-rehearsal { position: absolute; top: 28px; right: 34px; z-index: 50; padding: 6px 14px; background: #ffb020; color: #121212;
+  font: 800 22px/1 'Barlow Condensed', sans-serif; letter-spacing: .14em; text-transform: uppercase; border-radius: 3px; }

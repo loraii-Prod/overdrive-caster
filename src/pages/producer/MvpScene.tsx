@@ -6,7 +6,7 @@
  * a reveal needs the frozen result (or the analysts' pick), exactly like the MVP sequence.
  */
 import { useEffect, useState } from 'react';
-import { teamRoster, pcts } from '../../../shared/audience';
+import { matchRoster, pcts } from '../../../shared/audience';
 import { matchName, wcResolve } from '../../../shared/wildcard';
 import { isRevealView, revealAllowed, revealedOf, type MvpFlowIn, type MvpView } from '../../../shared/mvpFlow';
 import type { SourceDef } from '../../../shared/registry';
@@ -20,10 +20,11 @@ const LABEL = "font-['Barlow_Condensed'] font-bold uppercase tracking-[0.1em]";
 export function mvpSceneData(x: Ctx, a: AudCtx) {
   const g = x.st.graphics?.find(q => q.id === 'mvp');
   const R = wcResolve(x.wc.matches, x.wc.teams);
-  const match = String(g?.config.match || x.wc.cast || '');
+  // 3.0: the MVP match is the MVP graphic's own match (the server keeps it in step with the results)
+  const match = String(g?.config.match || '');
   const m = match ? R[match] : undefined;
   const finished = !!m?.winner && m.winner !== 'BYE';
-  const roster = m?.t1 && m?.t2 ? [...teamRoster(m.t1), ...teamRoster(m.t2)] : [];
+  const roster = matchRoster(m?.t1, m?.t2, x.wc.rosters);
   const poll = a.priv?.summary?.polls.filter(p => p.match === match).pop();
   const staff = a.aud?.staffMvp[match] ?? {};
   const flow: MvpFlowIn = { status: poll?.status ?? null, frozen: !!poll?.frozen, desk: Object.keys(staff).length > 0, published: String(g?.config.step ?? '') };
@@ -90,7 +91,7 @@ export function MvpSceneControls({ x, a, src, obsTr }: { x: Ctx; a: AudCtx; src:
         <span className="ml-auto flex items-center gap-1.5">
           {onAir && <span className={`${LABEL} rounded-[2px] px-1.5 text-[11px] text-white`} style={{ background: PGM }}>On air</span>}
           <button type="button" disabled={busy || !!why || !x.st.obs.connected && !obsScene} onClick={take} data-mvp-take={armed ? 'armed' : 'ready'}
-            title={why ?? (obsScene ? `Switch OBS to “${obsScene}”${reveal ? ' and authorize the reveal' : ''}` : 'No OBS scene yet: build the MVP scenes (Studio → OBS & Outputs)')}
+            title={why ?? (obsScene ? `Switch OBS to “${obsScene}”${reveal ? ' and authorize the reveal' : ''}` : 'No OBS scene yet: build the MVP scenes (Studio → Sources & OBS)')}
             className={`${LABEL} h-[26px] rounded-[2px] px-3 text-[13px] text-white disabled:opacity-35 ${armed ? 'animate-pulse' : ''}`} style={{ background: armed ? '#ff6a13' : PGM }}>
             {armed ? `CONFIRM ${TAKE_LABEL[view].replace(/^TAKE · |^REVEAL · /, '')}` : view === 'closed' && poll?.status === 'open' ? 'Close voting + TAKE' : TAKE_LABEL[view]}</button>
           {nextSeg && <Btn disabled={busy} onClick={() => act(async () => { const r = await x.run({ c: 'sp-go' }, `GO · ${nextSeg.label}`); return r.ok ? null : r.error ?? null; })} title="Show rundown: take the next segment (F9)">Next: {nextSeg.label}</Btn>}

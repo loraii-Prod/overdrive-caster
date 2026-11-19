@@ -49,11 +49,33 @@ wss.on('connection', ws => {
   ws.on('close', () => socks.delete(ws));
 });
 
+// 3.0 audio: OBS raises InputMuteStateChanged for every mute change; InputVolumeMeters every 50 ms (here 100 ms)
+// for every input with audio: a talking voice is simulated on unmuted inputs (levels only, no sound).
+const wire = () => { obs.onEvent = (type, data) => emit(type, data); };
+wire();
+let tick = 0;
+setInterval(() => {
+  tick++;
+  const inputs = [...obs.inputs].filter(([, i]) => i.audio || /audio|capture|wasapi|pulse|dshow/.test(i.kind) || /audio/i.test(String(i.settings?.url ?? ''))).map(([n, i], k) => {
+    const live = !i.audio?.muted, talk = 0.5 + 0.5 * Math.sin(tick / 4 + k * 1.7);
+    const mag = live ? 0.04 + 0.4 * talk * talk : 0;
+    return { inputName: n, inputLevelsMul: [[mag, Math.min(1, mag * 1.3), Math.min(1, mag * 1.3)], [mag * 0.9, Math.min(1, mag * 1.2), Math.min(1, mag * 1.2)]] };
+  });
+  if (inputs.length) emit('InputVolumeMeters', { inputs });
+}, 100);
+
 http.createServer((req, res) => {
   const u = new URL(req.url ?? '/', 'http://x');
   const j = (v: any) => { res.setHeader('content-type', 'application/json'); res.end(JSON.stringify(v)); };
   if (u.pathname === '/state') return j({ program: obs.program, scenes: [...obs.scenes].map(([n, s]) => ({ name: n, uuid: s.uuid, items: s.items })), inputs: [...obs.inputs].map(([n, i]) => ({ name: n, ...i })), log: obs.log });
-  if (u.pathname === '/reset') { obs = new MockObs(); return j({ ok: true }); }
+  if (u.pathname === '/reset') { obs = new MockObs(); wire(); return j({ ok: true }); }
+  if (u.pathname === '/add-audio') { const q = u.searchParams; if (!obs.scenes.has(q.get('scene') ?? 'Scene')) obs.addScene(q.get('scene')!); obs.addInput(q.get('scene') ?? 'Scene', q.get('name')!, q.get('kind') ?? 'wasapi_input_capture', q.get('url') ? { url: q.get('url') } : {}); emit('InputCreated', { inputName: q.get('name') }); return j({ ok: true }); }
+  if (u.pathname === '/mute') { obs.setMute(u.searchParams.get('input')!, u.searchParams.get('on') !== '0'); return j({ ok: true }); }
+  if (u.pathname === '/studio-mode') { obs.call('SetStudioModeEnabled', { studioModeEnabled: u.searchParams.get('on') !== '0' }); return j({ ok: true }); }
+  if (u.pathname === '/scenes') return j({ scenes: [...obs.scenes.keys()] });
+  if (u.pathname === '/program') return j({ program: obs.program, preview: obs.studioMode ? obs.preview : null, transition: obs.transition, studioMode: obs.studioMode });
+  if (u.pathname === '/audio') return j(Object.fromEntries([...obs.inputs].filter(([, i]) => i.audio).map(([n, i]) => [n, i.audio])));
+  if (u.pathname === '/scenes') return j({ scenes: [...obs.scenes.keys()] });
   if (u.pathname === '/program') { obs.program = u.searchParams.get('scene') ?? obs.program; emit('CurrentProgramSceneChanged', { sceneName: obs.program }); return j({ ok: true }); }
   if (u.pathname === '/project') { const n = u.searchParams.get('source') ?? ''; if (u.searchParams.get('on') === '0') obs.projected.delete(n); else obs.projected.add(n); return j({ ok: true }); }
   if (u.pathname === '/studio-off') { obs.studioMode = false; emit('StudioModeStateChanged', { studioModeEnabled: false }); return j({ ok: true }); }

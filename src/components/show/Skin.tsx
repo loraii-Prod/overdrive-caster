@@ -74,9 +74,14 @@ export function SkinCasters({ skin, scene, show, viewer, monitor, picks, casters
   const [, bump] = useState(0);
   // a camera mounted straight into a hole is first committed hidden, then entered with the transition
   useLayoutEffect(() => { const fresh = [...next].some(([id, v]) => v.fresh); last.current = next; if (fresh) bump(n => n + 1); });
+  // 3.4: when OBS composites these cameras locally (persistent VDO.Ninja feeds, positioned by the CamEngine),
+  // this source must leave the holes fully transparent — no backing colour, no embedded feed — so OBS's camera
+  // layer underneath shows through unobstructed. The Producer's own monitor preview is never captured by OBS,
+  // so it keeps showing the embedded feed there regardless (useful to see something while composing a layout).
+  const obsCams = scene.obsCams && !monitor;
   return (
-    <div className="absolute inset-0" style={{ isolation: 'isolate' }} data-booth={kind}>
-      <HoleBacking holes={backing} />
+    <div className="absolute inset-0" style={{ isolation: 'isolate' }} data-booth={kind} data-obs-cams={obsCams ? '1' : '0'}>
+      {!obsCams && <HoleBacking holes={backing} />}
       {/* Cameras: one persistent element per caster, moving between holes. */}
       {pool.map(c => {
         const i = ids.indexOf(c.id), r = i >= 0 ? holes[i] : undefined;
@@ -91,9 +96,9 @@ export function SkinCasters({ skin, scene, show, viewer, monitor, picks, casters
         const fd = cut ? 0 : tr.ms;
         const fade = on ? `opacity ${fd}ms ${EASE_OUT}, transform ${fd}ms ${EASE_OUT}` : `opacity ${Math.round(fd * 0.8)}ms ${EASE_OUT}, transform ${Math.round(fd * 0.8)}ms ${EASE_OUT}`;
         return (
-          <div key={c.id} data-cam={c.id} data-cam-on={on ? '1' : '0'} className="absolute overflow-hidden bg-[#140a0a]"
+          <div key={c.id} data-cam={c.id} data-cam-on={on ? '1' : '0'} className={obsCams ? 'absolute overflow-hidden' : 'absolute overflow-hidden bg-[#140a0a]'}
             style={{ zIndex: 1, left: rect.x, top: rect.y, width: rect.w, height: rect.h, opacity: on ? 1 : 0, transform: on ? 'none' : 'scale(0.96)', transition: geo === 'none' ? fade : `${geo}, ${fade}`, visibility: on || prev?.on || (!prev && r) ? undefined : 'hidden' }}>
-            {c.cameraOn && <Feed caster={c} viewer={viewer} size={kind === 'solo' ? 'lg' : 'md'} showName={false} monitor={monitor} />}
+            {!obsCams && c.cameraOn && <Feed caster={c} viewer={viewer} size={kind === 'solo' ? 'lg' : 'md'} showName={false} monitor={monitor} />}
           </div>
         );
       })}

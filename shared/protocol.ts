@@ -118,6 +118,8 @@ export type ServerMsg =
   /** Producer turned the live performance monitor on/off: outputs sample their frame timing while on. */
   | { t: 'perf-mode'; on: boolean }
   | { t: 'perf'; perf: PerfReport }
+  /** 3.0 talent audio meters (dBFS peak per talent id, ~10 per second while OBS sends levels). */
+  | { t: 'meters'; m: Record<string, number> }
   | { t: 'state'; state: ControllerState }
   | { t: 'tournament'; tournament: Tournament }
   | { t: 'ros'; ros: RunOfShow; now: number }
@@ -163,6 +165,10 @@ export interface PerfReport {
 }
 export interface AudPrivate {
   configured: boolean; online: boolean; error: string | null; summary: import('./audience').AudSummary | null;
+  /** 3.0: where MVP votes are counted now ('online' vote service, or 'local' = this server), the setting, and whether the online service is set up. */
+  mode?: 'online' | 'local'; voteMode?: 'auto' | 'local'; remoteConfigured?: boolean;
+  /** 3.0: MVP automation of this event, the last MVP notice, and whether this event is the rehearsal. */
+  mvpAuto?: import('./audience').MvpAuto; mvpNotice?: import('./audience').MvpNotice | null; rehearsal?: boolean;
   lockedMatches: string[]; championLocked: boolean; qrHosts: string[]; customQr: import('./audience').QrLink[]; publicUrl: string; /** Studio override of the public voting address ('' = the server setting). */ publicUrlSet: string; envPublicUrl: string; liveTotals: string[];
   /** Twitch chat voting (connection, counting, activity). Never contains a token. */
   chat?: import('./twitchChat').ChatStatus;

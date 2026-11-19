@@ -22,23 +22,25 @@ import type { Ctx, Run } from '../producer/modules';
 import { CATEGORIES } from '../producer/Library';
 import { AutomationBuilder, NotesLog } from './Automation';
 import { RundownMini, ShowRundown } from './Rundown';
-import { TalentManager } from './Talent';
+import { TALENT_TABS, TalentManager } from './Talent';
+import { HealthSection } from './Health';
 import { DATA_TABS, DataSection, MEDIA_TABS, MediaSection, OBS_TABS, ObsSection, SCENE_TABS, SHOW_TABS, ScenesSection, ShowSection, type SubTab } from './Sections';
 import { Btn, COND, Dot, Fit169, Fold, Handle, I, IconBtn, Pill, S, Seg, Toggle, fmtClock, useDrag, useLocal } from './kit';
 import { sceneCatalogue, segReady, studioIssues, targetToSel, type SceneEntry } from './model';
 
 export type LogLine = { at: number; ok: boolean; text: string };
-export type Section = 'scenes' | 'talent' | 'data' | 'automation' | 'rundown' | 'media' | 'obs' | 'show';
+export type Section = 'scenes' | 'talent' | 'data' | 'automation' | 'rundown' | 'media' | 'obs' | 'show' | 'health';
 
 const SECTIONS: { id: Section; label: string; icon: ReactNode; about: string; tabs?: SubTab[] }[] = [
   { id: 'scenes', label: 'Scenes', icon: I.scenes, about: 'Scene settings, controls, presets, packages and instances', tabs: SCENE_TABS },
-  { id: 'talent', label: 'Talent & Cameras', icon: I.talent, about: 'Casters, analysts and hosts, camera links, positions and desk layouts' },
+  { id: 'talent', label: 'Talent', icon: I.talent, about: 'Casters, analysts, hosts and guests: profiles, cameras, positions, Green Room and audio', tabs: TALENT_TABS },
   { id: 'data', label: 'Graphics & Data', icon: I.data, about: 'Match, scores, bracket, players, predictions, Pick\'ems, MVP, bindings', tabs: DATA_TABS },
   { id: 'rundown', label: 'Show Rundown', icon: I.rundown, about: 'The running order: scenes, durations, transitions, media, readiness' },
   { id: 'automation', label: 'Automation', icon: I.auto, about: 'Triggers, steps, producer GO confirmation, safe testing' },
-  { id: 'media', label: 'Media & Audio', icon: I.media, about: 'Media library, sponsor ads, music per scene, audio routing', tabs: MEDIA_TABS },
-  { id: 'obs', label: 'OBS & Outputs', icon: I.obs, about: 'OBS connection, scene builder and mapping, browser sources, transitions', tabs: OBS_TABS },
-  { id: 'show', label: 'Audience & Show File', icon: I.file, about: 'Public voting page and QR, show file export / import, recovery', tabs: SHOW_TABS },
+  { id: 'media', label: 'Media', icon: I.media, about: 'Media library, sponsor ads, music per scene, assets', tabs: MEDIA_TABS },
+  { id: 'obs', label: 'Sources & OBS', icon: I.obs, about: 'OBS connection, every browser source, Scene Builder and mapping, transitions', tabs: OBS_TABS },
+  { id: 'show', label: 'Audience', icon: I.audience, about: 'Public voting page and QR, MVP, show file export / import, recovery', tabs: SHOW_TABS },
+  { id: 'health', label: 'Health', icon: I.warn, about: 'What is broken right now (with recovery actions) and the pre-show checklist' },
 ];
 
 const FILTERS: [string, string][] = [['all', 'All'], ['fav', '★'], ['Desks', 'Desks'], ['Gameplay', 'Game'], ['Tournament graphics', 'Bracket'], ['Media', 'Breaks & media'], ['MVP & Awards', 'MVP'], ['Audience', 'Audience']];
@@ -221,13 +223,14 @@ export function StudioWorkspace(p: StudioProps) {
             </div>
             <div className="flex min-h-0 flex-1 flex-col">
               {section === 'scenes' && <ScenesSection tab={tab} st={st} run={run} x={ctx} entry={entry} onAddSegment={addSegment} />}
-              {section === 'talent' && <TalentManager st={st} eng={eng} run={run} viewer={p.viewer} setCams={p.setCams} />}
+              {section === 'talent' && <TalentManager tab={tab} st={st} eng={eng} run={run} viewer={p.viewer} setCams={p.setCams} />}
               {section === 'data' && <DataSection tab={tab} st={st} x={ctx} />}
               {section === 'rundown' && <ShowRundown st={st} run={run} now={now} sel={sel} onSelect={t => setSel(targetToSel(t))} />}
               {section === 'automation' && <AutomationBuilder st={st} eng={eng} run={run} now={now} openProducer={p.onProducer} />}
               {section === 'media' && <MediaSection tab={tab} st={st} x={ctx} musicScene={musicScene} setMusicScene={setMusicScene} />}
               {section === 'obs' && <ObsSection tab={tab} st={st} eng={eng} run={run} />}
               {section === 'show' && <ShowSection tab={tab} st={st} run={run} x={ctx} />}
+              {section === 'health' && <HealthSection st={st} run={run} conn={p.conn} rtt={p.rtt} aud={ctx.aud} go={(s, t) => go(s as Section, t)} />}
             </div>
           </section>
         </main>

@@ -99,12 +99,13 @@ const COUNTDOWNS: [string, string][] = [['0', 'No timer'], ['60', '1 min'], ['12
 export function MvpModule({ x, a }: { x: Ctx; a: AudCtx }) {
   const archived = a.aud?.archived ?? [];
   const done = matchesWithTeams(x).filter(r => r.winner && r.winner !== 'BYE');
-  const [sel, setSel] = useState('');
-  // Default: the cast match, else the latest finished match not archived yet (= the next MVP session).
-  const next = [...done].reverse().find(d => !archived.includes(d.id));
-  const id = sel || (x.wc.cast && done.some(d => d.id === x.wc.cast) && !archived.includes(x.wc.cast) ? x.wc.cast : next?.id ?? done[done.length - 1]?.id) || '';
+  // 3.0: ONE MVP match for every console (the MVP graphic's match, kept in step with the results by the server).
+  // Choosing another match here changes it for everyone (Producer, Studio, graphic, vote), never just this panel.
+  const next = [...done].reverse().find(d => !archived.includes(d.id) && d.id !== String(gfxOf(x, 'mvp')?.config.match ?? ''));
+  const id = String(gfxOf(x, 'mvp')?.config.match ?? '');
+  const setSel = (m: string) => { if (m) void x.run({ c: 'mvp-match', match: m }, `MVP match: ${m}`); };
   const m = done.find(r => r.id === id);
-  const roster = m ? [...teamRoster(m.t1!), ...teamRoster(m.t2!)] : [];
+  const roster = m ? [...teamRoster(m.t1!, x.wc.rosters), ...teamRoster(m.t2!, x.wc.rosters)] : [];
   const [off, setOff] = useState<string[]>([]);
   const [cd, setCd] = useState('0');
   const poll = a.priv?.summary?.polls.filter(p => p.match === id).pop();
@@ -126,6 +127,7 @@ export function MvpModule({ x, a }: { x: Ctx; a: AudCtx }) {
       {m && <MvpSequence x={x} a={a} match={id} poll={poll} staff={Object.keys(staff).length > 0} prepare={() => a.op({ k: 'mvp-prepare', match: id, players: roster.filter(p => !off.includes(p.handle)).map(p => p.handle) }, 'Prepare MVP vote')} countdown={Number(cd) || 0} />}
       <div className="flex items-center gap-2"><Tag>Match</Tag>
         <select value={id} onChange={e => { setSel(e.target.value); setOff([]); }} className="min-w-0 flex-1 rounded-[2px] border border-white/15 bg-black px-1 py-0.5 text-[12px]">
+          {!done.some(r => r.id === id) && <option value={id}>{id ? `${matchName(id)} (no result yet)` : '— no MVP match yet —'}</option>}
           {done.map(r => <option key={r.id} value={r.id}>{matchName(r.id)}: {r.t1} vs {r.t2}{archived.includes(r.id) ? ' (archived)' : ''}</option>)}
         </select></div>
       {!m ? <><div className="text-[12px] text-white/50">MVP voting opens after a match has a result.</div><ChatVotingPanel a={a} poll={undefined} now={x.now} /></> : <>
@@ -171,7 +173,7 @@ export function MvpModule({ x, a }: { x: Ctx; a: AudCtx }) {
         {!frozen && <div className="text-[11px] text-white/45">The reveal steps unlock once voting is closed. Closing never shows anything on air.</div>}
         <Tag>Session</Tag>
         <div className="flex flex-wrap items-center gap-1 text-[11.5px]">
-          <Btn disabled={poll?.status === 'open'} title={poll?.status === 'open' ? 'Close voting first' : ''} onClick={() => a.op({ k: 'mvp-archive', match: id, on: !isArchived }, isArchived ? 'Restore MVP session' : 'Archive MVP session').then(e => { if (!e && !isArchived) setSel(''); })}>{isArchived ? 'Restore' : 'Archive & next match'}</Btn>
+          <Btn disabled={poll?.status === 'open'} title={poll?.status === 'open' ? 'Close voting first' : ''} onClick={() => a.op({ k: 'mvp-archive', match: id, on: !isArchived }, isArchived ? 'Restore MVP session' : 'Archive MVP session').then(e => { if (!e && !isArchived && next) setSel(next.id); })}>{isArchived ? 'Restore' : 'Archive & next match'}</Btn>
           <span className="text-white/45">{isArchived ? 'Archived: results kept.' : next && next.id !== id ? `Next: ${matchName(next.id)}` : 'Results stay stored after archiving.'}</span>
         </div>
       </>}

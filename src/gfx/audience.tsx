@@ -6,7 +6,7 @@
  */
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import type { GfxInstance } from '../../shared/gfx';
-import { communityPick, pcts, teamRoster, type AudPlayer, type AudPoll, type MvpCard } from '../../shared/audience';
+import { communityPick, matchRoster, pcts, type AudPlayer, type AudPoll, type MvpCard } from '../../shared/audience';
 import { matchName, wcResolve } from '../../shared/wildcard';
 import { normHandle, teamLogo } from '../../shared/major';
 import { BgVideo } from '../components/Brand';
@@ -23,10 +23,11 @@ type R = (p: { cfg: Cfg; d: GfxData }) => ReactNode;
 const Logo = ({ team, size }: { team: string; size: number }) => { const s = teamLogo(team); return s ? <img className="logo" src={s} alt="" style={{ width: size, height: size }} /> : null; };
 const short = (t: string) => (t === 'FUT Esports' ? 'FUT' : t === 'Natus Vincere' ? 'NAVI' : t === 'All Gamers Global' ? 'AG' : t);
 
-function matchOf(cfg: Cfg, d: GfxData) {
+/** The graphic's match: its own setting, else the cast match. `own` (3.0 MVP): its own setting only. */
+function matchOf(cfg: Cfg, d: GfxData, own = false) {
   const wc = d.wc?.state;
   if (!wc) return null;
-  const id = String(cfg.match || wc.cast || '');
+  const id = String(cfg.match || (own ? '' : wc.cast) || '');
   const r = id ? wcResolve(wc.matches, wc.teams)[id] : undefined;
   if (!r || !r.t1 || !r.t2) return null;
   const st = wc.matches[id];
@@ -101,8 +102,10 @@ function mvpResult(p: AudPoll | undefined) {
   const rows = p.players.map(x => ({ ...x, n: p.frozen!.counts[x.handle] ?? 0 })).sort((a, b) => b.n - a.n);
   const share = pcts(rows.map(r => r.n));
   const out = rows.map((r, i) => ({ ...r, pct: share[i] }));
-  const top = out.filter(r => r.n === out[0].n && r.n > 0);
-  return { total: p.frozen.total, rows: out, top };
+  // 3.0: the production's choice (manual / voting failed): that player, whatever the counts
+  const manual = p.frozen.manual ? out.find(r => r.handle === p.frozen!.manual) ?? { handle: p.frozen.manual, team: '', n: 0, pct: 0 } : null;
+  const top = manual ? [manual] : out.filter(r => r.n === out[0].n && r.n > 0);
+  return { total: p.frozen.total, rows: out, top, manual: !!manual };
 }
 
 // Portraits: the Studio asset library's photo for the player (same association as the player showcase), preloaded
@@ -238,14 +241,17 @@ function Paced({ rate, sweep, children }: { rate: number; sweep: boolean; childr
 }
 const mvp: R = ({ cfg, d }) => {
   const step = String(cfg.step || 'voting');
-  if (step === 'voting') return <MvpInner cfg={cfg} d={d} />;
-  return <Paced rate={PACE[String(cfg.revealPace)] ?? 1} sweep={cfg.revealSweep !== false}><MvpInner cfg={cfg} d={d} /></Paced>;
+  // 3.0 rehearsal (demo event): a permanent tag, so demo data can never pass for a real result
+  const tag = d.wc?.state.rehearsal ? <div className="mv-rehearsal" data-rehearsal-tag>Rehearsal · demo data</div> : null;
+  if (step === 'voting') return <><MvpInner cfg={cfg} d={d} />{tag}</>;
+  return <><Paced rate={PACE[String(cfg.revealPace)] ?? 1} sweep={cfg.revealSweep !== false}><MvpInner cfg={cfg} d={d} /></Paced>{tag}</>;
 };
 const MvpInner: R = ({ cfg, d }) => {
-  const m = matchOf(cfg, d);
+  // 3.0: the MVP match is the graphic's own match (set by the server from the results), never the cast match
+  const m = matchOf(cfg, d, true);
   const step = String(cfg.step || 'voting');
   const poll = m ? d.aud?.polls.filter(p => p.match === m.id).pop() : undefined;
-  const roster = m ? [...teamRoster(m.a), ...teamRoster(m.b)] : [];
+  const roster = m ? matchRoster(m.a, m.b, d.wc?.state.rosters) : [];
   const res = mvpResult(poll);
   const desk = m ? deskMvp(d, m.id, roster) : null;
   // Everything this graphic could reveal is preloaded while it is on screen (the voting step included).
@@ -287,7 +293,7 @@ const MvpInner: R = ({ cfg, d }) => {
           })}
         </div>
         {/* Ways to vote: website (QR), Twitch chat, or both — as the producer opened this vote. */}
-        {!closed && poll?.chat && poll.web === false ? <div className="qrbox chat" data-chat-box><span className="k">Vote in Twitch chat</span><b className="cmd">{chatCmd} 1–{n}</b><span>Type the player's number{poll.chatChannel ? <> in <em>twitch.tv/{poll.chatChannel}</em></> : null}</span></div>
+        {cfg.qr === false && !closed ? null : !closed && poll?.chat && poll.web === false ? <div className="qrbox chat" data-chat-box><span className="k">Vote in Twitch chat</span><b className="cmd">{chatCmd} 1–{n}</b><span>Type the player's number{poll.chatChannel ? <> in <em>twitch.tv/{poll.chatChannel}</em></> : null}</span></div>
           : qr && !closed && <div className="qrbox"><Qr url={qr.url} size={300} /><b>Scan to vote</b><span>{qr.url.replace(/^https:\/\//, '')}</span>{poll?.chat && <span className="chatline" data-chat-line>or type <em>{chatCmd} 1–{n}</em> in chat</span>}</div>}
         {closed && <div className="qrbox done"><div className="lock" /><b>Votes are in</b><span>{poll?.frozen ? `${poll.frozen.total.toLocaleString('en-US')} votes counted` : 'Counting'}</span></div>}
         <div className="status"><div className={'live' + (open ? '' : ' off')}><i />{open ? 'VOTING OPEN' : closed ? 'VOTING CLOSED' : 'VOTING OPENS SOON'}</div>
@@ -311,7 +317,8 @@ const MvpInner: R = ({ cfg, d }) => {
         <div className="mvx-brand" data-mvp-brand><img src={hiRes('/brand/overdrive/logo.png')} alt="Overdrive" draggable={false} /></div>
         <div className="mvx-L">
           <div className="mvx-badges">{badges}</div>
-          <div className="mvx-name">{who.handle}</div>
+          {/* long names (event rosters, substitutes) shrink to fit beside the MVP mark instead of being cut */}
+          <div className="mvx-name" style={who.handle.length > 7 ? { fontSize: Math.max(110, Math.floor(1700 / who.handle.length)) } : undefined}>{who.handle}</div>
           <div className="mvx-tm"><Logo team={who.team} size={54} /><b>{who.team}</b></div>
           {body}
         </div>
@@ -322,6 +329,11 @@ const MvpInner: R = ({ cfg, d }) => {
   if (step === 'winner') {
     if (!res || !res.top.length) return null; // never a guess: nothing until the result is frozen
     const win = res.top[0];
+    if (res.manual) return hero(win, <div className="mvx-badge"><small>Match</small>MVP</div>, <>
+      <div className="mvx-res">{label} · <b>{result}</b></div>
+      <div className="mvx-share" data-mvp-manual><div className="lbl"><span>Chosen by the broadcast team</span><b /></div></div>
+      {extras(win.handle)}
+    </>);
     return hero(win, <div className="mvx-badge"><small>Community</small>MVP</div>, <>
       <div className="mvx-res">{label} · <b>{result}</b></div>
       <div className="mvx-share"><div className="lbl"><span>Community vote<em className="mvx-votes" data-mvp-total> · {res.total.toLocaleString('en-US')} votes</em></span><b>{win.pct}%</b></div><div className="bar"><i style={{ ['--w' as string]: `${win.pct}%` }} /></div></div>
@@ -342,9 +354,9 @@ const MvpInner: R = ({ cfg, d }) => {
   if (!res || !res.top.length || !desk) return null;
   const win = res.top[0];
   if (res.top.some(t => t.handle === desk.player)) {
-    return hero(win, <><div className="mvx-badge"><small>Community</small>MVP</div><div className="mvx-badge desk"><small>Analyst</small>MVP</div></>, <>
-      <div className="mvx-res">Community and analysts agree · <b>{result}</b></div>
-      <div className="mvx-share"><div className="lbl"><span>Community {win.pct}% · Analysts {desk.n} of {desk.of}</span><b>{desk.n === desk.of ? 'Unanimous' : 'They agree'}</b></div><div className="bar"><i style={{ ['--w' as string]: `${win.pct}%` }} /></div></div>
+    return hero(win, <><div className="mvx-badge"><small>{res.manual ? 'Match' : 'Community'}</small>MVP</div><div className="mvx-badge desk"><small>Analyst</small>MVP</div></>, <>
+      <div className="mvx-res">{res.manual ? 'Broadcast team' : 'Community'} and analysts agree · <b>{result}</b></div>
+      <div className="mvx-share"><div className="lbl"><span>{res.manual ? 'Chosen by the broadcast team' : `Community ${win.pct}%`} · Analysts {desk.n} of {desk.of}</span><b>{desk.n === desk.of ? 'Unanimous' : 'They agree'}</b></div><div className="bar"><i style={{ ['--w' as string]: `${win.pct}%` }} /></div></div>
       {extras(win.handle)}
     </>);
   }
@@ -358,7 +370,7 @@ const MvpInner: R = ({ cfg, d }) => {
   return (
     <div className={'aud mvc' + (wait ? ' mvx-wait' : '')}>
       <BgVideo /><div className="mvx-dim" />
-      {half('l', win, 'Community MVP', `${win.pct}% of ${res.total.toLocaleString('en-US')} votes`)}
+      {half('l', win, res.manual ? 'Match MVP' : 'Community MVP', res.manual ? 'chosen by the broadcast team' : `${win.pct}% of ${res.total.toLocaleString('en-US')} votes`)}
       {half('r', { handle: desk.player, team: desk.team }, 'Analyst MVP', `${desk.n} of ${desk.of} analysts`)}
       <div className="mvc-div" />
       <div className="mvc-head"><div className="kick">MVP · {result}</div><div className="t">Community vs Analysts</div></div>
@@ -374,15 +386,16 @@ const MvpInner: R = ({ cfg, d }) => {
  * producer REVEALED it on air (poll status 'revealed') and only when the desk asks for it: never from a closed vote.
  */
 function deskVote(d: GfxData, winner: boolean) {
-  const wc = d.wc?.state, polls = d.aud?.polls ?? [];
-  const poll = (wc?.cast ? polls.filter(p => p.match === wc.cast).pop() : undefined) ?? polls.filter(p => p.status !== 'draft').pop();
+  const polls = d.aud?.polls ?? [];
+  // 3.0: the vote running now, else the latest one that ran (never "the cast match", which has moved on by then)
+  const poll = polls.filter(p => p.status === 'open').pop() ?? [...polls].filter(p => p.status !== 'draft').sort((a, b) => (a.closedAt ?? 0) - (b.closedAt ?? 0)).pop();
   if (!poll || poll.status === 'draft') return null;
   if (poll.status === 'open') {
     const left = poll.closesAt ? Math.max(0, Math.ceil((poll.closesAt - d.now) / 1000)) : null;
     return { state: 'open' as const, line: left != null ? `Voting open · closes ${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}` : 'Voting open', who: poll.players.slice(0, 4).map(p => p.handle) };
   }
   const res = poll.status === 'revealed' && winner ? mvpResult(poll) : null;
-  if (res?.top.length) return { state: 'winner' as const, line: `Community MVP · ${res.top[0].handle} ${res.top[0].pct}%`, who: [] };
+  if (res?.top.length) return { state: 'winner' as const, line: res.manual ? `Match MVP · ${res.top[0].handle}` : `Community MVP · ${res.top[0].handle} ${res.top[0].pct}%`, who: [] };
   return { state: 'closed' as const, line: 'Voting closed · MVP revealed on air', who: [] };
 }
 const DeskVote = ({ v, who }: { v: ReturnType<typeof deskVote>; who: boolean }) => !v ? null : (

@@ -18,6 +18,7 @@
  * apply: automation never acts while it is held or right after a manual action, and an automatic GO that
  * is refused becomes a pending GO instead of being dropped. Manual always wins.
  */
+import { mainDef } from './obsLayout';
 import type { SourceDef } from './registry';
 
 export type SegTransition = 'obs' | 'stinger' | 'fade' | 'cut';
@@ -231,6 +232,7 @@ export function segmentObsScene(seg: Pick<Segment, 'obsScene' | 'target'>, o: Ob
   const fromSetup = o.setupMap[t]?.scene || o.setupMap[t.replace(/^s:/, '')]?.scene;
   if (fromSetup) return fromSetup;
   const byName = (n: string) => o.scenes.find(s => s.toLowerCase().includes(n.toLowerCase())) ?? null;
+  if (t.startsWith('main:')) { const m = mainDef(t.slice(5)); return m ? o.scenes.find(n => n === `Overdrive · ${m.label}`) ?? null : null; }
   if (t.startsWith('g:')) {
     const g = o.graphics.find(x => x.id === t.slice(2));
     if (!g) return null;

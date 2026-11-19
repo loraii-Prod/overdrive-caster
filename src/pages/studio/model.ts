@@ -1,5 +1,6 @@
 /** Studio Mode 2.0: read-only helpers over the shared controller state (no state of their own). */
 import type { ControllerState } from '../../../shared/types';
+import { checkTalent } from '../../../shared/talentCheck';
 import { pkgById, type GfxInstance } from '../../../shared/gfx';
 import { REGISTRY, AUD_SOURCES, outputRouteOf, type SourceDef } from '../../../shared/registry';
 import { segmentIssues, segmentObsScene, readiness, type ObsLookup, type ReadyCtx, type Segment } from '../../../shared/showplan';
@@ -72,6 +73,9 @@ export function studioIssues(st: ControllerState): { level: 'error' | 'warn'; te
   if (unnamed) out.push({ level: 'warn', text: `${unnamed} seated talent need a name`, where: 'talent' });
   const offline = (st.talent ?? []).filter(t => t.seat && t.mode !== 'vdo' && !t.publishing).length;
   if (offline) out.push({ level: 'warn', text: `${offline} seated camera${offline === 1 ? '' : 's'} offline`, where: 'talent' });
+  // 3.0: blocking talent problems (camera link missing, microphone missing, audio input missing, heard twice…)
+  const tBad = checkTalent({ talent: st.talent ?? [], seats: st.seats ?? ({} as never), audio: st.audio }).filter(i => i.tone === 'bad' && !/^cam-/.test(i.code));
+  if (tBad.length) out.push({ level: 'error', text: tBad.length === 1 ? tBad[0].text : `${tBad.length} talent problems (${tBad[0].text})`, where: 'talent' });
   const bad = Object.values(st.gfxHealth ?? {}).filter(h => !h.ok).length;
   if (bad) out.push({ level: 'error', text: `${bad} graphic${bad === 1 ? '' : 's'} report an error`, where: 'obs' });
   for (const s of st.plan?.segments ?? []) {

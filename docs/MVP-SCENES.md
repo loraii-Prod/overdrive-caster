@@ -57,6 +57,59 @@ the normal Studio layout. Everything is saved to the current event:
    source with the transition, and moves the show rundown on. A reveal asks for a second click (**CONFIRM**).
 4. **Next: <item>** continues to the next rundown item (the same as GO / F9).
 
+## 3.0: MVP as a main scene
+
+**Producer Mode → first column → Scenes.** MVP is a main scene tile next to Starting Soon, Caster Desk, Analyst Desk,
+Gameplay, Intermission and Ending. The tile has:
+
+- a live thumbnail;
+- the Program and Preview tally;
+- the voting state (open, vote count, countdown).
+
+The tile opens on the view the next step needs: Voting, Closed, Community reveal, Analyst reveal or Comparison.
+
+- **Click a tile** to put it in Preview. The 1920×1080 preview and that scene's controls switch to it. With OBS in
+  Studio Mode, OBS's own Preview follows. Program is never touched, so MVP is prepared while the Caster Desk stays on
+  air.
+- **TAKE** goes to Program with the transition chosen in the Publish column. **AUTO** uses OBS's transition. **CUT**
+  cuts. The show rundown follows. A reveal asks for **CONFIRM** first.
+- **MVP control panel** (MVP selected):
+  - match selection;
+  - candidates with picture, team, stats and live votes (private);
+  - Prepare, Start / Stop voting, countdown, +30 s, live totals on air;
+  - QR code shown / hidden on the graphic (applied at once);
+  - counting status: local or online, website and Twitch;
+  - rehearsal votes, counted apart and flagged until reset;
+  - **Manual MVP** (override);
+  - the analysts' picks;
+  - the five views as Preview buttons, with the reason a reveal is locked;
+  - Replay;
+  - **Reset for next match** (archives this match's MVP and moves to the next finished match).
+
+**Local counting (no vote service needed).** Without `VOTE_URL` / `VOTE_SECRET`, or with "Counting: Local", this
+server counts the MVP vote itself. It uses the vote service's rules: one vote per Twitch account, late votes refused,
+and the result frozen at close.
+
+- **Votes come from:** Twitch chat voting, plus rehearsal votes for tests.
+- **Public website:** voting there needs the online vote service, so the website QR is not shown in local counting.
+- **When viewers cannot vote:** the panel says so if Twitch chat is not connected.
+
+**Manual MVP.** When voting is not possible or must be overridden, the production picks the player.
+
+- An open vote is closed first; its count is kept.
+- With no vote at all, a closed result is created for the match.
+- The reveal names the player under a **Match MVP** badge with "Chosen by the broadcast team". It never shows a vote
+  share it does not have.
+- **Undo** returns to the vote's own result.
+
+Tests:
+
+- `tests/mvpLocal.test.ts` (34 checks).
+- `e2e-rig/mvp3/run.sh` (30 checks). It runs the real server, the Producer page, the browser sources at 1080p and 4K,
+  and the mock OBS with every scene built by the Scene Builder. It covers the seven-step workflow above, the manual
+  MVP, reset, and the Studio Program monitor.
+- A real OBS, real Twitch chat and the online vote service were not available for testing.
+
 ## Rundown and automation
 
 The starter rundown contains the five MVP items after the analyst desk. Studio → Automation has two templates, and

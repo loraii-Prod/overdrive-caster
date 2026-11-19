@@ -13,6 +13,7 @@
  */
 import type { ScreenId } from './types';
 import type { WcDeskPanel } from './wildcard';
+import type { DeskCamLayout } from './camPresets';
 
 export type TransitionKind = 'stinger' | 'fade' | 'cut';
 export const TRANSITIONS: { id: TransitionKind; label: string }[] = [
@@ -56,7 +57,14 @@ export type ProducerCmd =
   | { c: 'op-quick'; op: import('./protocol').QuickOp }
   // ---- Talent (10 profiles) and positions
   | { c: 'seat'; seat: number; talent: string | null }
-  | { c: 'talent-edit'; id: string; name?: string; role?: 'caster' | 'analyst'; mode?: 'webrtc' | 'vdo'; camQuality?: import('./talent').CamQuality; /** VDO.Ninja stream ID, or a pasted VDO.Ninja link (push= / view=) */ vdoId?: string }
+  | { c: 'talent-edit'; id: string } & TalentPatch
+  /** 3.0 Add Talent: one step = a profile with name, role, camera link and (optionally) a position. Answers "Added tN". */
+  | { c: 'talent-add'; name: string; role?: import('./talent').TalentRole; vdo?: string; seat?: number | null; mode?: 'webrtc' | 'vdo' }
+  /** Clears a profile (link revoked, off position); t11+ profiles are deleted. */
+  | { c: 'talent-remove'; id: string }
+  /** 3.0 audio: mute / unmute every talent voice at once (OBS), and re-apply every talent's audio settings to OBS. */
+  | { c: 'audio-master'; muted: boolean }
+  | { c: 'audio-apply' }
   | { c: 'talent-regen'; id: string }
   | { c: 'camera'; seat: number; on: boolean }
   | { c: 'feed-resync'; seat: number }
@@ -84,6 +92,14 @@ export type ProducerCmd =
   | { c: 'obs-setup'; action: 'apply'; hash: string; allowLive?: boolean }
   | { c: 'obs-setup'; action: 'cancel' }
   | { c: 'obs-setup'; action: 'options'; options: Partial<import('./obsSetup').ObsSetupOptions> }
+  | { c: 'obs-setup'; action: 'cleanup-scan' }
+  | { c: 'obs-setup'; action: 'cleanup-apply'; hash: string; remove: string[]; unnest: string[]; confirm: string; /** 3.3: retired sources to take out of main scenes, "scene\u0000input" */ drop?: string[]; /** 3.6: scenes whose old flat audio items migrate to the nested audio-group scene */ nestAudio?: string[] }
+  | { c: 'obs-setup'; action: 'audit' }
+  | { c: 'obs-setup'; action: 'validation' }
+  | { c: 'obs-setup'; action: 'validation-set'; id: string; checked: boolean }
+  | { c: 'obs-setup'; action: 'validation-new-session' }
+  /** 3.2 main-scenes layout: show / hide one layer (scene item) of a main scene. Showing a base or panel hides the others. */
+  | { c: 'obs-layer'; target: string; on: boolean }
   // ---- Graphics rundown (items act inside their graphic's own source; never switch OBS)
   | { c: 'rd-add'; gfx: string; preset?: string | null; snapshot?: boolean; label?: string; at?: number }
   | { c: 'rd-remove'; id: string }
@@ -104,6 +120,16 @@ export type ProducerCmd =
   | { c: 'mvp-settings'; patch: Record<string, string | number | boolean> }
   /** Internal staff pick'em: staff list, match locks, remove a pick, reset, new private link. */
   | { c: 'staff'; op: import('./staffPicks').StaffOp }
+  /** 3.0 main scenes: TAKE / CUT / AUTO a scene (rundown target 's:<id>' / 'g:<id>') to OBS Program with a transition; the rundown follows. MVP targets run the MVP TAKE (reveal rules). */
+  | { c: 'scene-take'; target: string; transition?: 'obs' | TransitionKind }
+  /** 3.0: put a scene in OBS's own Preview (OBS Studio Mode). Without Studio Mode the preview stays in Overdrive. */
+  | { c: 'obs-preview'; scene: string; /** 3.2: the output being prepared (shows its layer in an off-air main scene) */ target?: string }
+  /** 3.0 MVP scene: the match the MVP scene is about (back to the voting step; reveal authorizations cleared). */
+  | { c: 'mvp-match'; match: string }
+  /** 3.0 MVP scene: show / hide the QR code (and chat box) on the voting graphic, immediately. */
+  | { c: 'mvp-qr'; on: boolean }
+  /** 3.0 MVP rehearsal: load the demo match (fictional teams, separate event), finish it (3–1 → MVP prepares), leave. */
+  | { c: 'mvp-demo'; action: 'load' | 'finish' | 'leave' }
   | { c: 'mvp-take'; view: import('./mvpFlow').MvpView; transition?: 'obs' | TransitionKind; /** prepare only (no OBS switch) */ noObs?: boolean }
   | { c: 'sp-go' } // producer GO: resolves a pending automation GO, else takes the prepared segment
   | { c: 'sp-cancel' } // cancel the GO the automation is waiting for
@@ -114,6 +140,21 @@ export type ProducerCmd =
   | { c: 'sp-starter' } // starter show + reference automation (only into an empty plan)
   | { c: 'sp-import'; plan: { segments?: unknown[]; rules?: unknown[]; crewSync?: boolean } } // show file: replaces segments + rules (refused while a segment is on air)
   | { c: 'sp-opts'; crewSync?: boolean }
+  // ---- Desk Camera Engine (3.4): OBS-composited camera layouts with A/B scene isolation
+  /** Prepare a camera preset on Preview (B scene); does not touch Program. */
+  | { c: 'cam-prepare'; preset: string }
+  /** Prepare a custom camera layout on Preview. */
+  | { c: 'cam-prepare-layout'; cameras: DeskCamLayout[] }
+  /** TAKE: animated transition of the prepared camera layout to Program. */
+  | { c: 'cam-take'; duration?: number; easing?: 'ease-out' | 'ease-in-out' | 'linear' }
+  /** Snap: immediately set cameras on both A/B scenes (no animation, no swap). */
+  | { c: 'cam-snap'; preset: string }
+  /** Save the current camera layout as a named preset. */
+  | { c: 'cam-preset-save'; name: string; cameras: DeskCamLayout[]; id?: string }
+  /** Delete a custom camera preset (builtins cannot be deleted). */
+  | { c: 'cam-preset-delete'; id: string }
+  /** Auto-select the built-in preset matching the current desk mode & caster count; animated, like cam-take. */
+  | { c: 'cam-auto'; duration?: number; easing?: 'ease-out' | 'ease-in-out' | 'linear' }
   // ---- Recovery
   | { c: 'panic' } // clear every keyed graphic + popups, keep the scene
   | { c: 'safe' } // CUT Program to the BRB screen
@@ -121,6 +162,16 @@ export type ProducerCmd =
   | { c: 'automation'; hold: boolean };
 
 export type CmdSource = 'manual' | 'auto';
+
+/** Editable fields of a talent profile (talent-edit). */
+export interface TalentPatch {
+  name?: string; role?: import('./talent').TalentRole; mode?: 'webrtc' | 'vdo'; camQuality?: import('./talent').CamQuality;
+  /** VDO.Ninja stream ID, or a pasted VDO.Ninja link (push= / view=) */
+  vdoId?: string;
+  photo?: string; ready?: boolean; notes?: string;
+  audio?: Partial<import('./talent').TalentAudio>;
+  crop?: Partial<import('./talent').TalentCrop>;
+}
 
 /** Live-data commands that can be prepared and published later. */
 export type DraftCmd = Extract<ProducerCmd, { c: 'score' } | { c: 'pick' } | { c: 'picks-show' }>;

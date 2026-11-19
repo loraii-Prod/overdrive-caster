@@ -58,8 +58,8 @@ export function MvpSceneConfig({ st, run, x, src }: { st: ControllerState; run: 
       <Card title="Match & candidates" icon={I.data} className="flex-none">
         <div className="space-y-3">
           <Field label="Current match" hint={onAir ? 'An MVP scene is on air: changing the match changes it on air too.' : 'The MVP scenes show this match (finished matches only).'}>
-            <Select ariaLabel="MVP match" value={String(g?.config.match ?? '')} onChange={v => save({ match: v }, `MVP match: ${v ? matchName(v) : 'cast match'}`)}
-              options={[['', `Cast match (${x.wc.cast ? matchName(x.wc.cast) : 'none'})`], ...done.map(id => [id, `${matchName(id)}: ${R[id].t1} vs ${R[id].t2}`] as [string, string])]} />
+            <Select ariaLabel="MVP match" value={String(g?.config.match ?? '')} onChange={v => save({ match: v }, `MVP match: ${v ? matchName(v) : 'none'}`)}
+              options={[...(done.includes(String(g?.config.match ?? '')) ? [] : [[String(g?.config.match ?? ''), g?.config.match ? `${matchName(String(g.config.match))} (no result yet)` : '— set automatically by the next result —'] as [string, string]]), ...done.map(id => [id, `${matchName(id)}: ${R[id].t1} vs ${R[id].t2}`] as [string, string])]} />
           </Field>
           {!D.finished ? <div className="text-[14px] text-white/50">MVP voting opens after this match has a result.</div> : <>
             <Field label={`Candidates (${pick.length}/4)`} hint={locked ? `Voting is ${poll!.status}: candidates are fixed.` : 'The voting graphic shows four cards; chat votes use their numbers (!vote 1–4).'}>
@@ -89,7 +89,7 @@ export function MvpSceneConfig({ st, run, x, src }: { st: ControllerState; run: 
             <Toggle on={g?.config.liveCounts === true} onChange={v => save({ liveCounts: v }, 'Vote counts on the cards')} label="Vote counts next to the percentages" />
           </div>
           <div className="flex w-[180px] flex-none flex-col items-center gap-1.5 rounded-[8px] p-2.5" style={{ background: '#F4F2EF', color: '#121212' }} data-mvp-qr-preview>
-            {qr ? <><Qr url={qr.url} size={150} /><b className="text-[12px] uppercase tracking-[0.06em]">Scan to vote</b><span className="break-all text-center text-[11px] text-black/55">{qr.url.replace(/^https:\/\//, '')}</span></> : <span className="py-8 text-center text-[12px] text-black/55">No voting address (Audience & Show File)</span>}
+            {qr ? <><Qr url={qr.url} size={150} /><b className="text-[12px] uppercase tracking-[0.06em]">Scan to vote</b><span className="break-all text-center text-[11px] text-black/55">{qr.url.replace(/^https:\/\//, '')}</span></> : <span className="py-8 text-center text-[12px] text-black/55">No voting address (Audience)</span>}
           </div>
         </div>
         <div className="mt-3"><ChatVotingPanel a={a} poll={poll} now={x.now} /></div>
@@ -102,7 +102,7 @@ export function MvpSceneConfig({ st, run, x, src }: { st: ControllerState; run: 
               return <div key={s} className="flex flex-wrap items-center gap-1.5"><b className="w-[120px] truncate text-[14px]">{name}</b>
                 {D.roster.map(p => <button key={p.handle} type="button" onClick={() => aud({ k: 'staff-mvp', match: D.match, slot: s, player: cur === p.handle ? null : p.handle }, `${name} MVP ${p.handle}`)}
                   className="h-[32px] rounded-[6px] border px-2.5 text-[13px] font-semibold" style={cur === p.handle ? { background: '#fff', color: '#000', borderColor: '#fff' } : { borderColor: S.line2 }}>{p.handle}</button>)}</div>; })}
-            {!seats.length && <div className="text-[13px] text-white/50">No talent seated: seat the analysts in Talent & Cameras.</div>}
+            {!seats.length && <div className="text-[13px] text-white/50">No talent seated: seat the analysts in Talent → Layouts.</div>}
           </div>
         )}
       </Card>

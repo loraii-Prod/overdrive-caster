@@ -12,6 +12,17 @@
  */
 import { WC_IDS, matchName } from './wildcard';
 
+/**
+ * 3.4: the internal transition the PRIMARY /output/screen/* and /output/program routes use for every frame
+ * crossfade, nameplate move and panel swap (src/gfx/transition.tsx's DEFAULT_TRANSITION) — those routes render
+ * straight from the live show/scene state with no TransitionProvider, so a package's own `transition`/`transitionMs`
+ * props (the MOTION() props below) only take effect for a /g/<id> embed of that package, never for the main desk
+ * output OBS actually captures. The Desk Camera Engine (server/camEngine.ts) defaults its own TAKE duration to
+ * this SAME constant, so an OBS camera move and the graphics' own crossfade land together without either side
+ * guessing the other's timing.
+ */
+export const DEFAULT_GFX_TRANSITION_MS = 300;
+
 export type PropType = 'text' | 'number' | 'boolean' | 'color' | 'select';
 export interface PropDef {
   key: string;
@@ -33,7 +44,8 @@ export type Binding =
   | { kind: 'predictions'; label: string; seats: number[] }
   | { kind: 'score'; label: string }
   | { kind: 'bracket'; label: string } // tournament results (match scores, sheet sync)
-  | { kind: 'audience'; label: string; module: 'pickems' | 'mvp' | 'qr' }; // vote service (Pick'ems / MVP / QR)
+  | { kind: 'audience'; label: string; module: 'pickems' | 'mvp' | 'qr' } // vote service (Pick'ems / MVP / QR)
+  | { kind: 'track'; label: string }; // 3.1: round-by-round points of the current track (sheet or entered)
 
 export type AnimAction = 'in' | 'out' | 'update' | 'reset';
 export interface AnimDef { action: AnimAction; label: string; ms: number; how: 'waapi' | 'css' | 'video' }
@@ -75,6 +87,8 @@ export interface GfxInstance {
   presets: { name: string; config: Record<string, string | number | boolean> }[];
   /** OBS scene holding this graphic's browser source (Studio Mode mapping), or null = guess by name. */
   obsScene?: string | null;
+  /** 3.3 Preview identity: the view prepared off-air (drawn ONLY by the internal Preview source; never by Program). */
+  prepared?: string | null;
 }
 
 /** Health reported by the browser sources of an instance. */
@@ -107,6 +121,7 @@ export const PACKAGES: PackageDef[] = [
       { key: 'picks', label: 'Prediction badges', type: 'boolean', default: false, group: 'Graphics' },
       { key: 'ticker', label: 'Ticker', type: 'boolean', default: true, group: 'Graphics' },
       { key: 'accent', label: 'Accent colour', type: 'color', default: '', group: 'Look', help: 'Empty = the Overdrive brand colour.' },
+      { key: 'obsCams', label: 'Cameras composited in OBS', type: 'boolean', default: false, group: 'Cameras', help: 'Leaves the camera holes transparent so OBS’s own local VDO.Ninja feeds (positioned from the Caster Desk OBS dock) show through. Names, frames and badges still come from this source. Off = cameras embedded here as before.' },
       ...MOTION('crossfade', 300),
     ],
     bindings: [{ kind: 'seats', label: 'Caster positions', seats: [1, 2, 3] }, { kind: 'match', label: 'Match' }, { kind: 'predictions', label: 'Caster predictions', seats: [1, 2, 3] }],
@@ -130,6 +145,7 @@ export const PACKAGES: PackageDef[] = [
       { key: 'qr', label: 'Voting QR', type: 'boolean', default: false, group: 'Panel', help: 'Scannable voting code at the side of the desk (needs the public voting URL in Studio → Audience & QR).' },
       { key: 'qrTitle', label: 'QR title', type: 'text', default: 'Vote for the MVP', group: 'Panel' },
       { key: 'qrWinner', label: 'MVP winner beside the QR', type: 'boolean', default: false, group: 'Panel', help: 'After the reveal only: the Community MVP and their share next to the code (never before the producer revealed it on air).' },
+      { key: 'obsCams', label: 'Cameras composited in OBS', type: 'boolean', default: false, group: 'Cameras', help: 'Leaves the camera holes transparent so OBS’s own local VDO.Ninja feeds (positioned from the Analyst Desk OBS dock) show through, in both Cameras-only and panel layouts. Names, frames and badges still come from this source. Off = cameras embedded here as before.' },
       ...MOTION('slide', 350),
     ],
     bindings: [{ kind: 'seats', label: 'Analyst positions', seats: [4, 5] }, { kind: 'match', label: 'Match' }, { kind: 'predictions', label: 'Desk predictions', seats: [4, 5] }],
@@ -156,6 +172,20 @@ export const PACKAGES: PackageDef[] = [
     bindings: [{ kind: 'match', label: 'Match' }, { kind: 'score', label: 'Series score' }],
     animations: IN_OUT, assets: ['/brand/overdrive/maps/*.jpg'], commands: [{ id: 'replay', label: 'Replay badge' }, { id: 'highlights', label: 'Highlights badge' }, { id: 'clear-badge', label: 'Clear badge' }],
     permissions: ['cameras', 'match-data'],
+  },
+  {
+    id: 'od.track', name: 'Track Progression', version: '1.0.0', collection: 'Overdrive Major', category: 'Game', renderer: 'track',
+    description: 'Round-by-round story of the current track: cumulative points of both teams (lead, threshold, aces, overtime), one cell per round, fastest lap and the key takeaway. Data from the Google Sheet (Control tab or match + track) or rounds entered in Overdrive.',
+    resolution: [1920, 1080],
+    props: [
+      { key: 'bg', label: 'Background', type: 'select', default: 'brand', group: 'Display', options: [{ value: 'brand', label: 'Overdrive fire loop' }, { value: 'dim', label: 'Dark (no video)' }, { value: 'none', label: 'Transparent (over the game)' }] },
+      { key: 'colors', label: 'Team colours', type: 'select', default: 'game', group: 'Display', options: [{ value: 'game', label: 'In-game blue / red' }, { value: 'brand', label: 'Overdrive orange / bone' }], help: 'Team A (left) and team B (right) on the chart, scores and rounds.' },
+      { key: 'fastest', label: 'Fastest lap', type: 'boolean', default: true, group: 'Content' },
+      { key: 'ecmLogo', label: 'ECM branding', type: 'boolean', default: true, group: 'Content', help: 'Shows the ECM mark + "Powered by ECM" on the Track Data footer. Per-event toggle.' },
+      { key: 'reveal', label: 'Chart wipe + new round fade', type: 'boolean', default: true, group: 'Animation' },
+    ],
+    bindings: [{ kind: 'track', label: 'Track rounds' }],
+    animations: IN_OUT, assets: ['/brand/overdrive/maps/*.jpg', '/brand/overdrive/pattern.svg', '/brand/overdrive/loop.webm', '/brand/ecm/logo.png'], commands: [], permissions: ['match-data'],
   },
   {
     id: 'od.bracket', name: 'Tournament Bracket', version: '2.2.0', collection: 'Overdrive Major', category: 'Bracket', renderer: 'bracket', obsKey: 'bracket',
@@ -197,7 +227,7 @@ PACKAGES.push(
     description: 'Community MVP of a finished match: voting open (players + QR), the winner reveal, and the community vs desk comparison. The winner shows only from the result frozen when voting closed; showing it on air also reveals it on the voting page.',
     resolution: [1920, 1080],
     props: [
-      { key: 'match', label: 'Match', type: 'select', default: '', group: 'Content', options: MATCH_OPTS },
+      { key: 'match', label: 'MVP match', type: 'select', default: '', group: 'Content', options: [{ value: '', label: 'None yet (set by the next result)' }, ...MATCH_OPTS.slice(1)], help: '3.0: set automatically when a match gets its result. Changing it here changes it for every console.' },
       { key: 'step', label: 'Show', type: 'select', default: 'voting', group: 'Reveal', options: [{ value: 'voting', label: 'Voting open' }, { value: 'winner', label: 'Community MVP reveal' }, { value: 'desk', label: 'Analyst MVP reveal' }, { value: 'compare', label: 'Community vs Analysts' }] },
       { key: 'liveOrder', label: 'Rank cards by live votes', type: 'boolean', default: false, group: 'Live voting', help: 'Only while live totals are on air. Off: candidates keep their prepared order (nothing hints at a leader).' },
       { key: 'liveCounts', label: 'Vote counts on the cards', type: 'boolean', default: false, group: 'Live voting', help: 'Only while live totals are on air: the number of votes next to each percentage.' },
@@ -205,6 +235,7 @@ PACKAGES.push(
       { key: 'revealPace', label: 'Reveal pace', type: 'select', default: 'cinematic', group: 'Reveal animation', options: [{ value: 'cinematic', label: 'Cinematic (approved timing)' }, { value: 'standard', label: 'Standard (1.4× faster)' }, { value: 'quick', label: 'Quick (2× faster)' }], help: 'Speed of the reveal sequence; the beats and their order never change.' },
       { key: 'revealSweep', label: 'Opening sweep + flare', type: 'boolean', default: true, group: 'Reveal animation', help: 'The red angular sweep and flare that open the Community MVP reveal.' },
       { key: 'countdown', label: 'Voting countdown (s)', type: 'number', default: 0, min: 0, max: 3600, group: 'Voting', help: 'Default countdown when voting opens (0 = closed by hand). The producer can change it when opening.' },
+      { key: 'qr', label: 'Show the QR code', type: 'boolean', default: true, group: 'Voting', help: 'The QR code / Twitch chat box on the voting graphic. Off: the candidates only (the vote stays open).' },
       { key: 'revealed', label: 'Reveals authorized', type: 'text', default: '', group: 'Reveal', internal: true },
     ],
     bindings: [{ kind: 'audience', label: 'Community MVP', module: 'mvp' }, { kind: 'audience', label: 'QR', module: 'qr' }],
@@ -259,6 +290,7 @@ export function sanitizeGraphics(v: unknown): GfxInstance[] {
     anim: { action: 'in', seq: 0, at: 0 }, // a restarted server shows every graphic IN (its published state)
     presets: Array.isArray(x?.presets) ? x.presets.slice(0, 30).filter((q: any) => typeof q?.name === 'string').map((q: any) => ({ name: q.name.slice(0, 40), config: sanitizeConfig(p, q.config) })) : [],
     obsScene: typeof x?.obsScene === 'string' && x.obsScene ? x.obsScene.slice(0, 120) : null,
+    prepared: typeof x?.prepared === 'string' && /^[a-z]{3,12}$/.test(x.prepared) ? x.prepared : null,
   });
   for (const p of PACKAGES) { const id = p.id.replace(/^od\./, ''); add(list.find(x => x?.id === id), p, id); }
   for (const x of list) { const p = pkgById(x?.pkg); if (p && typeof x.id === 'string' && /^[a-z0-9-]{3,40}$/.test(x.id) && !out.some(o => o.id === x.id)) add(x, p, x.id); }

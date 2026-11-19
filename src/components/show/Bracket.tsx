@@ -11,6 +11,14 @@ interface Box { m: BMatch; r: Resolved; x: number; y: number; w: number; h: numb
 
 const AREA = { x: 80, y: 196, w: 1760, h: 800 };
 
+// Program-aligned data-graphics identity (matches the on-air score bug in Skin.tsx):
+// Russo One for numerals/titles, italic Montserrat for labels, var(--accent) for the event's theme color,
+// angular two-corner cuts in place of rounded corners, near-black panels.
+const DISP = "font-['Russo_One']";
+const LABEL = "font-['Montserrat'] font-extrabold italic uppercase";
+const CUT = { clipPath: 'polygon(10px 0,100% 0,100% calc(100% - 10px),calc(100% - 10px) 100%,0 100%)' } as const;
+const CUT_SM = { clipPath: 'polygon(6px 0,100% 0,100% calc(100% - 6px),calc(100% - 6px) 100%,0 100%)' } as const;
+
 /** Column of each match: UB/LB/GF aligned so finals line up. */
 function column(m: BMatch, t: Tournament) {
   const R = Math.log2(t.size);
@@ -76,12 +84,12 @@ function Row({ slot, refSlot, t, score, state, h, showScore }: { slot: Slot; ref
   return (
     <div className="flex items-center" style={{ height: h, gap: 10, padding: '0 0 0 10px', opacity: state === 'lose' ? 0.45 : 1 }}>
       {team ? <TeamLogo team={slot} size={h * 0.62} /> : <div style={{ width: h * 0.62 }} />}
-      <div className={`min-w-0 flex-1 truncate ${team ? 'font-display font-semibold uppercase text-white' : 'font-sans italic text-white/35'}`}
-        style={{ fontSize: team ? Math.min(17, h * 0.46) : Math.min(13, h * 0.36), letterSpacing: team ? '0.02em' : 0 }}>
+      <div className={`min-w-0 flex-1 truncate ${team ? `${LABEL} text-white` : 'font-sans italic text-white/35'}`}
+        style={{ fontSize: team ? Math.min(17, h * 0.46) : Math.min(13, h * 0.36), letterSpacing: team ? '0.01em' : 0 }}>
         {slotText(slot, refSlot, t)}
       </div>
-      <div className={`grid h-full flex-none place-items-center font-display font-bold ${state === 'win' ? 'bg-white text-[#111]' : 'bg-white/[0.06] text-white/80'}`}
-        style={{ width: h * 1.05, fontSize: h * 0.5 }}>
+      <div className={`grid h-full flex-none place-items-center ${DISP} ${state === 'win' ? 'bg-[var(--accent)] text-white' : 'bg-white/[0.06] text-white/80'}`}
+        style={{ width: h * 1.05, fontSize: h * 0.5, ...CUT_SM }}>
         {showScore ? score : ''}
       </div>
     </div>
@@ -97,16 +105,17 @@ function MatchBox({ b, t, i }: { b: Box; t: Tournament; i: number }) {
   return (
     <motion.div className="absolute" style={{ left: b.x, top: b.y, width: b.w, height: b.h }}
       initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.35, delay: 0.1 + i * 0.015, ease: EASE }}>
-      <div className={`h-full overflow-hidden rounded-[5px] border ${featured ? 'border-white' : m.status === 'live' ? 'border-[#e5484d]' : 'border-white/12'}`} style={{ background: 'rgba(18,18,18,0.94)' }}>
+      <div className={`h-full overflow-hidden border-l-4 ${featured ? 'border-white' : m.status === 'live' ? 'border-[var(--accent)]' : 'border-white/12'}`}
+        style={{ background: 'rgba(8,8,8,.92)', boxShadow: '0 10px 26px rgba(0,0,0,.5), inset 0 1px 0 rgba(255,255,255,.04)', ...CUT_SM }}>
         <Row slot={r.a} refSlot={m.a} t={t} score={m.scoreA} state={done ? (r.winner === 'A' ? 'win' : 'lose') : 'none'} h={rowH} showScore={showScore} />
         <div className="h-px bg-white/[0.07]" />
         <Row slot={r.b} refSlot={m.b} t={t} score={m.scoreB} state={done ? (r.winner === 'B' ? 'win' : 'lose') : 'none'} h={rowH - 1} showScore={showScore} />
       </div>
-      <div className="absolute flex w-full items-center justify-between font-sans font-semibold uppercase" style={{ top: -18, fontSize: 10.5, letterSpacing: '0.18em' }}>
+      <div className={`absolute flex w-full items-center justify-between ${LABEL}`} style={{ top: -18, fontSize: 10.5, letterSpacing: '0.1em' }}>
         {m.status === 'live'
-          ? <span className="rounded-[2px] bg-[#e5484d] px-1.5 text-white">LIVE</span>
-          : <span className="text-white/40">{m.time}</span>}
-        <span className="text-white/30">{m.bestOf > 1 ? `BO${m.bestOf}` : ''}</span>
+          ? <span className="bg-[var(--accent)] px-1.5 text-white" style={CUT_SM}>LIVE</span>
+          : <span className="text-white/40 not-italic font-semibold">{m.time}</span>}
+        <span className="text-white/30 not-italic font-semibold">{m.bestOf > 1 ? `BO${m.bestOf}` : ''}</span>
       </div>
     </motion.div>
   );
@@ -154,8 +163,8 @@ export function BracketView({ t, view = 'full', transparent = false, res: given,
           <div className="flex items-center gap-8" style={{ marginTop: theme === 'bnl' ? 22 : 0 }}>
             {theme !== 'bnl' && <Logo height={80} />}
             <div>
-              <div className="font-display font-bold uppercase text-white" style={{ fontSize: 44, letterSpacing: '0.02em' }}>{view === 'lower' ? 'Lower Bracket' : view === 'upper' ? 'Upper Bracket' : 'Bracket'}</div>
-              <div className="mt-1 font-sans font-semibold uppercase text-white/45" style={{ fontSize: 14, letterSpacing: '0.3em' }}>{subtitle ?? `${t.name} · ${t.format === 'double' ? 'Double elimination' : 'Single elimination'}`}</div>
+              <div className={`${DISP} text-white`} style={{ fontSize: 44, letterSpacing: '0.01em' }}>{view === 'lower' ? 'Lower Bracket' : view === 'upper' ? 'Upper Bracket' : 'Bracket'}</div>
+              <div className={`mt-1 ${LABEL} text-white/45`} style={{ fontSize: 14, letterSpacing: '0.2em' }}>{subtitle ?? `${t.name} · ${t.format === 'double' ? 'Double elimination' : 'Single elimination'}`}</div>
             </div>
           </div>
         </Rise>
@@ -168,7 +177,7 @@ export function BracketView({ t, view = 'full', transparent = false, res: given,
         </>
       )}
       {[...colLabels.values()].map(c => (
-        <div key={`${c.x}-${c.y}`} className="absolute font-sans font-bold uppercase text-white/50" style={{ left: c.x, top: c.y, fontSize: 11, letterSpacing: '0.22em', width: L.colW - 20 }}>
+        <div key={`${c.x}-${c.y}`} className={`absolute ${LABEL} not-italic text-white/50`} style={{ left: c.x, top: c.y, fontSize: 11, letterSpacing: '0.18em', width: L.colW - 20 }}>
           {c.label}
         </div>
       ))}
@@ -177,14 +186,14 @@ export function BracketView({ t, view = 'full', transparent = false, res: given,
       </svg>
       {L.boxes.map((b, i) => <MatchBox key={b.m.id} b={b} t={t} i={i} />)}
       {gf && (view === 'full' || withFinal) && (
-        <div className="absolute font-sans font-bold uppercase text-white/50" style={{ left: L.byId.get('GF-1')!.x, top: L.byId.get('GF-1')!.y - 44, fontSize: 11, letterSpacing: '0.22em' }}>Grand Final</div>
+        <div className={`absolute ${LABEL} not-italic text-white/50`} style={{ left: L.byId.get('GF-1')!.x, top: L.byId.get('GF-1')!.y - 44, fontSize: 11, letterSpacing: '0.18em' }}>Grand Final</div>
       )}
       {champ && gf && (view === 'full' || withFinal) && (
-        <motion.div className="absolute flex flex-col items-center rounded-[6px] border border-white/25 text-center" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, ease: EASE }}
-          style={{ left: gf.x, top: gf.y + gf.h + 36, width: gf.w, padding: '20px 16px', background: 'rgba(18,18,18,0.94)' }}>
+        <motion.div className="absolute flex flex-col items-center border border-[var(--accent)]/40 text-center" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, ease: EASE }}
+          style={{ left: gf.x, top: gf.y + gf.h + 36, width: gf.w, padding: '20px 16px', background: 'rgba(8,8,8,.92)', boxShadow: '0 10px 26px rgba(0,0,0,.5)', ...CUT }}>
           <Mark height={34} />
-          <div className="mt-3 font-sans font-bold text-white/50" style={{ fontSize: 11, letterSpacing: '0.32em' }}>CHAMPION</div>
-          <div className="mt-2 font-display font-bold uppercase text-white" style={{ fontSize: 24 }}>{champ.name}</div>
+          <div className={`mt-3 ${LABEL} not-italic text-white/50`} style={{ fontSize: 11, letterSpacing: '0.26em' }}>CHAMPION</div>
+          <div className={`mt-2 ${DISP} text-white`} style={{ fontSize: 24 }}>{champ.name}</div>
         </motion.div>
       )}
     </div>
@@ -194,8 +203,8 @@ export function BracketView({ t, view = 'full', transparent = false, res: given,
 function SectionTitle({ y, text }: { y: number; text: string }) {
   return (
     <div className="absolute flex items-center gap-3" style={{ left: AREA.x, top: y }}>
-      <span className="h-[3px] w-6 bg-white" />
-      <span className="font-display font-semibold text-white" style={{ fontSize: 15, letterSpacing: '0.26em' }}>{text}</span>
+      <span className="h-[3px] w-6 bg-[var(--accent)]" />
+      <span className={`${DISP} text-white`} style={{ fontSize: 15, letterSpacing: '0.18em' }}>{text}</span>
     </div>
   );
 }
@@ -203,7 +212,7 @@ function SectionTitle({ y, text }: { y: number; text: string }) {
 function Col({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div className="flex-1">
-      <div className="mb-5 flex items-center gap-3"><span className="h-[3px] w-6 bg-white" /><span className="font-display font-semibold text-white" style={{ fontSize: 18, letterSpacing: '0.26em' }}>{title}</span></div>
+      <div className="mb-5 flex items-center gap-3"><span className="h-[3px] w-6 bg-[var(--accent)]" /><span className={`${DISP} text-white`} style={{ fontSize: 18, letterSpacing: '0.18em' }}>{title}</span></div>
       <div className="border-t border-white/10">{children}</div>
     </div>
   );
@@ -219,7 +228,7 @@ export function MatchesBoard({ t, show, transparent = false }: { t: Tournament; 
   const team = (s: Slot, right = false) => (
     <div className={`flex min-w-0 flex-1 items-center gap-4 ${right ? 'flex-row-reverse text-right' : ''}`}>
       {isTeam(s) && <TeamLogo team={s} size={40} />}
-      <span className={`truncate font-display font-semibold uppercase ${isTeam(s) ? 'text-white' : 'text-white/35'}`} style={{ fontSize: 22 }}>{name(s)}</span>
+      <span className={`truncate ${isTeam(s) ? `${LABEL} text-white` : 'font-sans italic text-white/35'}`} style={{ fontSize: 22 }}>{name(s)}</span>
     </div>
   );
   return (
@@ -229,8 +238,8 @@ export function MatchesBoard({ t, show, transparent = false }: { t: Tournament; 
         <Rise className="absolute flex items-start justify-between" style={{ left: 80, right: 80, top: 56 }}>
           {theme === 'bnl' ? <span /> : <Logo height={92} />}
           <div className="text-right">
-            <div className="font-display font-semibold uppercase text-white" style={{ fontSize: 24, letterSpacing: '0.22em' }}>{t.name}</div>
-            <div className="mt-2 font-sans font-semibold uppercase text-white/45" style={{ fontSize: 14, letterSpacing: '0.3em' }}>{show.stage}</div>
+            <div className={`${DISP} text-white`} style={{ fontSize: 24, letterSpacing: '0.1em' }}>{t.name}</div>
+            <div className={`mt-2 ${LABEL} text-white/45`} style={{ fontSize: 14, letterSpacing: '0.2em' }}>{show.stage}</div>
           </div>
         </Rise>
       )}
@@ -240,11 +249,11 @@ export function MatchesBoard({ t, show, transparent = false }: { t: Tournament; 
           {next.map(({ m, r }, i) => (
             <Rise key={m.id} i={1 + i} className="flex items-center border-b border-white/10" style={{ height: 96, gap: 22 }}>
               <div style={{ width: 120 }}>
-                <div className={`font-display font-semibold ${m.status === 'live' ? 'text-[#ff5d62]' : 'text-white'}`} style={{ fontSize: 22 }}>{m.status === 'live' ? 'LIVE' : m.time || '—'}</div>
-                <div className="mt-1 truncate font-sans font-semibold uppercase text-white/40" style={{ fontSize: 11, letterSpacing: '0.2em' }}>{m.label}</div>
+                <div className={`${DISP} ${m.status === 'live' ? 'text-[var(--accent)]' : 'text-white'}`} style={{ fontSize: 22 }}>{m.status === 'live' ? 'LIVE' : m.time || '—'}</div>
+                <div className={`mt-1 truncate ${LABEL} not-italic text-white/40`} style={{ fontSize: 11, letterSpacing: '0.14em' }}>{m.label}</div>
               </div>
               {team(r.a)}
-              <span className="font-display font-bold text-white/35" style={{ fontSize: 18 }}>{m.status === 'live' ? `${m.scoreA} – ${m.scoreB}` : 'VS'}</span>
+              <span className={`${DISP} text-white/35`} style={{ fontSize: 18 }}>{m.status === 'live' ? `${m.scoreA} – ${m.scoreB}` : 'VS'}</span>
               {team(r.b, true)}
             </Rise>
           ))}
@@ -253,12 +262,12 @@ export function MatchesBoard({ t, show, transparent = false }: { t: Tournament; 
           {done.length === 0 && <div className="py-6 font-sans text-white/40" style={{ fontSize: 20 }}>No results yet</div>}
           {done.map(({ m, r }, i) => (
             <Rise key={m.id} i={1 + i} className="flex items-center border-b border-white/10" style={{ height: 96, gap: 22 }}>
-              <div className="truncate font-sans font-semibold uppercase text-white/40" style={{ width: 120, fontSize: 11, letterSpacing: '0.2em' }}>{m.label}</div>
+              <div className={`truncate ${LABEL} not-italic text-white/40`} style={{ width: 120, fontSize: 11, letterSpacing: '0.14em' }}>{m.label}</div>
               <div className="flex min-w-0 flex-1 items-center gap-4" style={{ opacity: r.winner === 'A' ? 1 : 0.5 }}>{team(r.a)}</div>
-              <div className="flex items-center gap-3 font-display font-bold" style={{ fontSize: 30 }}>
-                <span className={r.winner === 'A' ? 'text-white' : 'text-white/45'}>{m.scoreA}</span>
+              <div className={`flex items-center gap-3 ${DISP}`} style={{ fontSize: 30 }}>
+                <span className={r.winner === 'A' ? 'text-[var(--accent)]' : 'text-white/45'}>{m.scoreA}</span>
                 <span className="text-white/25">–</span>
-                <span className={r.winner === 'B' ? 'text-white' : 'text-white/45'}>{m.scoreB}</span>
+                <span className={r.winner === 'B' ? 'text-[var(--accent)]' : 'text-white/45'}>{m.scoreB}</span>
               </div>
               <div className="flex min-w-0 flex-1 items-center gap-4" style={{ opacity: r.winner === 'B' ? 1 : 0.5 }}>{team(r.b, true)}</div>
             </Rise>

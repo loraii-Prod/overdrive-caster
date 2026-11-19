@@ -2,6 +2,7 @@ import { hiRes } from './assetRes';
 import { sanitizeFrames } from './portraits';
 import { MAJOR_TEAMS } from './major';
 import { MAJOR_MAPS, isMapId } from './maps';
+import { emptyTrack, sanitizeTrack, type TrackLive, type TrackOp } from './trackProgress';
 
 /**
  * OverDrive 2026 Major (21–22 Nov): 8-team double-elimination bracket with a Grand final.
@@ -248,6 +249,15 @@ export interface WildcardState {
   /** The 8 first-round teams (Upper quarter-final 1 = slots 0–1, …); '' = TBD. */
   teams: string[];
   desk: { panel: WcDeskPanel; /** normHandle of the player in focus, or null = first player of team A */ player: string | null; /** Analyst slots (4–5) at the desk; empty = every analyst in the show */ slots: number[]; /** A caster (slot 1–3) joining the desk, or null */ guest: number | null; /** Match strip (teams) on the desk */ strip: boolean; /** "Starts in" countdown on the desk */ clock: boolean };
+  /**
+   * 3.0: players of a team for THIS event, when the verified Major profiles don't have them (another event, a
+   * substitute, the rehearsal teams). team name → player handles. Empty / missing = the verified profiles.
+   */
+  rosters: Record<string, string[]>;
+  /** 3.0: this event is the MVP rehearsal (fictional teams): votes stay on this server, real Twitch chat is ignored. */
+  rehearsal: boolean;
+  /** 3.1: round-by-round progression of the current track (sheet or entered here) for the Track Progression graphic. */
+  track: TrackLive;
   /** Server time of the last change. */
   rev: number;
 }
@@ -257,7 +267,7 @@ export const defaultWcOpts = (): WcOpts => ({ title: true, times: true, seeds: f
 export function defaultWildcard(enabled = false): WildcardState {
   const matches: Record<string, WcMatch> = {};
   for (const id of WC_IDS) matches[id] = { s1: '', s2: '', time: defaultTime(id), at: null, live: false };
-  return { enabled, pbs: {}, veto: defaultVeto(), interview: defaultInterview(), pickem: {}, champ: false, booth: [], map: { id: null, at: null }, mapPhotos: {}, bracket: WC_BRACKET, matches, teams: Array(8).fill(''), opts: defaultWcOpts(), air: 1, cue: 1, cast: null, sheetAuto: true, sheetSeen: {}, done: {}, showcase: defaultShowcase(), intro: defaultIntro(), desk: { panel: 'cams', player: null, slots: [], guest: null, strip: false, clock: false }, rev: 0 };
+  return { enabled, pbs: {}, veto: defaultVeto(), interview: defaultInterview(), pickem: {}, champ: false, booth: [], map: { id: null, at: null }, mapPhotos: {}, bracket: WC_BRACKET, matches, teams: Array(8).fill(''), opts: defaultWcOpts(), air: 1, cue: 1, cast: null, sheetAuto: true, sheetSeen: {}, done: {}, showcase: defaultShowcase(), intro: defaultIntro(), desk: { panel: 'cams', player: null, slots: [], guest: null, strip: false, clock: false }, rosters: {}, rehearsal: false, track: emptyTrack(), rev: 0 };
 }
 
 const score = (v: unknown) => (typeof v === 'string' ? v.trim().toUpperCase().slice(0, 3) : typeof v === 'number' && Number.isFinite(v) ? String(Math.max(0, Math.round(v))) : '');
@@ -270,6 +280,19 @@ export function sanitizeWcMatch(v: any, id: string): WcMatch {
     at: typeof v?.at === 'string' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(v.at) ? v.at : null,
     live: v?.live === true,
   };
+}
+
+/** Event rosters: up to 16 teams, 2–8 players each, trimmed handles (duplicates removed). */
+export function sanitizeRosters(v: unknown): Record<string, string[]> {
+  if (!v || typeof v !== 'object') return {};
+  const out: Record<string, string[]> = {};
+  for (const [team, list] of Object.entries(v as Record<string, unknown>).slice(0, 16)) {
+    const t = String(team).trim().slice(0, 60);
+    if (!t || !Array.isArray(list)) continue;
+    const hs = [...new Set(list.map(h => String(h ?? '').trim().replace(/\s+/g, ' ').slice(0, 40)).filter(Boolean))].slice(0, 8);
+    if (hs.length) out[t] = hs;
+  }
+  return out;
 }
 
 export function sanitizeWildcard(v: any, enabledDefault = false): WildcardState {
@@ -327,6 +350,9 @@ export function sanitizeWildcard(v: any, enabledDefault = false): WildcardState 
       slots: Array.isArray(v.desk?.slots) ? [...new Set<number>(v.desk.slots.filter((n: unknown) => n === 4 || n === 5))].sort() : [],
       guest: [1, 2, 3].includes(v.desk?.guest) ? v.desk.guest : Array.isArray(v.desk?.slots) ? (v.desk.slots.find((n: unknown) => n === 1 || n === 2 || n === 3) ?? null) : null,
       strip: v.desk?.strip === true, clock: v.desk?.clock === true },
+    rosters: sanitizeRosters(v.rosters),
+    rehearsal: v.rehearsal === true,
+    track: sanitizeTrack(v.track),
     rev: Number(v.rev) || 0,
   };
 }
@@ -454,6 +480,10 @@ export type WcOp =
   | { k: 'map'; id: string | null }
   | { k: 'map-photo'; id: string; url: string | null }
   | { k: 'desk'; panel?: WcDeskPanel; player?: string | null; slots?: number[]; guest?: number | null; strip?: boolean; clock?: boolean }
+  /** 3.0: this event's players of a team (empty list = back to the verified profiles). */
+  | { k: 'roster'; team: string; players: string[] }
+  /** 3.1 Track Progression (see shared/trackProgress.ts). */
+  | TrackOp
   | { k: 'intro-play' }
   | { k: 'intro-stop' };
 

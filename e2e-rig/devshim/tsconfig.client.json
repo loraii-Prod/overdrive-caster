@@ -1,0 +1,9 @@
+{
+  "compilerOptions": {
+    "target": "ES2022", "module": "ESNext", "moduleResolution": "Bundler", "strict": true, "noImplicitAny": false, "noUnusedLocals": true, "noEmit": true, "skipLibCheck": true,
+    "esModuleInterop": true, "resolveJsonModule": true, "jsx": "react-jsx", "jsxImportSource": "react",
+    "lib": ["ES2023", "DOM", "DOM.Iterable"], "types": ["node"], "typeRoots": ["/opt/npm-tools/node_modules/@types"],
+    "paths": { "motion/react": ["./motion-react.tsx"], "react-router-dom": ["./react-router-dom.tsx"], "qrcode": ["./qrcode.ts"] }
+  },
+  "include": ["../../src/**/*.ts", "../../src/**/*.tsx", "react.d.ts", "vite-env.d.ts"]
+}

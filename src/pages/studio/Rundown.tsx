@@ -100,7 +100,7 @@ export function ShowRundown({ st, run, now, sel, onSelect }: { st: ControllerSta
                       <div className="space-y-3">
                         <div><div className={`${COND} mb-1.5 text-[12.5px] tracking-[0.14em] text-white/50`}>OBS scene</div>
                           <Select ariaLabel={`OBS scene of ${s.label}`} value={s.obsScene ?? ''} options={s.obsScene && !st.obs.scenes.includes(s.obsScene) ? [...obsOpts, [s.obsScene, `${s.obsScene} (not in OBS)`]] : obsOpts} onChange={v => edit(s, { obsScene: v || null }, 'OBS scene')} />
-                          <div className="mt-1 text-[12.5px] text-white/45">{s.obsScene ? 'Explicit scene' : r.scene ? `Auto: ${r.scene}` : 'Map the scene in OBS & Outputs, or pick one here'}</div></div>
+                          <div className="mt-1 text-[12.5px] text-white/45">{s.obsScene ? 'Explicit scene' : r.scene ? `Auto: ${r.scene}` : 'Map the scene in Sources & OBS, or pick one here'}</div></div>
                         <div><div className={`${COND} mb-1.5 text-[12.5px] tracking-[0.14em] text-white/50`}>Media on GO</div>
                           <Select ariaLabel={`Media of ${s.label}`} value={s.media ?? ''} options={s.media && !mediaOpts.some(o => o[0] === s.media) ? [...mediaOpts, [s.media, mediaName(s.media)]] : mediaOpts} onChange={v => edit(s, { media: v || null }, 'media')} />
                           <div className="mt-1 text-[12.5px] text-white/45">Added to the playlist if needed and started on /output/media.</div></div>

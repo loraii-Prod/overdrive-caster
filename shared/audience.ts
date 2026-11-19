@@ -23,6 +23,8 @@ export interface AudMatchIn {
   winner: string | null;
   /** "3-1" from the winner's side, once final. */
   score: string | null;
+  /** 3.0: eligible MVP players of this match (both teams, this event's roster). Absent = the verified profiles. */
+  players?: AudPlayer[];
 }
 export interface AudSessionIn {
   session: string;
@@ -37,7 +39,11 @@ export const matchStatus = (m: Pick<AudMatchIn, 'live' | 'locked' | 'winner'>): 
 
 export type PollStatus = 'draft' | 'open' | 'closed' | 'revealed';
 export interface AudPlayer { handle: string; team: string; /** Portrait for the public voting page (absolute https URL), when one was uploaded. */ photo?: string }
-export interface AudFrozen { total: number; counts: Record<string, number>; at: number; hash: string }
+export interface AudFrozen {
+  total: number; counts: Record<string, number>; at: number; hash: string;
+  /** 3.0: the MVP chosen by the production (manual override / voting failed). The reveal says so; it never claims a vote. */
+  manual?: string;
+}
 export interface AudPoll {
   id: string;
   match: string;
@@ -57,7 +63,7 @@ export interface AudPoll {
   chatCmd?: string;
   chatChannel?: string;
   /** PRIVATE: how many of the votes came from chat / the website. */
-  bySource?: { web: number; chat: number };
+  bySource?: { web: number; chat: number; /** 3.0 rehearsal votes (local voting only) */ sim?: number };
   /** Live counts: PRIVATE (producer only, never on air, never public). */
   total?: number;
   counts?: Record<string, number>;
@@ -130,7 +136,25 @@ export type AudOp =
   /** Public voting page address used for the QR codes (Studio). '' = the VOTE_PUBLIC_URL setting. */
   | { k: 'vote-url'; url: string }
   | { k: 'staff-mvp'; match: string; slot: number; player: string | null; reason?: string }
-  | { k: 'qr-set'; qr: QrLink[] };
+  | { k: 'qr-set'; qr: QrLink[] }
+  /** 3.0: where MVP votes are counted: 'auto' = the online vote service when configured, else this server; 'local' = this server. */
+  | { k: 'vote-mode'; mode: 'auto' | 'local' }
+  /** 3.0 rehearsal: simulated votes into an OPEN local vote (counted apart, never in online voting). */
+  | { k: 'mvp-sim'; poll: string; votes: number }
+  /** 3.0: the production chooses the MVP (voting failed / override). Closes the vote if it is open. null = remove. */
+  | { k: 'mvp-override'; match: string; player: string | null }
+  /** 3.0: what happens when a match gets its result (prepare is on by default; open / OBS preview only when enabled). */
+  | { k: 'mvp-auto'; patch: Partial<MvpAuto> }
+  /** 3.0: the producer read the MVP notice. */
+  | { k: 'mvp-notice-clear' }
+  /** 3.0: prepare (or refresh) the MVP vote of a match with all its eligible players. */
+  | { k: 'mvp-ready'; match: string };
+
+/** 3.0 MVP automation per event: on a match result, prepare (default on), open voting, put MVP in OBS Preview. */
+export interface MvpAuto { prepare: boolean; open: boolean; preview: boolean }
+export const defaultMvpAuto = (): MvpAuto => ({ prepare: true, open: false, preview: false });
+/** 3.0: last thing the MVP system needs the producer to know (ready / queued / failed). */
+export interface MvpNotice { at: number; match: string; kind: 'ready' | 'queued' | 'error' | 'info'; text: string }
 
 export interface MvpCard { stats: { label: string; value: string }[]; achievements: string[] }
 /** match → player handle → reveal extras. */
@@ -177,8 +201,21 @@ export function qrUrlOk(url: string, hosts: string[]): string | null {
 
 // ------------------------------------------------------------------ verified data
 
-/** Eligible players of a team: the verified Major profiles (Liquipedia), never typed in. */
-export const teamRoster = (team: string): AudPlayer[] => MAJOR_PROFILES.filter(p => p.team === team).map(p => ({ handle: p.handle, team }));
+/**
+ * Eligible players of a team: the event's own roster for that team when the producer entered one (another event, a
+ * substitute, the rehearsal teams), else the verified Major profiles (Liquipedia).
+ */
+export const teamRoster = (team: string, rosters?: Record<string, string[]> | null): AudPlayer[] => {
+  const own = rosters?.[team];
+  if (own && own.length) return own.map(handle => ({ handle, team }));
+  return MAJOR_PROFILES.filter(p => p.team === team).map(p => ({ handle: p.handle, team }));
+};
+/** Where a team's players come from: 'event' (entered for this event), 'verified' (Major profiles) or 'none'. */
+export const rosterSource = (team: string, rosters?: Record<string, string[]> | null): 'event' | 'verified' | 'none' =>
+  rosters?.[team]?.length ? 'event' : MAJOR_PROFILES.some(p => p.team === team) ? 'verified' : 'none';
+/** Both teams' eligible players of a match (empty when a team is not known yet). */
+export const matchRoster = (t1: string | null | undefined, t2: string | null | undefined, rosters?: Record<string, string[]> | null): AudPlayer[] =>
+  t1 && t2 && t1 !== 'BYE' && t2 !== 'BYE' ? [...teamRoster(t1, rosters), ...teamRoster(t2, rosters)] : [];
 export const isMajorTeam = (t: string) => MAJOR_TEAMS.some(x => x.name === t);
 export const playerKey = (handle: string) => normHandle(handle);
 

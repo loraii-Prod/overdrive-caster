@@ -189,7 +189,9 @@ export function AudioOutput() {
   const live = useLive(sock);
   const viewer = useViewer(sock, 'hq');
   const ref = useRef<HTMLAudioElement>(null);
-  const isRemote = valid && live?.scene.casters[slot - 1].source.type === 'webrtc';
+  // 3.0: a talent whose voice comes from another OBS input (or none) is silent here: never heard twice
+  const audioOff = valid && live?.scene.casters[slot - 1].source.audioOff === true;
+  const isRemote = valid && !audioOff && live?.scene.casters[slot - 1].source.type === 'webrtc';
 
   useEffect(() => {
     viewer.setWanted(isRemote ? new Map([[slot, { video: false, audio: true }]]) : new Map());
@@ -204,7 +206,7 @@ export function AudioOutput() {
     });
   }, [viewer, slot, valid]);
 
-  const vdoSrc = valid && live?.scene.casters[slot - 1].source.type === 'vdo' ? live.scene.casters[slot - 1].source.vdo : '';
+  const vdoSrc = valid && !audioOff && live?.scene.casters[slot - 1].source.type === 'vdo' ? live.scene.casters[slot - 1].source.vdo : '';
   return (
     <>
       <audio ref={ref} autoPlay />
@@ -223,7 +225,10 @@ export function GraphicOutput() {
   useTransparentPage();
   // MVP & Awards scenes: /g/mvp?view=winner etc. (one graphic, several sources); anything else ignores `view`.
   const v = query().get('view'), view = id === 'mvp' && isMvpView(v) ? v : id === 'bracket' && isBracketView(v) ? v : undefined;
-  const sock = useSocket({ role: 'output', route: `g/${id}${view ? `?view=${view}` : ''}`, key: query().get('key') ?? undefined });
+  // 3.3 Preview identity (?id=pvw): the SAME renderer, drawing the state prepared off-air (inst.prepared + draft data)
+  // for OBS Studio Mode Preview. Never reports health, never opens cameras (no second WebRTC session), muted in OBS.
+  const pvw = query().get('id') === 'pvw';
+  const sock = useSocket({ role: 'output', route: `g/${id}${view ? `?view=${view}` : pvw ? '?id=pvw' : ''}`, key: query().get('key') ?? undefined });
   const state = useConnState(sock);
   const live = useLive(sock);
   const tournament = useTournament(sock);
@@ -234,7 +239,7 @@ export function GraphicOutput() {
   const now = useNow(live?.skew ?? 0, 250);
   const viewer = useViewer(sock, 'hq');
   const inst = graphics?.find(g => g.id === id);
-  const needsCams = !!inst && (pkgById(inst.pkg)?.permissions.includes('cameras') ?? false) && inst.anim.action !== 'out';
+  const needsCams = !pvw && !!inst && (pkgById(inst.pkg)?.permissions.includes('cameras') ?? false) && inst.anim.action !== 'out';
   useWantedCameras(viewer, [live?.scene], needsCams);
   const lastHealth = useRef('');
   const health = (ok: boolean, error?: string) => {
@@ -250,7 +255,11 @@ export function GraphicOutput() {
       <ScaledCanvas output>
         <ThemeProvider theme={live?.show.theme ?? 'bnl'} brand={live?.show.brand ?? null}>
           <div className="od-stage relative h-[1080px] w-[1920px] overflow-hidden" data-theme={live?.show.theme ?? 'bnl'}>
-            {inst && live && <GraphicHost inst={inst} d={{ scene: live.scene, show: live.show, wc, aud, now, tournament, bnl, viewer }} onHealth={health} view={view} />}
+            {inst && live && (pvw
+              ? <GraphicHost inst={inst} d={{ scene: live.scene, show: live.show, wc, aud, now, tournament, bnl, viewer }} preview forceShow gate={false} cfgOverride={inst.draft ?? null}
+                  view={id === 'mvp' && isMvpView(inst.prepared) ? inst.prepared : undefined} />
+              : <GraphicHost inst={inst} d={{ scene: live.scene, show: live.show, wc, aud, now, tournament, bnl, viewer }} onHealth={health} view={view} />)}
+            {pvw && <div className="hidden" data-identity="pvw" data-prepared={inst?.prepared ?? ''} />}
           </div>
         </ThemeProvider>
       </ScaledCanvas>

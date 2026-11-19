@@ -20,6 +20,10 @@ export interface CameraSource {
   vdo: string;
   /** Camera quality of the talent seated here (from their profile): '720p' (default) or '1080p'. */
   quality?: import('./talent').CamQuality;
+  /** 3.0: framing of the talent seated here (from their profile). Absent = full frame. */
+  crop?: import('./talent').TalentCrop;
+  /** 3.0: their voice comes from another OBS input (or none): the position's audio source stays silent. */
+  audioOff?: boolean;
 }
 
 /** What happens to a caster whose camera is OFF. */
@@ -167,6 +171,14 @@ export interface Scene {
   showBackground: boolean;
   /** Which full-screen scene /output/program shows. */
   screen: ScreenId;
+  /**
+   * 3.4: the desk's camera holes are composited by OBS (local VDO.Ninja feeds, positioned by the CamEngine —
+   * see server/camEngine.ts), not drawn by this browser source. When true, the desk renderer leaves the hole
+   * area fully transparent (no backing colour, no embedded <Feed>) so OBS's camera layer underneath shows
+   * through; the frame video, name bars, badges and every other graphic still render exactly as before. Only
+   * meaningful for the caster-desk and analyst-desk screens.
+   */
+  obsCams: boolean;
 }
 
 /** Run of show (rundown) shared with casters and crew. */
@@ -240,6 +252,8 @@ export interface ControllerState {
   /** 2.0 talent pool, positions and live status (producer only: contains link keys). */
   talent?: (import('./talent').TalentProfile & { online: boolean; publishing: boolean; hasAudio: boolean; seat: number | null })[];
   seats?: import('./talent').Seats;
+  /** 3.0 talent audio through OBS (inputs, faders, issues). */
+  audio?: import('./audio').AudioStatus;
   media?: import('./media').MediaState;
   studio?: import('./registry').Studio;
   graphics?: import('./gfx').GfxInstance[];
@@ -248,6 +262,8 @@ export interface ControllerState {
   plan?: import('./showplan').ShowPlan;
   /** OBS Scene Builder (Studio Mode → OBS Setup). */
   obsSetup?: import('./obsSetup').ObsSetupState;
+  /** 3.4 Desk Camera Engine: per-desk A/B composition state + presets (Caster Desk, Analyst Desk). */
+  camEngines?: Record<'caster-desk' | 'analyst-desk', { state: import('./camPresets').CamEngineState; presets: import('./camPresets').DeskCamPreset[] }>;
   gfxHealth?: Record<string, import('./gfx').GfxHealth>;
   preview: Scene;
   live: Scene;

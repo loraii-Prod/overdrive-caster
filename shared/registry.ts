@@ -14,7 +14,7 @@ import type { ScreenId } from './types';
 export type ModuleId =
   | 'talent-casters' | 'talent-analysts' | 'talent-guest' | 'cameras' | 'scoreboard' | 'match' | 'predictions'
   | 'stats' | 'h2h' | 'media' | 'countdown' | 'graphics' | 'bracket' | 'music' | 'veto' | 'interview' | 'intro' | 'showcase'
-  | 'pickems' | 'mvp' | 'qr';
+  | 'pickems' | 'mvp' | 'qr' | 'track';
 
 export const MODULES: Record<ModuleId, { name: string; about: string }> = {
   'talent-casters': { name: 'Talent · Caster desk', about: '3 caster positions (left / center / right), Solo / Duo / Trio, assign any talent' },
@@ -32,6 +32,7 @@ export const MODULES: Record<ModuleId, { name: string; about: string }> = {
   pickems: { name: "Pick'ems", about: 'Public picks per match (lock / reopen), the desk picks, the reveal steps, the community record' },
   mvp: { name: 'Community MVP', about: 'Eligible players, open / close voting, private counts, the desk MVP, the winner reveal' },
   qr: { name: 'QR codes', about: 'Choose an approved link, preview it, position, show / hide' },
+  track: { name: 'Track progression', about: 'Round-by-round points of the current track: from the Google Sheet or entered here (Ace / 2–1 / Draw), fastest lap, key takeaway' },
   bracket: { name: 'Tournament bracket', about: 'Upper / lower half on screen, auto switch, match states' },
   music: { name: 'Music & audio', about: "This scene's music bed, level, skip, master on/off" },
   veto: { name: 'Map veto', about: 'Pick / ban the maps in order, undo, reset, team PBs' },

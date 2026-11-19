@@ -9,8 +9,9 @@ import { usePerfReport } from '../../lib/perfStore';
 import { useEffect, useState } from 'react';
 import type { ControllerState } from '../../../shared/types';
 import type { ProducerCmd } from '../../../shared/engine';
-import type { ObsPlan, TargetReport, TargetStatus } from '../../../shared/obsSetup';
+import type { AuditReport, CleanupReport, ObsPlan, TargetReport, TargetStatus, ValidationReport } from '../../../shared/obsSetup';
 import { FOLLOW, controllerPath, dockEntries, dockInstallerPs1, dockInstallerSh, type DockEntry } from '../../../shared/obsDocks';
+import { MAIN_SCENE_DEFS } from '../../../shared/mainScenes';
 import type { Ack } from './modules';
 import { B, C, LABEL } from './ws';
 
@@ -25,7 +26,7 @@ const STATUS: Record<TargetStatus, { label: string; color: string; hint: string 
   error: { label: 'ERROR', color: C.in, hint: 'OBS returned an error for this scene' },
   unknown: { label: 'ORPHAN', color: 'rgba(233,233,236,.45)', hint: 'Mapped earlier, no longer in Overdrive (kept in OBS)' },
 };
-const KIND: Record<TargetReport['kind'], string> = { gfx: 'GRAPHIC', screen: 'SCREEN', source: 'SOURCE', support: 'AUDIO' };
+const KIND: Record<TargetReport['kind'], string> = { gfx: 'GRAPHIC', screen: 'SCREEN', source: 'SOURCE', support: 'AUDIO', preview: 'PREVIEW' };
 const OP_LABEL: Record<string, string> = { 'create-scene': 'New scene', 'create-input': 'New source', 'add-item': 'Add to scene', 'set-settings': 'Repair source', transform: 'Fit canvas', enable: 'Show', order: 'Order', 'nest-audio': 'Audio', 'add-capture': 'Capture', mark: 'Mark' };
 
 function Status({ s }: { s: TargetStatus }) {
@@ -83,7 +84,11 @@ export function ObsSetupPanel({ st, run }: { st: ControllerState; run: Run }) {
   const [base, setBase] = useState<string | null>(null);
   const [allowLive, setAllowLive] = useState(false);
   const [docksOpen, setDocksOpen] = useState(false);
+  const [sourcesOpen, setSourcesOpen] = useState(false);
   const [copied, setCopied] = useState('');
+  const [cleanOpen, setCleanOpen] = useState(false);
+  const [auditOpen, setAuditOpen] = useState(false);
+  const [validateOpen, setValidateOpen] = useState(false);
   const dockUrl = (id: string) => `${s?.baseUrl ?? location.origin}${controllerPath(id)}`;
   const copy = (text: string, what: string) => { void navigator.clipboard?.writeText(text); setCopied(what); setTimeout(() => setCopied(c => (c === what ? '' : c)), 1800); };
   /** Opens the controller in this browser (1920×1480 window, scaled); OBS docks use the URL OBS can reach. */
@@ -121,7 +126,10 @@ export function ObsSetupPanel({ st, run }: { st: ControllerState; run: Run }) {
           <B h={22} disabled={!canAct || !cur || cur.kind === 'support' || cur.status === 'unknown' || cur.status === 'missing'} data-act="repair-selected" title={cur ? `Repair ${cur.name} (URL, size, transform, visibility, order)` : 'Select a scene in the list'} onClick={() => cur && preview('repair', [cur.id], `Preview: repair ${cur.name}`)}>Repair OBS Scene</B>
           <B h={22} disabled={!cur || cur.kind === 'support' || cur.status === 'unknown'} data-act="open-controller" title={cur ? `Open the 1920×1480 controller of ${cur.name}` : 'Select a scene in the list'} onClick={() => cur && openController(cur.id)}>Open Individual Controller</B>
           <B h={22} disabled={!cur || cur.kind === 'support' || cur.status === 'unknown'} data-act="copy-dock" title={cur ? dockUrl(cur.id) : 'Select a scene in the list'} onClick={() => cur && copy(dockUrl(cur.id), cur.id)}>{cur && copied === cur.id ? 'Copied ✓' : 'Copy Controller Dock URL'}</B>
+          <B h={22} data-act="sources" title="All nine main-scene browser sources in one place: URL, resolution, OBS scene, status, on-air, preview" onClick={() => setSourcesOpen(true)}>Browser Sources…</B>
           <B h={22} data-act="docks" title="All controller docks + how to add them to OBS" onClick={() => setDocksOpen(true)}>OBS Docks…</B>
+          <B h={22} disabled={!canAct} data-act="audit" title="Checks EVERY browser source in OBS (not just the ones mapped here) for duplicates — two sources pointing at the same Overdrive page, mic or camera. Read-only." onClick={() => { setAuditOpen(true); void run({ c: 'obs-setup', action: 'audit' }, 'Audit OBS for duplicate sources'); }}>Audit OBS…</B>
+          <B h={22} data-act="validate" title="Pre-event checklist: what Overdrive can confirm on its own, and what only a human checking real OBS picture and sound can confirm." onClick={() => setValidateOpen(true)}>Validate…</B>
           <span className="mx-1 h-4 w-px bg-white/15" />
           <B h={22} kind="primary" disabled={!canAct} data-act="build-all" title="Create every missing scene and browser source (existing sources are not changed)" onClick={() => preview('build', 'all', 'Preview: build all')}>Build All OBS Scenes</B>
         </span>
@@ -135,6 +143,14 @@ export function ObsSetupPanel({ st, run }: { st: ControllerState; run: Run }) {
             className="h-[22px] w-[230px] rounded-[2px] border border-white/15 bg-[#0b0b0c] px-1.5 font-mono text-[11px]" />
         </label>
         <span className="text-white/40" title={s?.baseReason}>{s?.options.baseUrl ? 'set by you' : `auto: ${s?.baseUrl ?? '…'}`} · {s?.baseReason}</span>
+        <label className="flex items-center gap-1 text-white/70" title="Nine main scenes: Starting Soon, Gameplay, Caster Desk, Analyst Desk, MVP, Intermission, Ending, Safe / BRB, Team Introduction; every other graphic is a layer (scene item) inside one of them, switched from Producer Mode. One scene per output is the 3.1 layout.">
+          OBS layout
+          <select data-opt="layout" aria-label="OBS layout" disabled={busy} value={s?.options.layout ?? 'main'} onChange={e => opt({ layout: e.target.value }, 'OBS layout')}
+            className="h-[22px] rounded border border-white/15 bg-[#1b1b1d] px-1 text-[12px] text-white">
+            <option value="main">Nine main scenes (recommended)</option>
+            <option value="per-output">One scene per output (3.1)</option>
+          </select>
+        </label>
         <label className="flex items-center gap-1 text-white/70" title="Size of every picture browser source Overdrive builds, and the OBS canvas it expects. Graphics are rendered natively at this size. Change OBS → Settings → Video to match, then Repair the scenes.">
           Output
           <select data-opt="profile" aria-label="Output resolution profile" disabled={busy} value={s?.options.profile ?? 'fhd'} onChange={e => opt({ profile: e.target.value as OutputProfileId }, 'Output profile')}
@@ -143,12 +159,13 @@ export function ObsSetupPanel({ st, run }: { st: ControllerState; run: Run }) {
           </select>
         </label>
         <span className="ml-auto flex items-center gap-3">
-          {([['suspendOffAir', 'Pause off-air sources'], ['perfMonitor', 'Performance monitor'], ['audio', 'Caster audio + music in every scene'], ['gameCapture', 'Game capture under gameplay'], ['legacy', 'Build All includes legacy duplicates']] as const).map(([k, l]) => (
+          {([['suspendOffAir', 'Pause off-air sources'], ['perfMonitor', 'Performance monitor'], ['audio', 'Talent audio (nested) in every scene'], ['gameCapture', 'Game capture under gameplay'], ['legacy', 'Build All includes legacy duplicates']] as const).map(([k, l]) => (
             <label key={k} className="flex items-center gap-1 text-white/70" title={HINT[k]}><input type="checkbox" data-opt={k} checked={!!s?.options[k]} disabled={busy} onChange={e => opt({ [k]: e.target.checked }, l)} />{l}</label>
           ))}
         </span>
       </div>
       <PerfPanel />
+      {s?.options.layout === 'main' && <MainOverview st={st} onCleanup={() => { setCleanOpen(true); void run({ c: 'obs-setup', action: 'cleanup-scan' }, 'Cleanup report (dry run)'); }} canAct={canAct} />}
       {(s?.controllerLeaks.length ?? 0) > 0 && (
         <div className="flex-none border-b px-2.5 py-1 text-[12px]" style={{ borderColor: C.line, background: 'rgba(229,72,77,.14)', color: '#ffb3b5' }} data-controller-leak>
           <b>On-air risk:</b> {s!.controllerLeaks.map(l => `“${l.input}”`).join(', ')} load{s!.controllerLeaks.length === 1 ? 's' : ''} an Overdrive controller page as an OBS browser source. Controllers belong in Docks, never in a scene: remove {s!.controllerLeaks.length === 1 ? 'it' : 'them'} in OBS (Overdrive never deletes OBS sources).
@@ -180,7 +197,7 @@ export function ObsSetupPanel({ st, run }: { st: ControllerState; run: Run }) {
                     <td className="px-2 py-[3px]"><Status s={r.status} /></td>
                     <td className="py-[3px] pr-2">
                       <div className="flex min-w-0 items-baseline whitespace-nowrap" title={r.url}>
-                        <span className="mr-1.5 w-[44px] flex-none font-['Barlow_Condensed'] text-[10px] font-bold tracking-[0.08em] text-white/30">{KIND[r.kind]}</span>
+                        <span className="mr-1.5 w-[44px] flex-none font-['Barlow_Condensed'] text-[10px] font-bold tracking-[0.08em] text-white/30">{r.id.startsWith('main:') ? 'SCENE' : r.role && r.role !== 'base' ? r.role.toUpperCase() : KIND[r.kind]}</span>
                         <b className="min-w-0 truncate text-white/90">{r.name}</b>
                         <span className="ml-1.5 min-w-0 flex-1 truncate font-mono text-[10.5px] text-white/35">{shortUrl(r.url)}</span>
                       </div>
@@ -232,11 +249,23 @@ export function ObsSetupPanel({ st, run }: { st: ControllerState; run: Run }) {
         </div>
       </div>
       <div className="flex h-[24px] flex-none items-center gap-3 border-t px-2.5 text-[11px] text-white/45" style={{ borderColor: C.line }}>
-        <span>{inAll.length} scenes in Build All</span>
+        <span>{inAll.length} {s?.options.layout === 'main' ? 'items' : 'scenes'} in Build All</span>
         {Object.entries(counts).map(([k, n]) => <span key={k}><Status s={k as TargetStatus} /> {n}</span>)}
         <span className="ml-auto">Overdrive never switches OBS here: OBS stays the switcher.{s?.busy ? ` · Working: ${s.busy}…` : ''}</span>
       </div>
+      {sourcesOpen && <BrowserSourcesDialog rows={rows} profile={s?.options.profile} copied={copied} copy={copy} onOpen={openController}
+        onBuild={id => preview('build', [id], `Preview: build ${rows.find(r => r.id === id)?.name ?? id}`)}
+        onRepair={id => preview('repair', [id], `Preview: repair ${rows.find(r => r.id === id)?.name ?? id}`)}
+        canAct={canAct} onOpenDocks={() => { setSourcesOpen(false); setDocksOpen(true); }} onOpenAudit={() => { setSourcesOpen(false); setAuditOpen(true); void run({ c: 'obs-setup', action: 'audit' }, 'Audit OBS for duplicate sources'); }}
+        onClose={() => setSourcesOpen(false)} />}
       {docksOpen && <DocksDialog docks={dockEntries(s?.baseUrl ?? location.origin, rows)} base={s?.baseUrl ?? location.origin} copied={copied} copy={copy} onOpen={openController} onClose={() => setDocksOpen(false)} />}
+      {cleanOpen && <CleanupDialog report={s?.cleanup ?? null} busy={busy} onClose={() => setCleanOpen(false)}
+        onRescan={() => run({ c: 'obs-setup', action: 'cleanup-scan' }, 'Cleanup report (dry run)')}
+        onApply={(remove, unnest, confirm, drop, nestAudio) => run({ c: 'obs-setup', action: 'cleanup-apply', hash: s!.cleanup!.hash, remove, unnest, confirm, drop, nestAudio }, 'Cleanup (confirmed)')} />}
+      {auditOpen && <AuditDialog report={s?.audit ?? null} busy={busy} onClose={() => setAuditOpen(false)} onRescan={() => run({ c: 'obs-setup', action: 'audit' }, 'Audit OBS for duplicate sources')} />}
+      {validateOpen && <ValidationDialog report={s?.validation ?? null} busy={busy} onClose={() => setValidateOpen(false)}
+        onSet={(id, checked) => run({ c: 'obs-setup', action: 'validation-set', id, checked }, checked ? 'Confirm validation item' : 'Clear validation confirmation')}
+        onNewSession={() => run({ c: 'obs-setup', action: 'validation-new-session' }, 'Start new pre-event check')} />}
       {s?.plan && <PlanDialog plan={s.plan} rows={rows} busy={busy} allowLive={allowLive} setAllowLive={setAllowLive}
         onCancel={() => run({ c: 'obs-setup', action: 'cancel' }, 'Cancel')}
         onConfirm={() => run({ c: 'obs-setup', action: 'apply', hash: s.plan!.hash, allowLive }, s.plan!.mode === 'build' ? 'Build in OBS' : 'Repair in OBS')} />}
@@ -306,6 +335,122 @@ function download(name: string, text: string) {
  * Controller docks: OBS cannot create Custom Browser Docks through obs-websocket, so they are added by hand in OBS
  * or installed into OBS's settings (OBS closed) with a generated script. Nothing here claims OBS was changed.
  */
+/**
+ * 3.9 · Browser Sources: every main-scene broadcast browser source in one place — name, URL, resolution, OBS
+ * scene, connection/status, on-air, a compact preview, and a button to its individual Studio controls (the
+ * dock controller, opened in-browser here; still a different thing from an OBS Custom Browser Dock — see
+ * "OBS Docks…" for that). Reuses the exact rows/status/build/repair the per-scene table already computes;
+ * adds no OBS scene or source of its own — it is a read/manage view over the existing registry.
+ * "Show Screens" is one category with three real underlying OBS scenes (Starting Soon, Intermission, Thanks
+ * for Watching); "Be Right Back" shares Intermission's browser source (see OBS Docks… for that nuance), so it
+ * has no separate row of its own here.
+ */
+const SOURCE_GROUPS: { id: string; label: string; mains: string[] }[] = MAIN_SCENE_DEFS.map(m => ({ id: m.id, label: m.label, mains: m.id === 'show' ? ['starting', 'intermission', 'ending'] : [m.id] }));
+/** Show Screens' three real OBS scenes, labeled the way the Producer's own mode switcher labels them (not the
+ * raw registry source name) — "intermission" is the mode the switcher calls "Intermission"; "Be Right Back"
+ * is a different mode that shares this same browser source (see the note under the table). */
+const SHOW_SCREEN_SUBLABEL: Record<string, string> = { starting: 'Starting Soon', intermission: 'Intermission', ending: 'Thanks for Watching' };
+
+function BrowserSourcesDialog({ rows, profile, copied, copy, onOpen, onBuild, onRepair, canAct, onOpenDocks, onOpenAudit, onClose }: {
+  rows: TargetReport[]; profile?: OutputProfileId; copied: string; copy: (t: string, w: string) => void; onOpen: (id: string) => void;
+  onBuild: (id: string) => void; onRepair: (id: string) => void; canAct: boolean; onOpenDocks: () => void; onOpenAudit: () => void; onClose: () => void;
+}) {
+  const [showPreviews, setShowPreviews] = useState(false);
+  const p = profileOf(profile);
+  const items: { group: string; row: TargetReport | null }[] = SOURCE_GROUPS.flatMap(g => {
+    // Each main scene's actual broadcast browser source: a real g:/s: target (never the 'main:<key>' scene
+    // marker or a 'support' row like a camera composition), preferring whichever one isn't a legacy duplicate.
+    const found = g.mains.map(mk => {
+      const cands = rows.filter(r => r.main === mk && r.role === 'base' && r.kind !== 'support');
+      return cands.find(r => !r.supersededBy) ?? cands[0];
+    }).filter((r): r is TargetReport => !!r);
+    const withRows: { group: string; row: TargetReport | null }[] = found.length ? found.map(r => ({ group: g.label, row: r })) : [{ group: g.label, row: null }];
+    return withRows;
+  });
+  const withUrl = items.filter((it): it is { group: string; row: TargetReport } => !!it.row);
+  const problems = withUrl.filter(it => it.row.status !== 'ok' && it.row.status !== 'unknown');
+  const copyAll = () => copy(withUrl.map(it => `${it.row.name}\t${it.row.url}`).join('\n'), 'sources-all');
+  return (
+    <div className="absolute inset-0 z-10 flex items-start justify-center bg-black/60 pt-3" data-sources-dialog>
+      <div className="flex max-h-[96%] w-[1180px] flex-col rounded-[3px] border border-white/15 shadow-2xl" style={{ background: C.panel }}>
+        <div className="flex h-[30px] flex-none items-center gap-2 border-b px-3" style={{ background: C.head, borderColor: C.line }}>
+          <b className={`${LABEL} text-[13px]`}>Browser Sources</b>
+          <span className="text-[11px] text-white/45" data-sources-summary>{withUrl.length} of the nine main scenes · {p.label} ({p.w}×{p.h}){problems.length ? ` · ${problems.length} need attention` : ' · all OK'}</span>
+          <span className="ml-auto flex gap-1">
+            <label className="mr-1 flex items-center gap-1 text-[11px] text-white/60"><input type="checkbox" data-sources-previews checked={showPreviews} onChange={e => setShowPreviews(e.target.checked)} />Show previews</label>
+            <B h={22} data-sources-audit="1" title="Scan all of OBS for duplicate or misnamed browser sources" onClick={onOpenAudit}>Audit…</B>
+            <B h={22} data-sources-docks="1" title="OBS Custom Browser Docks (individual Studio controls) — a separate, non-broadcast set of URLs" onClick={onOpenDocks}>OBS Docks…</B>
+            <B h={22} data-sources-copy-all="1" disabled={!withUrl.length} onClick={copyAll}>{copied === 'sources-all' ? 'Copied ✓' : 'Copy All URLs'}</B>
+            <B h={22} onClick={onClose} data-sources-close="1">Close</B>
+          </span>
+        </div>
+        <div className="min-h-0 flex-1 overflow-y-auto p-3 text-[12px]">
+          <table className="w-full table-fixed">
+            <colgroup>
+              {showPreviews && <col style={{ width: 110 }} />}
+              <col style={{ width: 60 }} /><col style={{ width: 150 }} /><col /><col style={{ width: 150 }} /><col style={{ width: 100 }} /><col style={{ width: 150 }} />
+            </colgroup>
+            <thead className={`sticky top-0 z-[1] bg-[#111113] text-left text-[11px] text-white/40 ${LABEL}`}>
+              <tr>
+                {showPreviews && <th className="py-1">Preview</th>}
+                <th>Status</th><th>Main scene</th><th>URL</th><th>OBS scene</th><th>Resolution</th><th className="text-right pr-1">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {items.map((it, i) => (
+                <tr key={it.row?.id ?? `${it.group}-${i}`} className="border-t border-white/[0.06]" data-source-row={it.row?.id ?? it.group}>
+                  {showPreviews && <td className="py-1.5">{it.row ? <SourcePreview url={it.row.url} w={p.w} h={p.h} /> : <span className="text-white/25">—</span>}</td>}
+                  {it.row ? (<>
+                    <td><Status s={it.row.status} /></td>
+                    <td className="truncate pr-2">
+                      <b className="text-white/90">{it.group}</b>
+                      {it.group === 'Show Screens' && <span className="ml-1 text-white/35">({SHOW_SCREEN_SUBLABEL[it.row.main ?? ''] ?? it.row.name})</span>}
+                    </td>
+                    <td className="truncate pr-2 font-mono text-[11px] text-white/60" title={it.row.url}>{it.row.url}</td>
+                    <td className="truncate pr-2">
+                      <span className="text-white/80">{it.row.scene}</span>
+                      {it.row.onAir && <span className="ml-1 rounded-[2px] px-1 font-['Barlow_Condensed'] text-[10px] font-bold text-white" style={{ background: C.pgm }}>ON AIR</span>}
+                      {it.row.supersededBy && <span className="ml-1 text-[10.5px]" style={{ color: C.draft }}>duplicate</span>}
+                    </td>
+                    <td className="text-white/70">{p.w}×{p.h}</td>
+                    <td className="text-right pr-1">
+                      <span className="inline-flex gap-1">
+                        <B h={20} disabled={!canAct} onClick={() => onBuild(it.row!.id)}>Build</B>
+                        <B h={20} disabled={!canAct || it.row.status === 'missing'} onClick={() => onRepair(it.row!.id)}>Repair</B>
+                        <B h={20} title="Open this scene's individual Studio controls" onClick={() => onOpen(it.row!.id)}>Controls ↗</B>
+                        <B h={20} onClick={() => copy(it.row!.url, it.row!.id)}>{copied === it.row.id ? '✓' : 'Copy'}</B>
+                      </span>
+                    </td>
+                  </>) : (<>
+                    <td><Status s="missing" /></td>
+                    <td className="truncate pr-2"><b className="text-white/90">{it.group}</b></td>
+                    <td colSpan={4} className="text-white/40">No browser source mapped yet — Scan OBS, then Build to create it.</td>
+                  </>)}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <p className="mt-2 text-[11px] text-white/40">
+            Nine main scenes, one broadcast browser source each (Show Screens has three: Starting Soon, Intermission, Thanks for Watching — Be Right Back shares Intermission's). These are the real OBS browser sources Program/Preview switch between; they are never put in an OBS dock. For the separate per-scene OBS Custom Browser Dock controllers, use <b>OBS Docks…</b> above.
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** Small read-only scaled embed of the real route, for a quick visual check without opening OBS. */
+function SourcePreview({ url, w, h }: { url: string; w: number; h: number }) {
+  const boxW = 96, boxH = Math.round((boxW * h) / w);
+  const scale = boxW / w;
+  return (
+    <div style={{ width: boxW, height: boxH, overflow: 'hidden', background: '#000', borderRadius: 2 }} data-source-preview>
+      <iframe src={url} title="preview" loading="lazy" tabIndex={-1}
+        style={{ width: w, height: h, border: 0, transform: `scale(${scale})`, transformOrigin: 'top left', pointerEvents: 'none' }} />
+    </div>
+  );
+}
+
 function DocksDialog({ docks, base, copied, copy, onOpen, onClose }: { docks: DockEntry[]; base: string; copied: string; copy: (t: string, w: string) => void; onOpen: (id: string) => void; onClose: () => void }) {
   return (
     <div className="absolute inset-0 z-10 flex items-start justify-center bg-black/60 pt-3" data-docks-dialog>
@@ -360,6 +505,205 @@ function DocksDialog({ docks, base, copied, copy, onOpen, onClose }: { docks: Do
               <li>OBS docks share one zoom per site: zooming a dock can also zoom Overdrive's browser sources. Leave dock zoom at 100 %; the controller already scales to fit.</li>
             </ul>
           </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** 3.2: the nine main scenes at a glance, and the migration steps from a 3.1 collection. */
+function MainOverview({ st, onCleanup, canAct }: { st: ControllerState; onCleanup: () => void; canAct: boolean }) {
+  const s = st.obsSetup!, mains = s.mains ?? [];
+  const missing = mains.filter(m => !m.exists).length;
+  const extra = st.obs.scenes.filter(n => n.startsWith('Overdrive') && !mains.some(m => m.scene === n)).length;
+  return (
+    <div className="flex flex-none flex-wrap items-center gap-1.5 border-b px-2.5 py-1.5 text-[11.5px]" style={{ borderColor: C.line }} data-main-overview>
+      <span className={`${LABEL} mr-1 text-[11px] text-white/45`}>Main scenes</span>
+      {mains.map(m => (
+        <span key={m.key} data-main-scene={m.key} data-exists={m.exists ? '1' : '0'} title={`${m.scene}${m.exists ? '' : ' — not built yet'}\n${m.layers.map(l => `${l.on ? '●' : '○'} ${l.name} (${l.role})`).join('\n')}`}
+          className="inline-flex items-center gap-1 rounded-[2px] border px-1.5 py-[1px]" style={{ borderColor: m.scene === st.obs.currentScene ? C.pgm : m.exists ? 'rgba(255,255,255,.18)' : 'rgba(255,255,255,.08)', color: m.exists ? 'rgba(255,255,255,.85)' : 'rgba(255,255,255,.35)' }}>
+          {m.label}<span className="text-white/35">{m.layers.length}</span>
+        </span>
+      ))}
+      <span className="ml-auto flex items-center gap-2 text-white/55">
+        {missing > 0 ? <span data-migrate-hint>Step 1: <b>Build All</b> adds the {missing} missing main scene{missing === 1 ? '' : 's'} and puts every existing source in them (nothing is deleted or renamed).</span>
+          : extra > 0 ? <span data-migrate-hint>{extra} older Overdrive scene{extra === 1 ? '' : 's'} still in OBS. Step 2: check the cleanup report.</span>
+          : <span>Every output is a layer of a main scene.</span>}
+        <B h={22} disabled={!canAct} data-act="cleanup" onClick={onCleanup} title="Dry run: which OBS scenes Overdrive manages, which can be consolidated, which stay untouched. Nothing is removed without your confirmation.">Cleanup report…</B>
+      </span>
+    </div>
+  );
+}
+
+/** Read-only, whole-collection duplicate-source audit against the real OBS connection. Never changes anything. */
+function AuditDialog({ report, busy, onClose, onRescan }: { report: AuditReport | null; busy: boolean; onClose: () => void; onRescan: () => void }) {
+  return (
+    <div className="absolute inset-0 z-10 flex items-start justify-center bg-black/60 pt-6" data-audit-dialog={report ? '1' : ''}>
+      <div className="flex max-h-[90%] w-[640px] flex-col rounded-[3px] border border-white/15 shadow-2xl" style={{ background: C.panel }}>
+        <div className="flex h-[30px] flex-none items-center gap-2 border-b px-3" style={{ background: C.head, borderColor: C.line }}>
+          <b className={`${LABEL} text-[13px]`}>Real-OBS duplicate-source audit</b>
+          <span className="text-[11px] text-white/45">{report ? `${report.checked} browser sources checked · read-only, nothing changed` : 'Checking…'}</span>
+          <span className="ml-auto flex gap-1"><B h={22} onClick={onRescan} disabled={busy} data-audit-rescan="1">Check again</B><B h={22} onClick={onClose} data-audit-close="1">Close</B></span>
+        </div>
+        <div className="min-h-0 flex-1 overflow-y-auto p-3 text-[12px]">
+          {!report && <p className="text-white/55">Reading every browser source in OBS…</p>}
+          {report && !report.duplicates.length && !report.foreignManagedLooking.length && (
+            <p style={{ color: C.ok }} data-audit-clean>No duplicates. Every browser source in this OBS points at a different Overdrive page, mic or camera — nothing is doubled up.</p>
+          )}
+          {report && report.duplicates.length > 0 && (
+            <div className="mb-3" data-audit-duplicates>
+              <div className={`${LABEL} mb-1 text-[11px]`} style={{ color: C.in }}>Duplicates found · {report.duplicates.length}</div>
+              {report.duplicates.map(d => (
+                <div key={d.route} className="border-t border-white/[0.06] py-1.5">
+                  <div className="text-white/50">{d.inputs.length} sources all point at <span className="font-mono text-white/75">{d.route}</span>:</div>
+                  <ul className="list-disc pl-5 text-white/85">{d.inputs.map(n => <li key={n}>{n}</li>)}</ul>
+                  <div className="text-white/45">Only one of these should exist. Keep whichever one Overdrive's scenes actually use (check the main scene list), then remove the other(s) in OBS by hand — Overdrive never deletes a source you didn't ask it to.</div>
+                </div>
+              ))}
+            </div>
+          )}
+          {report && report.foreignManagedLooking.length > 0 && (
+            <div data-audit-foreign>
+              <div className={`${LABEL} mb-1 text-[11px]`} style={{ color: C.draft }}>Named like Overdrive's own, but not one it manages · {report.foreignManagedLooking.length}</div>
+              <ul className="list-disc pl-5 text-white/75">{report.foreignManagedLooking.map(n => <li key={n}>{n}</li>)}</ul>
+              <div className="mt-1 text-white/45">Likely a manual rename or a very old build. Not touched automatically — rename or remove it in OBS if it's not needed.</div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Pre-event validation checklist. Deliberately keeps two different kinds of signal visibly apart:
+ *  - "Automated" — Overdrive's own scan/audit/cleanup data, computed just now. Useful, but it cannot see real
+ *    pixels or real sound, so a clean automated result is never shown as proof the item is validated.
+ *  - "Confirm on real OBS" — only ticked by the operator, after actually checking against real OBS/audio. This is
+ *    the only thing that marks an item validated; Overdrive never ticks it for you and never infers it from a test run.
+ */
+const AUTO_BADGE: Record<string, { t: string; c: string }> = { ok: { t: 'Automated: OK', c: C.ok }, issue: { t: 'Automated: issue found', c: C.in }, 'n/a': { t: 'No automated check', c: 'rgba(255,255,255,.35)' } };
+function ValidationDialog({ report, busy, onClose, onSet, onNewSession }: { report: ValidationReport | null; busy: boolean; onClose: () => void; onSet: (id: string, checked: boolean) => Promise<Ack>; onNewSession: () => Promise<Ack> }) {
+  const items = report?.items ?? [];
+  const stale = items.filter(i => i.needsRevalidation).length;
+  return (
+    <div className="absolute inset-0 z-10 flex items-start justify-center bg-black/60 pt-4" data-validate-dialog={report ? '1' : ''}>
+      <div className="flex max-h-[94%] w-[860px] flex-col rounded-[3px] border border-white/15 shadow-2xl" style={{ background: C.panel }}>
+        <div className="flex h-[30px] flex-none items-center gap-2 border-b px-3" style={{ background: C.head, borderColor: C.line }}>
+          <b className={`${LABEL} text-[13px]`}>Pre-event validation checklist</b>
+          <span className="text-[11px] text-white/45" data-validate-summary>{report ? `${report.manualConfirmed}/${report.manualTotal} confirmed this check${stale ? ` · ${stale} need revalidation (config changed)` : ''}${report.autoIssues ? ` · ${report.autoIssues} automated issue${report.autoIssues === 1 ? '' : 's'} flagged` : ''}` : '—'}</span>
+          <span className="ml-auto flex gap-1">
+            <B h={22} disabled={busy} data-validate-new-session="1" title="Clears every checkbox for a fresh pre-event pass. Nothing is deleted — when each item was last confirmed is kept below." onClick={() => void onNewSession()}>Start New Pre-Event Check</B>
+            <B h={22} onClick={onClose} data-validate-close="1">Close</B>
+          </span>
+        </div>
+        {report && <div className="flex-none border-b px-3 py-1 text-[11px] text-white/40" data-validate-session={report.session}>This check started {new Date(report.sessionAt).toLocaleString()}.</div>}
+        <div className="flex-none border-b px-3 py-1.5 text-[11.5px] leading-[1.4] text-white/55" style={{ borderColor: C.line }}>
+          Two different signals, never blurred: <b className="text-white/80">Automated</b> is what Overdrive computed just now from its own scan/audit data — it can be wrong about anything it cannot see. <b className="text-white/80">Confirm on real OBS</b> is a box only you can tick, after actually checking real OBS picture and sound. A clean automated result never ticks that box for you, and a config change (scenes, source mapping, audio routing) flags a past confirmation as stale instead of silently keeping it.
+        </div>
+        <div className="min-h-0 flex-1 overflow-y-auto p-3 text-[12px]">
+          {items.map(it => (
+            <div key={it.id} className="mb-3 border-t border-white/[0.06] pt-2" data-validate-item={it.id} data-confirmed={it.confirmed ? '1' : '0'} data-stale={it.needsRevalidation ? '1' : '0'}>
+              <div className="flex items-start gap-2">
+                <span className="w-[22px] flex-none pt-[2px]">
+                  <input type="checkbox" data-validate-check={it.id} checked={it.confirmed} disabled={busy}
+                    onChange={e => void onSet(it.id, e.target.checked)} />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-baseline gap-2">
+                    <span className={`${LABEL} text-[10.5px] text-white/35`}>{it.category}</span>
+                    <span className="inline-flex h-[15px] items-center rounded-[2px] px-1 font-['Barlow_Condensed'] text-[10px] font-bold tracking-[0.05em]" style={{ color: AUTO_BADGE[it.autoStatus].c, border: `1px solid ${AUTO_BADGE[it.autoStatus].c}` }}>{AUTO_BADGE[it.autoStatus].t}</span>
+                    {it.needsRevalidation && <span className="inline-flex h-[15px] items-center rounded-[2px] px-1 font-['Barlow_Condensed'] text-[10px] font-bold tracking-[0.05em]" style={{ color: C.draft, border: `1px solid ${C.draft}` }} title="The OBS scene collection, source mapping or audio routing changed since this was last confirmed.">Needs revalidation</span>}
+                    {it.confirmed && <span className="text-[10.5px]" style={{ color: C.ok }}>confirmed {it.confirmedAt ? new Date(it.confirmedAt).toLocaleString() : ''}</span>}
+                    {!it.confirmed && it.confirmedAt && <span className="text-[10.5px] text-white/40">last performed {new Date(it.confirmedAt).toLocaleString()}</span>}
+                  </div>
+                  <div className="font-semibold text-white/90">{it.label}</div>
+                  <div className="text-white/60">{it.detail}</div>
+                  <div className="mt-0.5 text-white/45">{it.autoNote}</div>
+                  {it.steps?.length ? (
+                    <ul className="mt-1 list-disc pl-4 text-white/70">{it.steps.map((s, i) => <li key={i}>{s}</li>)}</ul>
+                  ) : null}
+                </div>
+              </div>
+            </div>
+          ))}
+          {!items.length && <p className="text-white/55">Loading…</p>}
+        </div>
+        <div className="flex flex-none items-center gap-2 border-t px-3 py-2 text-[11px] text-white/45" style={{ borderColor: C.line }}>
+          Confirmations are saved and reappear here next time — tick again before every event (and whenever flagged "Needs revalidation"), since OBS and hardware can change between shows.
+        </div>
+      </div>
+    </div>
+  );
+}
+
+const CLS_LABEL: Record<string, { t: string; c: string }> = {
+  main: { t: 'Main scene', c: C.ok }, consolidate: { t: 'Can be removed', c: C.draft }, keep: { t: 'Kept', c: 'rgba(255,255,255,.55)' }, 'not-overdrive': { t: 'Not Overdrive’s', c: 'rgba(255,255,255,.35)' },
+};
+/** Dry-run cleanup report; removal only for the scenes ticked, after typing REMOVE. */
+function CleanupDialog({ report, busy, onClose, onRescan, onApply }: { report: CleanupReport | null; busy: boolean; onClose: () => void; onRescan: () => void; onApply: (remove: string[], unnest: string[], confirm: string, drop: string[], nestAudio: string[]) => Promise<Ack> }) {
+  const [drop, setDrop] = useState<Set<string>>(new Set());
+  useEffect(() => { setDrop(new Set(report?.redundant?.map(r => `${r.scene}\u0000${r.input}`))); }, [report?.hash]); // eslint-disable-line react-hooks/exhaustive-deps
+  const [pick, setPick] = useState<Set<string>>(new Set());
+  const [unnest, setUnnest] = useState<Set<string>>(new Set());
+  const [nestAudio, setNestAudio] = useState<Set<string>>(new Set());
+  const [typed, setTyped] = useState('');
+  const [res, setRes] = useState<string>('');
+  useEffect(() => { setPick(new Set(report?.scenes.filter(x => x.cls === 'consolidate').map(x => x.scene))); setUnnest(new Set(report?.nestedAudio)); setNestAudio(new Set(report?.flatAudio?.map(x => x.scene))); setTyped(''); }, [report?.hash]); // eslint-disable-line react-hooks/exhaustive-deps
+  const tog = (set: Set<string>, v: string) => { const n = new Set(set); if (n.has(v)) n.delete(v); else n.add(v); return n; };
+  const n = pick.size + unnest.size + drop.size + nestAudio.size;
+  return (
+    <div className="absolute inset-0 z-10 flex items-start justify-center bg-black/60 pt-4" data-cleanup-dialog={report?.hash ?? ''}>
+      <div className="flex max-h-[94%] w-[900px] flex-col rounded-[3px] border border-white/15 shadow-2xl" style={{ background: C.panel }}>
+        <div className="flex h-[30px] flex-none items-center gap-2 border-b px-3" style={{ background: C.head, borderColor: C.line }}>
+          <b className={`${LABEL} text-[13px]`}>OBS cleanup · dry run</b>
+          <span className="text-[11px] text-white/45">{report ? `${report.scenes.length} scenes in OBS · nothing has been removed` : 'Reading OBS…'}</span>
+          <span className="ml-auto flex gap-1"><B h={22} onClick={onRescan} disabled={busy}>Report again</B><B h={22} onClick={onClose} data-cleanup-close="1">Close</B></span>
+        </div>
+        <div className="min-h-0 flex-1 overflow-y-auto p-3 text-[12px]">
+          {report?.nestedAudio.length ? (
+            <div className="mb-3 rounded-[2px] border p-2" style={{ borderColor: 'rgba(240,180,60,.4)' }}>
+              <b style={{ color: C.draft }}>Audio:</b> these main scenes still nest the old “Overdrive · Caster audio” scene. Replace it with the same audio sources added directly (no new sources):
+              {report.nestedAudio.map(nm => <label key={nm} className="ml-3 inline-flex items-center gap-1"><input type="checkbox" data-unnest={nm} checked={unnest.has(nm)} onChange={() => setUnnest(u => tog(u, nm))} />{nm}</label>)}
+            </div>
+          ) : null}
+          {report?.flatAudio?.length ? (
+            <div className="mb-3 rounded-[2px] border p-2" style={{ borderColor: 'rgba(240,180,60,.4)' }} data-cleanup-flataudio>
+              <b style={{ color: C.draft }}>Audio clutter:</b> these main scenes still have the old one-item-per-mic audio directly in them. Replace with the single reusable audio scene instead (same mics, same music — nothing recreated, independent mute/volume/sync per talent untouched):
+              {report.flatAudio.map(x => <label key={x.scene} className="ml-3 inline-flex items-center gap-1"><input type="checkbox" data-nest-audio={x.scene} checked={nestAudio.has(x.scene)} onChange={() => setNestAudio(u => tog(u, x.scene))} />{x.scene}</label>)}
+            </div>
+          ) : null}
+          {report?.redundant?.length ? (
+            <div className="mb-3 rounded-[2px] border p-2" style={{ borderColor: 'rgba(240,180,60,.4)' }} data-cleanup-redundant>
+              <b style={{ color: C.draft }}>Retired sources:</b> the MVP scene now draws all five views with its one dynamic source. These old per-view sources can come out of it:
+              {report.redundant.map(r => { const k = `${r.scene}\u0000${r.input}`; return <label key={k} className="ml-3 inline-flex items-center gap-1"><input type="checkbox" data-drop={r.input} checked={drop.has(k)} onChange={() => setDrop(u => tog(u, k))} />{r.input}</label>; })}
+            </div>
+          ) : null}
+          {(['consolidate', 'keep', 'main', 'not-overdrive'] as const).map(cls => {
+            const list = report?.scenes.filter(x => x.cls === cls) ?? [];
+            if (!list.length) return null;
+            return (
+              <div key={cls} className="mb-3">
+                <div className={`${LABEL} mb-1 text-[11px]`} style={{ color: CLS_LABEL[cls].c }}>{CLS_LABEL[cls].t} · {list.length}</div>
+                {list.map(x => (
+                  <div key={x.scene} className="flex gap-2 border-t border-white/[0.06] py-1" data-cleanup-scene={x.scene} data-cls={x.cls}>
+                    <span className="w-[18px] flex-none">{cls === 'consolidate' && <input type="checkbox" data-remove={x.scene} checked={pick.has(x.scene)} onChange={() => setPick(p => tog(p, x.scene))} />}</span>
+                    <span className="w-[300px] flex-none truncate font-semibold text-white/85" title={x.scene}>{x.scene}{x.onAir && <span className="ml-1 rounded-[2px] px-1 text-[10px] text-white" style={{ background: C.pgm }}>PGM/PVW</span>}</span>
+                    <span className="min-w-0 flex-1 text-white/60">{x.reasons.join(' ')}{x.refs.length ? <span style={{ color: C.draft }}> Repointed to its main scene on removal: {x.refs.join(', ')}.</span> : null}</span>
+                  </div>
+                ))}
+              </div>
+            );
+          })}
+          {res && <p className="mt-2 text-white/75" data-cleanup-result>{res}</p>}
+        </div>
+        <div className="flex flex-none items-center gap-2 border-t px-3 py-2" style={{ borderColor: C.line }}>
+          <span className="text-[11.5px] text-white/55">Removes only the ticked scenes classed “Can be removed” (their sources stay, inside the main scenes). Type <b>REMOVE</b> to confirm.</span>
+          <input data-cleanup-confirm value={typed} onChange={e => setTyped(e.target.value)} placeholder="REMOVE" className="ml-auto h-[24px] w-[110px] rounded-[2px] border border-white/15 bg-[#0b0b0c] px-1.5 font-mono text-[12px]" />
+          <B h={24} kind="primary" disabled={busy || !report || !n || typed !== 'REMOVE'} data-cleanup-apply="1"
+            onClick={async () => { const r = await onApply([...pick], [...unnest], typed, [...drop], [...nestAudio]); setRes(r.ok ? r.note ?? 'Done' : r.error ?? 'Failed'); setTyped(''); }}>
+            {busy ? 'Working…' : `Remove ${pick.size} scene${pick.size === 1 ? '' : 's'}${drop.size ? ` · ${drop.size} retired source${drop.size === 1 ? '' : 's'}` : ''}${unnest.size ? ` · fix legacy audio in ${unnest.size}` : ''}${nestAudio.size ? ` · declutter audio in ${nestAudio.size}` : ''}`}
+          </B>
         </div>
       </div>
     </div>

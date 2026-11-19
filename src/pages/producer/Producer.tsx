@@ -11,6 +11,7 @@
  * Selecting anything only changes this workspace: it never airs, never switches OBS, never animates.
  */
 import { feedPerf } from '../../lib/perfStore';
+import { feedMeters } from '../../lib/meterStore';
 import { StorageBanner } from '../../components/StorageBanner';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import type { CasterId, ControllerState, ScreenId } from '../../../shared/types';
@@ -27,6 +28,17 @@ import { Inspector } from './Inspector';
 import { Library, libraryOrder, obsSceneOfGfx, obsSceneOfSource } from './Library';
 import { MvpSceneControls } from './MvpScene';
 import { RundownPanel } from './RundownPanel';
+import { TalentLive } from './TalentLive';
+import { MainScenes, ShowModeBar, obsSceneOfMain } from './MainScenes';
+import { ControlRoom } from './ControlRoom';
+import { MvpPanel } from './MvpPanel';
+import { mvpSceneData } from './MvpScene';
+import { MVP_SOURCE, drawKeyOf, isMvpSel, isShowSel, mainScenes, mvpViewOfSel, sceneOrModeOf, showModeOfSel } from '../../../shared/mainScenes';
+import { shortCode } from '../../../shared/wildcard';
+import { HealthIndicator, openStudioAt } from '../studio/Health';
+import { checkTalent } from '../../../shared/talentCheck';
+import { SEATS } from '../../../shared/talent';
+import { neededSeats } from '../studio/Talent';
 import { StudioMode, type StudioTab } from './Studio';
 import { B, C, Dot, DraftBadge, Kbd, LABEL, PanelHead, Splitter, VisBadge, useColumns, useFitCanvas } from './ws';
 import { GraphicHost } from '../../gfx/Graphic';
@@ -74,10 +86,20 @@ function useRtt(sock: Socket) {
 type Mode = 'live' | 'studio';
 const ls = { get: (k: string, d: string) => { try { return localStorage.getItem(k) ?? d; } catch { return d; } }, set: (k: string, v: string) => { try { localStorage.setItem(k, v); } catch {} } };
 
+/** The MVP view a step draws (the closed vote is the voting step with the poll closed). */
+const stepView = (step: string) => (step === 'winner' || step === 'desk' || step === 'compare' ? step : 'voting');
 /** OBS scene → the Overdrive output that owns it (Scene Builder mapping, then graphic / screen mappings). */
 export function targetOfObsScene(scene: string | undefined, st: ControllerState): string | null {
   if (!scene) return null;
-  for (const [id, e] of Object.entries(st.obsSetup?.map ?? {})) if (e.scene === scene && id !== 'support:audio') return id;
+  // 3.3 unified scene (MVP): its one Program source shows the view of the graphic's step; its Preview identity the prepared view
+  for (const [id, e] of Object.entries(st.obsSetup?.map ?? {})) {
+    if (e.role === 'pvw' && e.scene === scene) { const g = st.graphics?.find(x => x.id === 'mvp'); const v = g?.prepared ?? stepView(String(g?.config.step ?? 'voting')); return `s:${MVP_SOURCE[v as keyof typeof MVP_SOURCE] ?? MVP_SOURCE.voting}`; }
+    if (e.role === 'base' && e.main === 'mvp' && e.scene === scene && id === 'g:mvp') { const g = st.graphics?.find(x => x.id === 'mvp'); return `s:${MVP_SOURCE[stepView(String(g?.config.step ?? 'voting')) as keyof typeof MVP_SOURCE]}`; }
+  }
+  // 3.2 main-scenes layout: the scene shows its base, or the panel OBS shows in it right now (overlays sit on top)
+  const ms = st.obsSetup?.mains?.find(m => m.scene === scene && m.exists);
+  if (ms) { const l = ms.layers.find(x => x.on && x.role === 'panel') ?? ms.layers.find(x => x.on && x.role === 'base') ?? ms.layers.find(x => x.role === 'base'); if (l) return l.target; }
+  for (const [id, e] of Object.entries(st.obsSetup?.map ?? {})) if (e.scene === scene && id !== 'support:audio' && !e.main) return id;
   const mv = REGISTRY.find(x => x.gfxView && `Overdrive · ${x.name}` === scene); // view scenes first (exact names)
   if (mv) return `s:${mv.id}`;
   const g = (st.graphics ?? []).find(x => obsSceneOfGfx(x, st) === scene);
@@ -96,6 +118,7 @@ const selOfTarget = (t: string) => (t.startsWith('g:') ? t : t.replace(/^s:/, ''
 export function Producer({ onLogout, dock, studio = false }: { onLogout: () => void; dock?: string; /** open in Studio Mode (/studio) */ studio?: boolean }) {
   const sock = useSocket({ role: 'controller' });
   useEffect(() => feedPerf(sock), [sock]);
+  useEffect(() => feedMeters(sock), [sock]);
   const conn = useConnState(sock);
   const [st, setSt] = useState<ControllerState | null>(null);
   const [skew, setSkew] = useState(0);
@@ -133,6 +156,9 @@ export function Producer({ onLogout, dock, studio = false }: { onLogout: () => v
   const [guides, setGuides] = useState(false);
   const [help, setHelp] = useState(false);
   const [details, setDetails] = useState(false);
+  // 3.1 Control room (prototype for approval): /producer?ui=room, or the header switch; the classic layout stays default
+  const [ui, setUi] = useState<'classic' | 'room'>(() => { const q = new URLSearchParams(location.search).get('ui'); return q === 'room' || q === 'classic' ? q : ls.get('od3.ui', 'classic') === 'room' ? 'room' : 'classic'; });
+  useEffect(() => { if (!dock) ls.set('od3.ui', ui); }, [ui, dock]);
   const cols = useColumns('od2.cols.v2', [300, 450, 372], [230, 360, 330], [440, 660, 480]);
   useEffect(() => { if (!dock) ls.set('od2.sel', sel); }, [sel, dock]);
   useEffect(() => { if (!dock) ls.set('od2.mode', mode); }, [mode, dock]);
@@ -153,7 +179,7 @@ export function Producer({ onLogout, dock, studio = false }: { onLogout: () => v
   const { run, busy, log } = useCommands(sock, eng?.version);
   const gInst = sel.startsWith('g:') ? st?.graphics?.find(g => g.id === sel.slice(2)) : undefined;
   const gPkg = gInst ? pkgById(gInst.pkg) : undefined;
-  const src = (gPkg?.category === 'Audience' ? AUD_SOURCES[gPkg.renderer] : undefined) ?? (gPkg?.obsKey ? REGISTRY.find(s => s.obsKey === gPkg.obsKey) : undefined) ?? sourceById(sel) ?? REGISTRY[0];
+  const src = (gPkg?.category === 'Audience' ? AUD_SOURCES[gPkg.renderer] : undefined) ?? (gPkg?.obsKey ? REGISTRY.find(s => s.obsKey === gPkg.obsKey) : undefined) ?? sourceById(drawKeyOf(sel)) ?? REGISTRY[0];
 
   // Draft = preview scene/show + staged desk/booth + prepared live data. Live = exactly what the sources show.
   const draft = useMemo(() => {
@@ -179,7 +205,14 @@ export function Producer({ onLogout, dock, studio = false }: { onLogout: () => v
     if (src.screen === 'gameplay' && st.showLive.gameplay.cams) [1, 2, 3].forEach(i => ids.add(i));
     return [...ids].sort().join(',');
   }, [st, eng, wc, src, view, gInst, gPkg]);
-  useEffect(() => { const ids = [...new Set([...camKey.split(',').filter(Boolean).map(Number), ...(mode === 'studio' ? studioCams : [])])] as CasterId[]; viewer.setWanted(new Map(ids.map(id => [id, { video: true, audio: false }]))); }, [viewer, camKey, studioCams, mode]);
+  // 3.0: Scenes (main scene tiles + transport) | Library in the first column (per browser)
+  const [libTab, setLibTab] = useState<'scenes' | 'library'>(() => (ls.get('od3.lib', 'scenes') === 'library' ? 'library' : 'scenes'));
+  useEffect(() => { if (!dock) ls.set('od3.lib', libTab); }, [libTab, dock]);
+  // 3.0: Rundown | Talent in the third column (per browser); the Talent panel shows every seated camera
+  const [col3, setCol3] = useState<'rundown' | 'talent'>(() => (ls.get('od3.col3', 'rundown') === 'talent' ? 'talent' : 'rundown'));
+  useEffect(() => { if (!dock) ls.set('od3.col3', col3); }, [col3, dock]);
+  const seatedKey = col3 === 'talent' && mode === 'live' && st ? SEATS.filter(s => st.seats?.[s]).join(',') : '';
+  useEffect(() => { const ids = [...new Set([...camKey.split(',').filter(Boolean).map(Number), ...seatedKey.split(',').filter(Boolean).map(Number), ...(mode === 'studio' ? studioCams : [])])] as CasterId[]; viewer.setWanted(new Map(ids.map(id => [id, { video: true, audio: false }]))); }, [viewer, camKey, seatedKey, studioCams, mode]);
 
   // Keyboard: graphics operations on the selected graphic + global publish/undo/rundown. Never while typing.
   const keyState = useRef({ st, gInst, sel, mode, dock });
@@ -216,10 +249,24 @@ export function Producer({ onLogout, dock, studio = false }: { onLogout: () => v
 
   const outputs = (route: string) => st.outputs.find(o => `/output/${o.route}` === route.split('?')[0])?.count ?? 0;
   const obsProgram = st.obs.currentScene, obsPreview = st.obs.studioMode ? st.obs.previewScene : undefined;
-  const selObs = gInst ? obsSceneOfGfx(gInst, st) : obsSceneOfSource(src, st);
+  const selObs = sel.startsWith('main:') ? obsSceneOfMain(sceneOrModeOf(sel)!, st) : gInst ? obsSceneOfGfx(gInst, st) : obsSceneOfSource(src, st);
   const showDraft = view === 'draft';
   const scene = showDraft ? draft.scene : st.live, show = showDraft ? draft.show : st.showLive, wcv = showDraft ? draft.wc : wc;
   const ctx: Ctx = { st, eng, wc: wc.state, pv: draft.wc.state, run, prepare, src, now, media: media?.media ?? null, mediaSkew: media?.skew ?? 0, aud: { aud, priv: audPriv, op: audOp } };
+  // 3.0 main scenes (MVP follows its flow, or the view the producer is on)
+  const mvpD = ctx.aud ? mvpSceneData(ctx, ctx.aud) : null;
+  const mains = mainScenes(st.graphics ?? [], { flow: mvpD?.flow ?? { status: null, frozen: false, desk: false, published: '' }, selected: mvpViewOfSel(sel) }, isShowSel(sel) ? showModeOfSel(sel).id : undefined);
+  const mvpLeft = mvpD?.poll?.status === 'open' && mvpD.poll.closesAt ? Math.max(0, Math.round((mvpD.poll.closesAt - now) / 1000)) : null;
+  /** A selection as its browser source draws it (tiles' live thumbnails; MVP views keep their reveal gate). */
+  const thumb = (key: string) => {
+    const g = key.startsWith('g:') ? st.graphics?.find(x => x.id === key.slice(2)) : undefined;
+    const d = { scene: st.live, show: st.showLive, wc, aud, now, tournament, bnl, viewer, monitor: true };
+    if (g) return <GraphicHost key={`th-${g.id}`} inst={g} preview d={d} />;
+    const s = sourceById(drawKeyOf(key));
+    if (!s) return null;
+    if (s.gfx) { const sg = st.graphics?.find(x => x.id === s.gfx); return sg ? <GraphicHost key={`th-${s.id}`} inst={sg} preview view={s.gfxView} gate d={d} /> : null; }
+    return s.screen ? <ScreenView key={`th-${s.screen}`} id={s.screen} scene={{ ...st.live, screen: s.screen }} show={st.showLive} now={now} tournament={tournament} viewer={viewer} monitor bnl={bnl} wc={wc} /> : null;
+  };
   const layout = src.id.startsWith('aud-') ? { modules: src.modules, pinned: [] as typeof src.modules } : studioFor(st.studio, src.id);
   const mods = [...layout.pinned, ...layout.modules.filter(m => !layout.pinned.includes(m))];
   const selConns = gInst ? (st.outputs.find(o => o.route === `g/${gInst.id}`)?.count ?? 0) : src.gfx ? (st.outputs.find(o => o.route === outputRouteOf(src))?.count ?? 0) : outputs(src.route);
@@ -228,19 +275,19 @@ export function Producer({ onLogout, dock, studio = false }: { onLogout: () => v
   const gfxWithSrc = (st.graphics ?? []).filter(g => gfxOut.some(o => o.route === `g/${g.id}`)).length;
   const gfxErr = Object.values(st.gfxHealth ?? {}).filter(h => !h.ok).length;
   const seated = (st.talent ?? []).filter(t => t.seat), pubs = seated.filter(t => t.publishing || t.mode === 'vdo').length;
+  const talentBad = checkTalent({ talent: st.talent ?? [], seats: st.seats ?? ({} as never), audio: st.audio, needed: neededSeats(st) }).filter(i => i.tone === 'bad').length;
   const [wLib, wRd, wPub] = cols.w;
   const grid = dock ? `minmax(0,1fr) 5px ${wPub}px` : mode === 'live' ? `${wLib}px 5px minmax(0,1fr) 5px ${wRd}px 5px ${wPub}px` : `${wLib}px 5px minmax(0,1fr) 5px ${wPub}px`;
   const dockMissing = !!dock && !follow && (dock.startsWith('g:') ? !gInst : !sourceById(dock.replace(/^s:/, '')));
   const dockIdle = follow && !followTarget;
   const selectGfx = (id: string) => setSel(`g:${id}`);
 
-  if (mode === 'studio' && !dock) {
-    /** One renderer for Studio's Preview and Program monitors: the same components the browser sources use. */
-    const renderTarget = (key: string, v: 'draft' | 'live') => {
+  /** One renderer for the Preview and Program monitors (Studio, Control room): the same components the browser sources use. */
+  const renderTarget = (key: string, v: 'draft' | 'live') => {
       const g = key.startsWith('g:') ? st.graphics?.find(x => x.id === key.slice(2)) : undefined;
       const dr = v === 'draft';
       if (g) return <GraphicHost key={`${v}-${g.id}`} inst={g} preview forceShow={dr} cfgOverride={dr ? g.draft : null} d={{ scene: st.live, show: st.showLive, wc, aud, now, tournament, bnl, viewer, monitor: true }} />;
-      const s = sourceById(key.replace(/^s:/, ''));
+      const s = sourceById(drawKeyOf(key.replace(/^s:/, '')));
       if (!s) return null;
       if (s.gfx) { const sg = st.graphics?.find(x => x.id === s.gfx); return sg ? <GraphicHost key={`${v}-scene-${s.id}`} inst={sg} preview forceShow={dr} cfgOverride={dr ? sg.draft : null} view={s.gfxView} gate={!dr} d={{ scene: st.live, show: st.showLive, wc, aud, now, tournament, bnl, viewer, monitor: true }} /> : null; }
       const sc = dr ? draft.scene : st.live, sh = dr ? draft.show : st.showLive, w = dr ? draft.wc : wc;
@@ -249,13 +296,39 @@ export function Producer({ onLogout, dock, studio = false }: { onLogout: () => v
         {s.view === 'scoreboard' && <Scoreboard show={sh} />}
         {s.view === 'media' && <MediaView media={media?.media ?? null} skew={media?.skew ?? 0} preview />}
       </>;
-    };
+  };
+  if (mode === 'studio' && !dock) {
     const pk = targetOfObsScene(obsProgram, st);
     return (
       <>
         {!dock && <StorageBanner />}
         <StudioWorkspace st={st} eng={eng} ctx={ctx} run={run} log={log} conn={conn} rtt={rtt} busy={busy} now={now} viewer={viewer} sel={sel} setSel={setSel}
           renderTarget={renderTarget} programKey={pk ? selOfTarget(pk) : null} onProducer={() => setMode('live')} onLogout={onLogout} setCams={setCams} />
+      </>
+    );
+  }
+
+  if (ui === 'room' && !dock) {
+    const pk = targetOfObsScene(obsProgram, st);
+    const prepared = [...draftDiff(st, wc.state, eng), ...eng.draft.map(draftLabel), ...(st.graphics ?? []).filter(g => g.draft).map(g => `${g.name} (graphic)`)];
+    return (
+      <>
+        {!dock && <StorageBanner />}
+        <ControlRoom st={st} eng={eng} ctx={ctx} run={run} log={log} busy={busy > 0} conn={conn} rtt={rtt} now={now} sel={sel} setSel={setSel} mains={mains}
+          mvpD={mvpD ? { flow: mvpD.flow, match: mvpD.match, poll: mvpD.poll ?? null } : null} thumb={thumb} renderTarget={renderTarget} programKey={pk}
+          obsTr={obsTr} setObsTr={setObsTr} prepare={prepare} setPrepare={setPrepare} prepared={prepared} selName={gInst ? gInst.name : src.name} selObs={selObs}
+          inspector={gInst ? <Inspector g={gInst} st={st} eng={eng} wc={wc.state} pv={draft.wc.state} run={run} ctxBase={{ st, eng, wc: wc.state, pv: draft.wc.state, run, prepare, now, media: media?.media ?? null, mediaSkew: media?.skew ?? 0, aud: { aud, priv: audPriv, op: audOp } }} /> : null}
+          mods={mods} library={<Library st={st} sel={sel} onSelect={setSel} run={run} />} rundownGfx={<RundownPanel st={st} run={run} sel={gInst} onSelect={selectGfx} />}
+          talent={<TalentLive st={st} eng={eng} run={run} viewer={viewer} />}
+          health={<HealthIndicator st={st} run={run} conn={conn} rtt={rtt} aud={ctx.aud} onGo={(s, t) => { openStudioAt({ section: s, tab: t }); setMode('studio'); }}
+            render={(tone, n, toggle) => (
+              <button type="button" onClick={toggle} data-health-chip={tone} title="Broadcast health: what is broken right now, with recovery actions"
+                className={`${LABEL} inline-flex h-[26px] items-center gap-1.5 rounded-[2px] border px-2 text-[12px]`}
+                style={tone === 'bad' ? { background: C.in, borderColor: C.in, color: '#fff' } : tone === 'warn' ? { borderColor: C.draft, color: C.draft } : { borderColor: 'rgba(255,255,255,.15)', color: C.ok }}>
+                <span className="h-[8px] w-[8px] rounded-full" style={{ background: tone === 'bad' ? '#fff' : tone === 'warn' ? C.draft : C.ok }} />Health{n ? ` · ${n}` : ''}
+              </button>
+            )} />}
+          onInstant={() => sock.send({ t: 'set-instant', on: !st.instant })} onLogout={onLogout} onClassic={() => setUi('classic')} onStudio={() => setMode('studio')} />
       </>
     );
   }
@@ -316,7 +389,32 @@ export function Producer({ onLogout, dock, studio = false }: { onLogout: () => v
               <StatusChip ok={gfxErr === 0 && gfxWithSrc > 0} warn={gfxErr > 0} label="Sources" value={`${gfxWithSrc}/${(st.graphics ?? []).length}${gfxErr ? ` · ⚠${gfxErr}` : ''}`} />
               <StatusChip ok={seated.length > 0 && pubs === seated.length} warn={pubs < seated.length} label="Talent" value={`${pubs}/${seated.length} cams`} />
               <StatusChip ok={!eng.autoHold} warn={eng.autoHold} label="Auto" value={eng.autoHold ? 'held' : 'armed'} />
+              {/* 3.0 MVP: the producer is told here wherever they are (ready / waiting / failed), one click to the MVP scene */}
+              {!dock && mvpD && (() => {
+                const n = audPriv?.mvpNotice, stg = mvpD.flow.status ?? 'none';
+                const tone = n?.kind === 'error' ? C.in : n?.kind === 'queued' ? C.draft : n?.kind === 'ready' ? C.ok : 'rgba(255,255,255,.15)';
+                return (
+                  <button type="button" data-mvp-chip={n?.kind ?? 'none'} title={n?.text ?? 'MVP scene'} onClick={() => {
+                      setLibTab('scenes'); const to = isMvpSel(sel) ? sel : MVP_SOURCE.voting; setSel(to);
+                      const s0 = sourceById(to), o = s0 ? obsSceneOfSource(s0, st) : undefined; // same as selecting the tile: OBS Preview follows (Studio Mode)
+                      if (o && st.obs.connected) void run({ c: 'obs-preview', scene: o, target: `s:${to}` }, `OBS Preview: ${o}`);
+                    }}
+                    className={`${LABEL} inline-flex h-[20px] items-center gap-1 whitespace-nowrap rounded-[2px] border px-1.5 text-[11px] ${n ? 'animate-pulse' : ''}`} style={{ borderColor: tone, color: n ? tone : 'rgba(255,255,255,.6)' }}>
+                    {audPriv?.rehearsal && <span className="rounded-[2px] px-1 text-black" style={{ background: C.draft }}>REHEARSAL</span>}
+                    MVP{mvpD.match ? ` ${shortCode(mvpD.match).replace(/\s+/g, '')}` : ''} · {n?.kind === 'ready' ? 'READY' : n?.kind === 'queued' ? 'WAITING' : n?.kind === 'error' ? 'CHECK' : stg === 'none' ? (mvpD.finished ? 'not prepared' : '—') : stg}
+                  </button>
+                );
+              })()}
+              {!dock && <HealthIndicator st={st} run={run} conn={conn} rtt={rtt} aud={ctx.aud} onGo={(s, t) => { openStudioAt({ section: s, tab: t }); setMode('studio'); }}
+                render={(tone, n, toggle) => (
+                  <button type="button" onClick={toggle} data-health-chip={tone} title="Broadcast health: what is broken right now, with recovery actions"
+                    className={`${LABEL} inline-flex h-[20px] items-center gap-1.5 rounded-[2px] border px-1.5 text-[11px]`}
+                    style={tone === 'bad' ? { background: C.in, borderColor: C.in, color: '#fff' } : tone === 'warn' ? { borderColor: C.draft, color: C.draft } : { borderColor: 'rgba(255,255,255,.15)', color: C.ok }}>
+                    <span className="h-[7px] w-[7px] rounded-full" style={{ background: tone === 'bad' ? '#fff' : tone === 'warn' ? C.draft : C.ok }} />Health{n ? ` · ${n}` : ''}
+                  </button>
+                )} />}
               <button type="button" onClick={() => setDetails(v => !v)} className={`${LABEL} rounded-[2px] border px-1.5 text-[11px] ${details ? 'border-white bg-white text-black' : 'border-white/15 text-white/55'}`} data-details-toggle>Details</button>
+              {!dock && <button type="button" onClick={() => setUi('room')} className={`${LABEL} rounded-[2px] px-1.5 text-[11px] text-white`} style={{ background: C.brand }} title="Try the new Producer control room (prototype)" data-room-open>Control room</button>}
               <button type="button" onClick={() => setHelp(v => !v)} className="grid h-[20px] w-[20px] place-items-center rounded-full border border-white/20 text-[11px] text-white/60" title="Shortcuts (?)">?</button>
             </span>
           </div>
@@ -324,7 +422,17 @@ export function Producer({ onLogout, dock, studio = false }: { onLogout: () => v
           {/* body 370 px */}
           <div className="grid min-h-0 flex-1" style={{ gridTemplateColumns: grid }}>
             {!dock && <>
-              <Library st={st} sel={sel} onSelect={setSel} run={run} />
+              <div className="flex min-h-0 min-w-0 flex-col" style={{ background: C.panel }}>
+                <div className="flex h-[24px] flex-none items-stretch border-b" style={{ borderColor: C.line, background: C.bg }} data-libtab={libTab}>
+                  {(['scenes', 'library'] as const).map(k => <button key={k} type="button" onClick={() => setLibTab(k)} data-libtab-btn={k}
+                    className={`${LABEL} flex-1 text-[12px] ${libTab === k ? 'bg-white/[0.08] text-white' : 'text-white/45 hover:text-white/75'}`} style={libTab === k ? { boxShadow: `inset 0 -2px 0 ${C.brand}` } : undefined}>
+                    {k === 'scenes' ? 'Scenes' : 'Library'}</button>)}
+                </div>
+                {libTab === 'scenes'
+                  ? <MainScenes st={st} scenes={mains} sel={sel} onSelect={setSel} run={run} obsTr={obsTr} thumb={thumb}
+                      mvp={{ flow: mvpD?.flow ?? { status: null, frozen: false, desk: false, published: '' }, votes: mvpD?.poll?.status === 'open' ? mvpD.poll.total ?? 0 : null, left: mvpLeft, confirm: st.graphics?.find(g => g.id === 'mvp')?.config.confirmReveal !== false, match: mvpD?.match }} />
+                  : <Library st={st} sel={sel} onSelect={setSel} run={run} />}
+              </div>
               <Splitter onPointerDown={cols.start(0, 1, fit.s)} onDoubleClick={cols.reset} />
             </>}
             {mode === 'live' ? (
@@ -337,19 +445,32 @@ export function Producer({ onLogout, dock, studio = false }: { onLogout: () => v
                       {!dock && <B h={20} kind="ghost" onClick={() => { setMode('studio'); setStudioTab('modules'); setModSrc(src.id); }}>Modules…</B>}
                       <B h={20} kind="ghost" onClick={() => navigator.clipboard?.writeText(location.origin + src.route)}>Copy URL</B>
                     </PanelHead>
-                    {src.gfx === 'mvp' && src.gfxView && ctx.aud && <MvpSceneControls x={ctx} a={ctx.aud} src={src} obsTr={obsTr} />}
-                    <div className="min-h-0 flex-1 overflow-y-auto" data-modules={src.id}>
+                    {/* 3.8: Show Screens' mode switcher (Starting Soon · Be Right Back · Intermission · Thanks for Watching),
+                        right where its controls are — in the normal console AND in this scene's OBS dock, which has no
+                        tile row of its own. Same switcher, same preview/TAKE calls as the Scenes tile row. */}
+                    {isShowSel(sel) && <div className="flex-none border-b p-1.5" style={{ borderColor: C.line, background: '#0d0d0f' }}><ShowModeBar st={st} sel={sel} onSelect={setSel} run={run} obsTr={obsTr} compact={!!dock} /></div>}
+                    {isMvpSel(src.id) && ctx.aud && !dock && <MvpPanel x={ctx} a={ctx.aud} sel={src.id} onSelect={setSel} obsTr={obsTr} />}
+                    {src.gfx === 'mvp' && src.gfxView && ctx.aud && dock && <MvpSceneControls x={ctx} a={ctx.aud} src={src} obsTr={obsTr} />}
+                    {!(isMvpSel(src.id) && ctx.aud && !dock) && <div className="min-h-0 flex-1 overflow-y-auto" data-modules={src.id}>
                       <div className="grid" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(400px, 1fr))', gridAutoRows: 312 }}>
                         {mods.map(m => <div key={m} className="flex min-h-0 min-w-0 [&>section]:w-full [&>section]:min-w-0">{<ModuleView id={m} x={ctx} pinned={layout.pinned.includes(m)} />}</div>)}
                       </div>
-                    </div>
+                    </div>}
                   </div>
                 )}
               </div>
             ) : (
               <StudioMode st={st} run={run} tab={studioTab} setTab={setStudioTab} sel={sel} onSelectGfx={selectGfx} srcForModules={sourceById(modSrc) ?? REGISTRY[0]} setSrcForModules={setModSrc} x={ctx} />
             )}
-            {mode === 'live' && !dock && <><Splitter onPointerDown={cols.start(1, -1, fit.s)} onDoubleClick={cols.reset} /><RundownPanel st={st} run={run} sel={gInst} onSelect={selectGfx} /></>}
+            {mode === 'live' && !dock && <><Splitter onPointerDown={cols.start(1, -1, fit.s)} onDoubleClick={cols.reset} />
+              <div className="flex min-h-0 min-w-0 flex-col" style={{ background: C.panel }}>
+                <div className="flex h-[24px] flex-none items-stretch border-b" style={{ borderColor: C.line, background: C.bg }} data-col3={col3}>
+                  {(['rundown', 'talent'] as const).map(k => <button key={k} type="button" onClick={() => setCol3(k)} data-col3-tab={k}
+                    className={`${LABEL} flex-1 text-[12px] ${col3 === k ? 'bg-white/[0.08] text-white' : 'text-white/45 hover:text-white/75'}`} style={col3 === k ? { boxShadow: `inset 0 -2px 0 ${C.brand}` } : undefined}>
+                    {k === 'rundown' ? 'Rundown' : `Talent${talentBad ? ` · ${talentBad}` : ''}`}</button>)}
+                </div>
+                {col3 === 'rundown' ? <RundownPanel st={st} run={run} sel={gInst} onSelect={selectGfx} /> : <TalentLive st={st} eng={eng} run={run} viewer={viewer} />}
+              </div></>}
             <Splitter onPointerDown={cols.start(2, -1, fit.s)} onDoubleClick={cols.reset} />
             <PublishPanel st={st} eng={eng} wc={wc.state} run={run} prepare={prepare} setPrepare={setPrepare} obsTr={obsTr} setObsTr={setObsTr} selObs={selObs} selName={gInst ? gInst.name : src.name}
               log={log} onInstant={() => sock.send({ t: 'set-instant', on: !st.instant })} onLogout={onLogout} showGo={dock ? null : <ShowGo st={st} run={run} now={now} />} />

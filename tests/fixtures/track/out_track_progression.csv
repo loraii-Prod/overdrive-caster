@@ -1,0 +1,5 @@
+match_id,track_number,round_number,track_id,p1_team_id,team_a_id,team_b_id,pts_a,pts_b,combo_a,combo_b,track_name,picked_by,point_limit,team_a_tag,team_a_name,team_a_roster,team_a_color,team_a_logo_slug,team_b_tag,team_b_name,team_b_roster,team_b_color,team_b_logo_slug,fastest_player,fastest_time_ms,fastest_round,custom_takeaway
+match_0009,2,1,t_egypt,,NAVI,NYX,1,2,2-4,1-3,OverDrive Egypt 2026,NYX PICK,10,NAVI,NaVi x Joel,Mime & eLconn21,#00E5FF,NavixJoel.png,NYX,Nyxar Competitive,Alpha & Beta,#F43F5E,Nyxar.png,,0,,
+match_0009,2,2,,,NAVI,NYX,0,3,3-4,1-2,,,,,,,,,,,,,,,,,
+match_0009,2,3,,,NAVI,NYX,2,1,1-3,2-4,,,,,,,,,,,,,,,,,
+match_0009,2,4,,,NAVI,NYX,3,0,1-2,3-4,,,,,,,,,,,,,,,,,

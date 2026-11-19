@@ -1,0 +1,9 @@
+{
+  "compilerOptions": {
+    "target": "ES2022", "module": "ESNext", "moduleResolution": "Bundler", "strict": true, "noImplicitAny": false, "noUnusedLocals": true, "esModuleInterop": true, "resolveJsonModule": true, "noEmit": true, "skipLibCheck": true,
+    "lib": ["ES2023", "DOM", "DOM.Iterable"], "types": ["node"], "typeRoots": ["/opt/npm-tools/node_modules/@types"],
+    
+    "paths": { "express": ["./express.ts"], "cookie": ["./cookie.ts"], "qrcode": ["./qrcode.ts"], "aws4fetch": ["./aws4fetch.ts"], "pg": ["./pg.ts"], "obs-websocket-js": ["./obs-websocket-js.ts"], "@msgpack/msgpack": ["./msgpack.ts"] }
+  },
+  "include": ["../../server/**/*.ts", "../../shared/**/*.ts", "../../vote/**/*.ts", "ambient.d.ts"]
+}

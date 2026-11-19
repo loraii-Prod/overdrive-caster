@@ -1,3 +1,5 @@
+> **Overdrive 3.0** (`3.0.0-talent`): Talent Manager (Add talent in one step, reusable profiles, layouts, Green Room), persistent talent audio controlled through OBS, Broadcast Health + pre-show checklist. See [CHANGES-3.0.md](CHANGES-3.0.md) (feature report, migration, limits) and [docs/TALENT-AUDIO-3.0.md](docs/TALENT-AUDIO-3.0.md).
+
 > **Overdrive 2.0**: one Producer Console at `/producer`; every scene is its own OBS browser source; 10 talent profiles with personal links; graphics engine with packages and `/g/<instance>` browser sources. See [OVERDRIVE-2.0.md](OVERDRIVE-2.0.md) for the sources list, the workflow and the test results.
 
 # Overdrive — Broadcast Caster System

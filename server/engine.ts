@@ -8,6 +8,7 @@
  *   OBS scene switches are explicit (`obs-switch`) and OBS performs the transition.
  * The legacy TAKE/CUT (whole-show /output/program) still work for the HTTP API, but the console no longer uses them.
  */
+import { mainDef } from '../shared/obsLayout';
 import type { Scene, Show, ScreenId, CasterId } from '../shared/types';
 import { SCREEN_IDS } from '../shared/types';
 import type { WildcardState, WcOp } from '../shared/wildcard';
@@ -58,19 +59,42 @@ export interface EngineDeps {
   onGfxPublish?(g: GfxInstance): void;
   /** Talent / positions (hub owns the camera routing). Return an error message or null. */
   setSeat(seat: number, talent: string | null): string | null;
-  editTalent(id: string, patch: { name?: string; role?: 'caster' | 'analyst'; mode?: 'webrtc' | 'vdo'; camQuality?: import('../shared/talent').CamQuality; vdoId?: string }): string | null;
+  editTalent(id: string, patch: import('../shared/engine').TalentPatch): string | null;
+  /** 3.0 Add Talent: returns the new profile id, or { error }. */
+  addTalent?(a: { name: string; role?: import('../shared/talent').TalentRole; vdo?: string; seat?: number | null; mode?: 'webrtc' | 'vdo' }): { id: string } | { error: string };
+  removeTalent?(id: string): string | null;
+  /** 3.0 talent audio through OBS (master mute, re-apply). */
+  audio?: { master(muted: boolean): Promise<string | null>; applyAll(): Promise<string | null> };
   regenTalent(id: string): string | null;
   resyncSeat(seat: number): string | null;
   /** OBS: switch Program scene with the given transition (undefined = OBS's current one). */
-  obsSwitch(scene: string, transition?: TransitionKind): Promise<string | null>;
+  obsSwitch(scene: string, transition?: TransitionKind, /** 3.2: the output going on air (its layer is shown first in the main-scenes layout) */ target?: string): Promise<string | null>;
+  /** 3.0: OBS Studio Mode preview (returns a note when OBS is not in Studio Mode). 3.2: target = the layer to prepare off-air. */
+  obsPreview?(scene: string, target?: string): Promise<{ error?: string; note?: string }>;
+  /** 3.2: show / hide one layer of a main scene (main-scenes layout). */
+  obsLayer?(target: string, on: boolean): Promise<{ error?: string; note?: string }>;
   /** OBS Scene Builder: returns an error, or a note for the ack. Never switches OBS. */
   obsSetup(cmd: Extract<ProducerCmd, { c: 'obs-setup' }>): Promise<{ error?: string; note?: string }>;
   /** Show plan: how segment targets map to OBS scenes (Scene Builder, screen mapping, graphics mapping, OBS scene list). */
   obsLookup?(): ObsLookup;
   /** Show plan with crew sync on: mirror the segments (and the one on air) to the crew / caster run of show. */
   syncCrew?(plan: ShowPlan): void;
+  /** 3.4: Desk Camera Engine — OBS-composited cameras with A/B scene isolation. */
+  camEngine?: {
+    prepare(presetOrLayout: string | import('../shared/camPresets').DeskCamLayout[]): Promise<string | null>;
+    take(duration?: number, easing?: string): Promise<string | null>;
+    snap(presetOrLayout: string | import('../shared/camPresets').DeskCamLayout[]): Promise<string | null>;
+    autoPreset(mode: 'cams' | 'panel', casterCount: number): string;
+    savePreset(name: string, cameras: import('../shared/camPresets').DeskCamLayout[], id?: string): import('../shared/camPresets').DeskCamPreset;
+    deletePreset(id: string): boolean;
+  };
   /** MVP voting of the MVP graphic's match (hub → vote service). */
-  mvp?: { state(): MvpFlowIn & { match: string }; op(action: 'open' | 'close'): Promise<string | null> };
+  mvp?: { state(): MvpFlowIn & { match: string }; op(action: 'open' | 'close'): Promise<string | null>;
+    /** 3.0: the MVP match changed: load its players and prepare its vote (never opens it). Returns a warning or null. */
+    ready?(match: string): Promise<string | null>;
+    /** 3.0 rehearsal (demo event). */
+    demo?(action: 'load' | 'finish' | 'leave'): Promise<{ error?: string; note?: string }>;
+  };
 }
 
 type Snap = { label: string; at: number; kind: 'stage' | 'take'; preview: Scene; showPreview: Show; stage: Stage; touched: boolean; draft: DraftCmd[];
@@ -198,13 +222,24 @@ export function createEngine(d: EngineDeps) {
   const rdIndex = (id: string) => db.rundown.items.findIndex(x => x.id === id);
   const rdId = () => { let id: string; do id = Math.random().toString(36).slice(2, 10); while (rdIndex(id) >= 0); return id; };
   const anim = (g: GfxInstance, action: GfxInstance['anim']['action']) => { g.anim = { action, seq: g.anim.seq + 1, at: Date.now() }; };
+  /**
+   * 3.3 TAKE safety (unified MVP renderer): the Program source's state before a TAKE, to roll back when OBS refuses
+   * the switch. A closed vote stays closed (never reopened by a rollback); the reveal authorization is withdrawn.
+   */
+  const mvpSnapshot = () => { const g = gfx('mvp'); return g ? { config: JSON.parse(JSON.stringify(g.config)), out: g.anim.action === 'out', prepared: g.prepared ?? null } : null; };
+  function mvpRollback(sn: ReturnType<typeof mvpSnapshot>) {
+    const g = gfx('mvp'); if (!g || !sn) return;
+    g.config = sn.config; g.prepared = sn.prepared;
+    anim(g, sn.out ? 'out' : 'update');
+    d.save(); d.pushGfx();
+  }
   /** Published config changes on a graphic that is IN play its UPDATE animation (never other graphics). */
   /**
    * MVP graphic: publishing a reveal step IS the producer's authorization of that reveal for that match (the MVP &
    * Awards reveal scenes draw only authorized reveals). A stale draft never takes an authorization back.
    */
   function mvpAuthorize(prev: GfxInstance['config'], next: GfxInstance['config']): GfxInstance['config'] {
-    const match = String(next.match || db.wildcard.cast || '');
+    const match = String(next.match || ''); // 3.0: the MVP graphic's own match only (never the cast match)
     const out = { ...next, revealed: mergeRevealed(prev, next, match) };
     if ((REVEAL_STEPS as string[]).includes(String(next.step))) out.revealed = withRevealed(out, match, String(next.step));
     return out;
@@ -216,6 +251,16 @@ export function createEngine(d: EngineDeps) {
     g.config = g.draft; g.draft = null;
     if (changed && g.anim.action !== 'out') anim(g, 'update');
     if (changed) d.onGfxPublish?.(g);
+  }
+
+  /**
+   * 3.0: the MVP match may change unless voting is open on the current one (its votes stay with it, but switching
+   * away mid-vote would leave viewers voting for a match that is no longer on screen).
+   */
+  function mvpMatchBlocked(next: string): string | null {
+    const st = d.mvp?.state();
+    if (st && st.status === 'open' && st.match && st.match !== next) return `Voting is open for ${st.match}: stop voting before changing the MVP match`;
+    return null;
   }
 
   /** MVP graphic → a reveal step for a match, on its source now (IN if it was out). The audience reveal follows. */
@@ -307,12 +352,13 @@ export function createEngine(d: EngineDeps) {
     // pick) and the producer's GO — the GO authorizes the reveal, which then draws on its browser source.
     const gv = seg.target?.startsWith('s:') ? REGISTRY.find(s => s.id === seg.target!.slice(2))?.gfxView : undefined;
     const view = isMvpView(gv) ? gv : undefined;
+    const sn = view ? mvpSnapshot() : null;
     if (view) { const e = await mvpEnter(view, source); if (e) return { error: e }; }
     const scene = d.obsLookup ? segmentObsScene(seg, d.obsLookup()) : seg.obsScene;
     let extra = view && isRevealView(view) ? ' · reveal authorized' : '';
     if (scene) {
-      const e = await d.obsSwitch(scene, seg.transition === 'obs' ? undefined : seg.transition);
-      if (e) return { error: `${e}. Nothing changed: use “Mark on air” if you switched OBS yourself` };
+      const e = await d.obsSwitch(scene, seg.transition === 'obs' ? undefined : seg.transition, seg.obsScene ? undefined : seg.target ?? undefined);
+      if (e) { if (sn) mvpRollback(sn); return { error: `${e}. Nothing changed${sn ? ' (MVP rolled back)' : ''}: use “Mark on air” if you switched OBS yourself` }; }
     } else extra = ' · no OBS scene mapped: OBS was not switched';
     if (seg.media) {
       const md = m();
@@ -580,7 +626,16 @@ export function createEngine(d: EngineDeps) {
       }
       // ------------------------------------------------------------- talent
       case 'seat': { const e = d.setSeat(Number(cmd.seat), cmd.talent ?? null); if (e) return fail(e); break; }
-      case 'talent-edit': { const e = d.editTalent(String(cmd.id), { name: cmd.name, role: cmd.role, mode: cmd.mode, camQuality: cmd.camQuality, vdoId: cmd.vdoId }); if (e) return fail(e); break; }
+      case 'talent-edit': { const { c: _c, id, ...patch } = cmd; const e = d.editTalent(String(id), patch); if (e) return fail(e); break; }
+      case 'talent-add': {
+        if (!d.addTalent) return fail('Not available');
+        const r = d.addTalent({ name: String(cmd.name ?? ''), role: cmd.role, vdo: typeof cmd.vdo === 'string' ? cmd.vdo : undefined, seat: cmd.seat == null ? null : Number(cmd.seat), mode: cmd.mode });
+        if ('error' in r) return fail(r.error);
+        note = `Added ${r.id}`; break;
+      }
+      case 'talent-remove': { if (!d.removeTalent) return fail('Not available'); const e = d.removeTalent(String(cmd.id)); if (e) return fail(e); note = 'Profile cleared: their link no longer works'; break; }
+      case 'audio-master': { if (!d.audio) return fail('Not available'); const e = await d.audio.master(cmd.muted === true); if (e) return fail(e); note = cmd.muted ? 'Every talent voice muted in OBS' : 'Talent voices back to their own mute settings'; break; }
+      case 'audio-apply': { if (!d.audio) return fail('Not available'); const e = await d.audio.applyAll(); if (e) return fail(e); note = 'Talent audio settings applied to OBS'; break; }
       case 'talent-regen': { const e = d.regenTalent(String(cmd.id)); if (e) return fail(e); note = 'New link: the old one no longer works'; break; }
       case 'feed-resync': { const e = d.resyncSeat(Number(cmd.seat)); if (e) return fail(e); note = 'Feed renegotiated (talent did not have to do anything)'; break; }
       // ------------------------------------------------------------- OBS
@@ -927,13 +982,15 @@ export function createEngine(d: EngineDeps) {
           patch[k] = c.value;
         }
         if (!Object.keys(patch).length) return fail('Nothing to change');
+        if ('match' in patch && patch.match !== g.config.match) { const why = mvpMatchBlocked(String(patch.match)); if (why) return fail(why); }
         // Another match: the MVP graphic goes back to its voting step (a reveal is never carried over to a new match).
-        if ('match' in patch && patch.match !== g.config.match) patch.step = 'voting';
+        if ('match' in patch && patch.match !== g.config.match) { patch.step = 'voting'; patch.revealed = ''; }
         g.config = { ...g.config, ...patch };
         if (g.draft) g.draft = { ...g.draft, ...patch };
         if ('match' in patch && g.anim.action !== 'out') anim(g, 'update');
         d.save(); d.pushGfx();
         note = 'MVP scene settings saved to this event';
+        if ('match' in patch && patch.match && d.mvp?.ready) { const w = await d.mvp.ready(String(patch.match)); if (w) note += ` · ${w}`; }
         break;
       }
       case 'mvp-take': {
@@ -946,16 +1003,161 @@ export function createEngine(d: EngineDeps) {
         const seg = (p.next ? p.segments.find(x => x.id === p.next && x.target === target) : undefined)
           ?? p.segments.slice(p.onAir ? segIdx(p.onAir.id) + 1 : 0).find(x => x.target === target);
         const scene = d.obsLookup ? segmentObsScene({ obsScene: seg?.obsScene ?? null, target }, d.obsLookup()) : null;
-        if (!scene && !cmd.noObs) return fail(`No OBS scene for ${src.name}: build the MVP scenes in Studio → OBS & Outputs (or use “Mark on air”)`);
+        if (!scene && !cmd.noObs) return fail(`No OBS scene for ${src.name}: build the MVP scenes in Studio → Sources & OBS (or use “Mark on air”)`);
+        const sn = mvpSnapshot();
         const e = await mvpEnter(cmd.view, source);
         if (e) return fail(e);
         const tr = cmd.transition ?? seg?.transition ?? 'obs';
-        if (scene && !cmd.noObs) { const er = await d.obsSwitch(scene, tr === 'obs' ? undefined : tr); if (er) return fail(`${er}. The MVP graphic is prepared; OBS was not switched`); }
+        if (scene && !cmd.noObs) { const er = await d.obsSwitch(scene, tr === 'obs' ? undefined : tr, seg?.obsScene ? undefined : target); if (er) { mvpRollback(sn); return fail(`${er}. Rolled back: the MVP Program source is back to its previous state (a closed vote stays closed)`); } }
         if (seg) { p.onAir = { id: seg.id, at: Date.now() }; p.next = followingSeg(); p.pending = null; endFired = null; crew(); }
         if (source === 'manual') manualAt = Date.now();
         planNote(`ON AIR: ${src.name}${scene && !cmd.noObs ? ` (OBS → ${scene})` : ''}`, 'go');
         note = `${src.name} on air${scene && !cmd.noObs ? ` · OBS → ${scene}` : ''}${seg ? ` · rundown: ${seg.label}` : ''}`;
         d.save();
+        break;
+      }
+      case 'scene-take': {
+        const target = String(cmd.target ?? '');
+        const tsrc = target.startsWith('s:') ? REGISTRY.find(s => s.id === target.slice(2)) : undefined;
+        // MVP scenes: the MVP TAKE (voting close / reveal authorization / reveal rules), never a plain switch
+        if (tsrc?.gfx === 'mvp' && tsrc.gfxView && isMvpView(tsrc.gfxView)) {
+          const r = await run({ c: 'mvp-take', view: tsrc.gfxView, ...(cmd.transition && cmd.transition !== 'obs' ? { transition: cmd.transition } : {}) }, 'scene-take', source);
+          if (!r.ok) return fail(r.error ?? 'MVP TAKE failed');
+          note = r.note; break;
+        }
+        const mdef = target.startsWith('main:') ? mainDef(target.slice(5)) : undefined;
+        if (!tsrc && !mdef && !(target.startsWith('g:') && gfx(target.slice(2)))) return fail('Unknown scene');
+        const g0 = guard(source); if (g0) return fail(g0);
+        const p = plan();
+        const seg = (p.next ? p.segments.find(x => x.id === p.next && x.target === target) : undefined)
+          ?? p.segments.slice(p.onAir ? segIdx(p.onAir.id) + 1 : 0).find(x => x.target === target);
+        const scene = d.obsLookup ? segmentObsScene({ obsScene: seg?.obsScene ?? null, target }, d.obsLookup()) : null;
+        const name = tsrc?.name ?? mdef?.label ?? gfx(target.slice(2))?.name ?? target;
+        if (!scene) return fail(`No OBS scene for ${name}: build it in Studio → Sources & OBS → Scene Builder`);
+        const tr = cmd.transition ?? seg?.transition ?? 'obs';
+        const er = await d.obsSwitch(scene, tr === 'obs' ? undefined : tr, seg?.obsScene ? undefined : target);
+        if (er) return fail(er);
+        if (seg) { p.onAir = { id: seg.id, at: Date.now() }; p.next = followingSeg(); p.pending = null; endFired = null; crew(); }
+        if (source === 'manual') manualAt = Date.now();
+        planNote(`ON AIR: ${name} (OBS → ${scene})`, 'go');
+        note = `${name} on air · OBS → ${scene}${seg ? ` · rundown: ${seg.label}` : ''}`;
+        d.save();
+        break;
+      }
+      case 'obs-preview': {
+        if (!d.obsPreview) return fail('Not available');
+        const r = await d.obsPreview(String(cmd.scene ?? ''), typeof cmd.target === 'string' && cmd.target ? cmd.target : undefined);
+        if (r.error) return fail(r.error);
+        note = r.note; break;
+      }
+      case 'obs-layer': {
+        if (!d.obsLayer) return fail('Not available');
+        const r = await d.obsLayer(String(cmd.target ?? ''), cmd.on !== false);
+        if (r.error) return fail(r.error);
+        manualAt = Date.now();
+        note = r.note; break;
+      }
+      // ---- 3.4 Desk Camera Engine ----
+      case 'cam-prepare': {
+        if (!d.camEngine) return fail('Camera engine not available');
+        const e = await d.camEngine.prepare(String(cmd.preset ?? ''));
+        if (e) return fail(e);
+        stageVersion = version + 1; stageBy = by;
+        note = `Camera layout prepared: ${cmd.preset}`;
+        break;
+      }
+      case 'cam-prepare-layout': {
+        if (!d.camEngine) return fail('Camera engine not available');
+        if (!Array.isArray(cmd.cameras)) return fail('Invalid camera layout');
+        const e = await d.camEngine.prepare(cmd.cameras);
+        if (e) return fail(e);
+        stageVersion = version + 1; stageBy = by;
+        note = 'Custom camera layout prepared';
+        break;
+      }
+      case 'cam-take': {
+        if (!d.camEngine) return fail('Camera engine not available');
+        const e = await d.camEngine.take(cmd.duration, cmd.easing);
+        if (e) return fail(e);
+        manualAt = Date.now();
+        note = 'Camera layout taken to air';
+        break;
+      }
+      case 'cam-snap': {
+        if (!d.camEngine) return fail('Camera engine not available');
+        const e = await d.camEngine.snap(String(cmd.preset ?? ''));
+        if (e) return fail(e);
+        manualAt = Date.now();
+        note = `Camera snap: ${cmd.preset}`;
+        break;
+      }
+      case 'cam-preset-save': {
+        if (!d.camEngine) return fail('Camera engine not available');
+        const name = String(cmd.name ?? '').trim().slice(0, 48) || 'Untitled';
+        if (!Array.isArray(cmd.cameras)) return fail('Invalid camera layout');
+        const p = d.camEngine.savePreset(name, cmd.cameras, cmd.id);
+        d.save();
+        note = `Camera preset saved: ${p.name}`;
+        break;
+      }
+      case 'cam-preset-delete': {
+        if (!d.camEngine) return fail('Camera engine not available');
+        if (!d.camEngine.deletePreset(String(cmd.id ?? ''))) return fail('Preset not found or is a built-in');
+        d.save();
+        note = 'Camera preset deleted';
+        break;
+      }
+      case 'cam-auto': {
+        if (!d.camEngine) return fail('Camera engine not available');
+        const st = stage();
+        const panel = st.desk.panel ?? 'cams';
+        const mode = panel === 'cams' ? 'cams' : 'panel';
+        const count = (st.desk.slots?.length ?? 0) + (st.desk.guest ? 1 : 0);
+        const presetId = d.camEngine.autoPreset(mode as 'cams' | 'panel', count);
+        // 3.4d: animated, not a hard cut — prepare() stages the matching preset on the Preview (B) scene, then
+        // take() (default duration: DEFAULT_GFX_TRANSITION_MS, the same fixed crossfade the desk's own graphics
+        // run on any layout change) swaps it to Program so the camera move lands with the frame/nameplate move
+        // instead of jumping ahead of or behind it. A caller that wants a hard cut can still cam-snap directly.
+        const pe = await d.camEngine.prepare(presetId);
+        if (pe) return fail(pe);
+        const e = await d.camEngine.take(cmd.duration, cmd.easing);
+        if (e) return fail(e);
+        note = `Camera auto: ${presetId}`;
+        break;
+      }
+      case 'mvp-match': {
+        const g = gfx('mvp'), p = g && pkgById(g.pkg);
+        if (!g || !p) return fail('The MVP graphic no longer exists');
+        const m = String(cmd.match ?? '');
+        const c = checkProp(p.props.find(x => x.key === 'match')!, m);
+        if (!c.ok) return fail(c.error);
+        if (c.value !== g.config.match) { const why = mvpMatchBlocked(String(c.value)); if (why) return fail(why); }
+        // a new match starts again from the voting step: authorizations belong to a match
+        g.config = sanitizeConfig(p, { ...g.config, match: c.value, step: 'voting', revealed: '' });
+        if (g.draft) g.draft = sanitizeConfig(p, { ...g.draft, match: c.value, step: 'voting', revealed: '' });
+        if (g.anim.action !== 'out') anim(g, 'update');
+        d.save(); d.pushGfx();
+        note = m ? `MVP scene: ${m}` : 'MVP scene: no match';
+        // the new match's players and vote are prepared straight away (voting is never opened here)
+        if (m && d.mvp?.ready) { const w = await d.mvp.ready(m); if (w) note += ` · ${w}`; }
+        break;
+      }
+      case 'mvp-demo': {
+        if (!d.mvp?.demo) return fail('Rehearsal not available');
+        if (!['load', 'finish', 'leave'].includes(cmd.action)) return fail('Unknown rehearsal action');
+        const r = await d.mvp.demo(cmd.action);
+        if (r.error) return fail(r.error);
+        note = r.note;
+        break;
+      }
+      case 'mvp-qr': {
+        const g = gfx('mvp'), p = g && pkgById(g.pkg);
+        if (!g || !p) return fail('The MVP graphic no longer exists');
+        g.config = sanitizeConfig(p, { ...g.config, qr: cmd.on === true });
+        if (g.draft) g.draft = sanitizeConfig(p, { ...g.draft, qr: cmd.on === true });
+        if (g.anim.action !== 'out') anim(g, 'update');
+        d.save(); d.pushGfx();
+        note = cmd.on ? 'QR code shown on the MVP voting graphic' : 'QR code hidden on the MVP voting graphic';
         break;
       }
       case 'sp-cancel': {

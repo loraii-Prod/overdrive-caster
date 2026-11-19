@@ -20,6 +20,7 @@ import { VIEW_STEP, isBracketView, isMvpView, isRevealView, viewAllowed, type Gf
 import type { RtcViewer } from '../lib/rtcViewer';
 import type { AudLive, WcLive } from '../lib/hooks';
 import { AUD_RENDERERS } from './audience';
+import { TrackProgression } from './track';
 import { ScreenView } from '../components/show/Program';
 import { Scoreboard } from '../components/show/Overlays';
 import { Swap, TransitionProvider, transitionOf, whenVisualsReady } from './transition';
@@ -38,18 +39,19 @@ export const RENDERERS: Record<string, Renderer> = {
     const n = cfg.layout === 'solo' ? 1 : cfg.layout === 'duo' ? 2 : cfg.layout === 'trio' ? 3 : on.length;
     const booth = on.slice(0, n);
     const wc = d.wc && { ...d.wc, state: { ...d.wc.state, booth, intro: { ...d.wc.state.intro, picksShow: cfg.picks === true } } };
-    return <ScreenView id="casters" scene={{ ...d.scene, screen: 'casters', showNames: cfg.names !== false }} show={{ ...d.show, showMatchupOnCasters: cfg.matchup === true, ticker: { ...d.show.ticker, onScreens: cfg.ticker !== false } }}
+    return <ScreenView id="casters" scene={{ ...d.scene, screen: 'casters', showNames: cfg.names !== false, obsCams: cfg.obsCams === true }} show={{ ...d.show, showMatchupOnCasters: cfg.matchup === true, ticker: { ...d.show.ticker, onScreens: cfg.ticker !== false } }}
       now={d.now} tournament={d.tournament} viewer={d.viewer} monitor={d.monitor} bnl={d.bnl} wc={wc} />;
   },
   'analyst-desk': ({ cfg, d }) => {
     const slots = cfg.layout === 'solo' ? [4] : [4, 5];
     const guest = cfg.guest === 'none' ? null : Number(cfg.guest);
     const wc = d.wc && { ...d.wc, state: { ...d.wc.state, desk: { ...d.wc.state.desk, slots, guest, panel: String(cfg.panel) as 'cams', strip: cfg.strip === true, clock: cfg.clock === true } } };
-    const desk = <ScreenView id="analysis" scene={{ ...d.scene, screen: 'analysis', showNames: cfg.names !== false }} show={{ ...d.show, ticker: { ...d.show.ticker, onScreens: cfg.ticker !== false } }}
+    const desk = <ScreenView id="analysis" scene={{ ...d.scene, screen: 'analysis', showNames: cfg.names !== false, obsCams: cfg.obsCams === true }} show={{ ...d.show, ticker: { ...d.show.ticker, onScreens: cfg.ticker !== false } }}
       now={d.now} tournament={d.tournament} viewer={d.viewer} monitor={d.monitor} bnl={d.bnl} wc={wc} />;
     // Optional voting QR on the desk (off by default; the same approved code as the QR graphic's desk position).
     return cfg.qr === true ? <>{desk}{AUD_RENDERERS.qr({ cfg: { qr: 'vote', position: cfg.layout === 'solo' ? 'desk-inline-solo' : 'desk-inline', title: String(cfg.qrTitle || 'Vote for the MVP'), winner: cfg.qrWinner === true }, d })}</> : desk;
   },
+  track: ({ cfg, d }) => <TrackProgression cfg={cfg} d={d} />,
   scoreboard: ({ cfg, d }) => <Scoreboard show={{ ...d.show, showScoreboard: true, mapName: cfg.map === false ? '' : d.show.mapName }} />,
   gameplay: ({ cfg, d }) => (
     <ScreenView id="gameplay" scene={{ ...d.scene, screen: 'gameplay' }} show={{ ...d.show, showScoreboard: cfg.scoreboard !== false, gameplay: { ...d.show.gameplay, cams: cfg.cams === true, ticker: cfg.ticker === true } }}

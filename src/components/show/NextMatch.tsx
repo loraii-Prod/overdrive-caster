@@ -48,8 +48,9 @@ export function fmtLeft(ms: number) {
   return h > 0 ? `${h}:${p(m)}:${p(sec)}` : `${p(m)}:${p(sec)}`;
 }
 
-const TAG = 'bg-[#E8E8E8] text-[#111]';
 export const NM_W = 300, NM_H = 78;
+const LABEL = "font-['Montserrat'] font-extrabold italic uppercase";
+const CUT = { clipPath: 'polygon(10px 0,100% 0,100% calc(100% - 10px),calc(100% - 10px) 100%,0 100%)' } as const;
 
 /** Small always-on corner counter: "NEXT MATCH · 15:00 / Lower Final / 12:34". */
 export function NextMatchCorner({ show, bnl, now, screen }: { show: Show; bnl: MatchData | null; now: number; screen?: string }) {
@@ -72,16 +73,16 @@ export function NextMatchCorner({ show, bnl, now, screen }: { show: Show; bnl: M
   return (
     <motion.div className="pointer-events-none absolute flex" style={{ ...pos, width: NM_W, height: NM_H, filter: 'drop-shadow(0 10px 24px rgba(0,0,0,0.45))' }}
       initial={{ opacity: 0, y: c[0] === 't' ? -12 : 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35, ease: EASE }}>
-      <div className="flex min-w-0 flex-1 flex-col justify-center bg-[#050505] px-3.5">
+      <div className="flex min-w-0 flex-1 flex-col justify-center border-l-4 border-[var(--accent)] bg-[rgba(8,8,8,.92)] px-3.5" style={CUT}>
         <div className="flex items-center gap-2">
-          <span className={`${TAG} px-1.5 pt-[2px] font-display text-[16px] leading-[20px]`}>NEXT MATCH</span>
-          {info.time && <span className="font-display text-[17px] text-white/55">{info.time}</span>}
+          <span className={`bg-[var(--accent)] px-1.5 pt-[2px] ${LABEL} text-[14px] leading-[20px] text-white`}>Next Match</span>
+          {info.time && <span className={`${LABEL} not-italic text-[15px] text-white/55`}>{info.time}</span>}
         </div>
-        <div className="mt-1 truncate font-display text-[25px] leading-none text-white">{info.label}</div>
+        <div className={`mt-1 truncate font-['Russo_One'] text-[24px] leading-none text-white`}>{info.label}</div>
       </div>
-      <div className="flex w-[104px] flex-none flex-col items-center justify-center bg-[#151515]">
-        <span className="font-display text-[15px] leading-none text-white/45">{left ? 'IN' : ''}</span>
-        <span className="font-display tabular-nums leading-none text-white" style={{ fontSize: left && left.length > 5 ? 26 : 34, paddingTop: 2 }}>{left ?? 'NOW'}</span>
+      <div className="flex w-[104px] flex-none flex-col items-center justify-center bg-[rgba(8,8,8,.92)]" style={CUT}>
+        <span className={`${LABEL} not-italic text-[13px] leading-none text-white/45`}>{left ? 'IN' : ''}</span>
+        <span className="font-['Russo_One'] tabular-nums leading-none text-white" style={{ fontSize: left && left.length > 5 ? 26 : 34, paddingTop: 2 }}>{left ?? 'NOW'}</span>
       </div>
     </motion.div>
   );
@@ -154,10 +155,10 @@ export function OtherMatchPopout({ show, bnl }: { show: Show; bnl: MatchData | n
     <AnimatePresence>
       <motion.div key={i} className="pointer-events-none absolute bottom-6 left-1/2 flex items-stretch" style={{ x: '-50%', height: 58, filter: 'drop-shadow(0 8px 20px rgba(0,0,0,0.5))' }}
         initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 12 }} transition={{ duration: 0.3, ease: EASE }}>
-        <span className={`${TAG} flex items-center px-3 font-display text-[16px]`}>ELSEWHERE</span>
-        <div className="flex items-center gap-3 bg-[#050505] px-4 font-display text-[20px] leading-none text-white">
+        <span className={`bg-[var(--accent)] flex items-center px-3 ${LABEL} text-[14px] text-white`}>Elsewhere</span>
+        <div className="flex items-center gap-3 bg-[rgba(8,8,8,.92)] px-4 font-['Russo_One'] text-[19px] leading-none text-white" style={{ clipPath: 'polygon(0 0,100% 0,100% 100%,8px 100%)' }}>
           <span className="truncate">{m.t1}</span>
-          <span className="text-white/45">{m.s1}–{m.s2}</span>
+          <span className="text-[var(--accent)]">{m.s1}–{m.s2}</span>
           <span className="truncate">{m.t2}</span>
         </div>
       </motion.div>

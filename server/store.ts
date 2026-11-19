@@ -40,6 +40,8 @@ export interface Persisted {
   plan: ShowPlan;
   /** OBS Scene Builder: options + Overdrive output ↔ OBS scene/source mapping. */
   obsSetup: ObsSetupStore;
+  /** 3.0: master talent mute (OBS). */
+  audioMaster?: boolean;
   /** Overdrive 2.0 engine: staged Preview (desk/booth) and default transition. */
   engine?: { stage?: Stage; touched?: boolean; transition?: TransitionKind };
   /** Transition of the TAKE being broadcast (not meaningful at rest). */
@@ -81,7 +83,7 @@ export interface Persisted {
   /** Game feed for casters (stream server WHEP + caster login). */
   gameFeed: GameFeedSettings;
   /** Events (productions). The active one's data lives in the top-level fields. */
-  events: { id: string; name: string; createdAt: number }[];
+  events: { id: string; name: string; createdAt: number; /** 3.0 rehearsal: event it was started from */ from?: string }[];
   activeEvent: string;
   /** Stored data of the inactive events. */
   eventData: Record<string, any>;
@@ -206,6 +208,7 @@ function load(): Persisted {
       rundown: sanitizeRundown(raw.rundown),
       plan: sanitizePlan(raw.plan),
       obsSetup: sanitizeObsSetup(raw.obsSetup),
+      audioMaster: raw.audioMaster === true,
       instant: !!raw.instant,
       apiToken: typeof raw.apiToken === 'string' && raw.apiToken ? raw.apiToken : base.apiToken,
       crewKey: typeof raw.crewKey === 'string' && raw.crewKey ? raw.crewKey : base.crewKey,
@@ -227,7 +230,7 @@ function load(): Persisted {
       staffPicks: sanitizeStaffPicks(raw.staffPicks, base.staffPicks.key),
       assets: sanitizeAssets(raw.assets),
       gameFeed: sanitizeGameFeed(raw.gameFeed),
-      events: Array.isArray(raw.events) && raw.events.length ? raw.events.map((e: any) => ({ id: String(e.id).replace(/[^\w-]/g, '').slice(0, 40), name: String(e.name ?? 'Event').slice(0, 60), createdAt: Number(e.createdAt) || Date.now() })) : base.events,
+      events: Array.isArray(raw.events) && raw.events.length ? raw.events.map((e: any) => ({ id: String(e.id).replace(/[^\w-]/g, '').slice(0, 40), name: String(e.name ?? 'Event').slice(0, 60), createdAt: Number(e.createdAt) || Date.now(), ...(typeof e.from === 'string' ? { from: e.from.replace(/[^\w-]/g, '').slice(0, 40) } : {}) })) : base.events,
       activeEvent: typeof raw.activeEvent === 'string' ? raw.activeEvent : base.activeEvent,
       eventData: raw.eventData && typeof raw.eventData === 'object' ? raw.eventData : {},
       sessions: Object.fromEntries(Object.entries(raw.sessions ?? {}).map(([k, v]: [string, any]) => [k, typeof v === 'number' ? { exp: v, role: 'producer' } : v])) as Persisted['sessions'],

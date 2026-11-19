@@ -1,4 +1,4 @@
-import { OBSWebSocket } from 'obs-websocket-js';
+import { OBSWebSocket, EventSubscription } from 'obs-websocket-js';
 import { config } from './config';
 import { compose, CANVAS } from '../shared/layout';
 import type { ObsStatus, Scene, ThemeId } from '../shared/types';
@@ -13,6 +13,8 @@ import type { ObsStatus, Scene, ThemeId } from '../shared/types';
  * Credentials stay server-side; the browser never sees them.
  */
 export class ObsBridge {
+  /** 3.2: called when a scene item is shown / hidden in OBS (layer state). */
+  onItems?: () => void;
   status: ObsStatus = { enabled: false, connected: false, scenes: [] };
   private url = '';
   private password = '';
@@ -38,10 +40,15 @@ export class ObsBridge {
     this.obs.on('SceneListChanged', () => this.refreshScenes());
     this.obs.on('SceneItemCreated', () => this.itemIds.clear());
     this.obs.on('SceneItemRemoved', () => this.itemIds.clear());
+    // 3.2 main-scenes layout: someone showed / hid a layer in OBS itself → Overdrive's layer view follows
+    this.obs.on('SceneItemEnableStateChanged', () => this.onItems?.());
     const url = config.obsUrl || saved?.url || '';
     const pw = config.obsUrl ? config.obsPassword : saved?.password ?? '';
     if (url) this.configure(url, pw);
   }
+
+  /** Listen to any OBS event over this connection (3.0: audio meters, mute changes, inputs). */
+  onEvent(name: string, cb: (data: any) => void) { (this.obs as any).on(name, cb); }
 
   /** (Re)connect to an OBS WebSocket. Empty URL disconnects. */
   configure(url: string, password: string) {
@@ -61,7 +68,8 @@ export class ObsBridge {
   private async connect() {
     try {
       if (!this.url) return;
-      await this.obs.connect(this.url, this.password || undefined);
+      // All normal events + the high-volume InputVolumeMeters (talent audio meters, 3.0)
+      await this.obs.connect(this.url, this.password || undefined, { eventSubscriptions: EventSubscription.All | EventSubscription.InputVolumeMeters });
       const v = await this.obs.call('GetVideoSettings');
       this.base = { w: v.baseWidth, h: v.baseHeight };
       this.status = { ...this.status, connected: true, error: undefined };
@@ -91,6 +99,13 @@ export class ObsBridge {
    * Switch OBS Program. With `transition`, OBS performs that transition (found by type, so it works whatever
    * the transitions are called in the user's OBS language). Returns false if OBS refused.
    */
+  /** 3.0: OBS's own Preview (Studio Mode only). */
+  async setPreview(name: string): Promise<string | null> {
+    if (!this.status.connected) return 'OBS is not connected';
+    try { await this.obs.call('SetCurrentPreviewScene', { sceneName: name }); return null; }
+    catch (e: any) { return e.message; }
+  }
+
   async setScene(name: string, transition?: 'stinger' | 'fade' | 'cut'): Promise<boolean> {
     if (!this.status.connected) return false;
     if (transition) {

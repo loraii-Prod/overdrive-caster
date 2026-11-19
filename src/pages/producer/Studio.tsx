@@ -51,7 +51,7 @@ export function TalentDashboard({ st, run }: { st: ControllerState; run: (c: Pro
                     onKeyDown={e => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
                     className={`w-[150px] rounded-[2px] border bg-[#0b0b0c] px-1.5 py-[3px] ${t.name ? 'border-white/15' : 'border-[#f5a524]/60'}`} />
                 </div></td>
-                <td><Seg value={t.role} options={[['caster', 'Caster'], ['analyst', 'Analyst']]} onChange={v => run({ c: 'talent-edit', id: t.id, role: v as 'caster' | 'analyst' }, `${t.id} role ${v}`)} /></td>
+                <td><Seg value={t.role} options={[['caster', 'Caster'], ['analyst', 'Analyst'], ['host', 'Host'], ['guest', 'Guest']]} onChange={v => run({ c: 'talent-edit', id: t.id, role: v as 'caster' | 'analyst' | 'host' | 'guest' }, `${t.id} role ${v}`)} /></td>
                 <td><Seg value={t.mode} options={[['webrtc', 'App'], ['vdo', 'VDO.Ninja']]} onChange={v => run({ c: 'talent-edit', id: t.id, mode: v as 'webrtc' | 'vdo' }, `${t.id} camera via ${v}`)} /></td>
                 <td><Seg value={t.camQuality ?? '720p'} options={[['720p', '720p'], ['1080p', '1080p']]} onChange={v => run({ c: 'talent-edit', id: t.id, camQuality: v as CamQuality }, `${t.id} camera ${v}`)} /></td>
                 <td className="whitespace-nowrap">{t.mode === 'vdo' ? <span className="text-white/60">VDO push</span> : t.publishing ? <span style={{ color: PVW }}>● {t.hasAudio ? 'cam + mic' : 'cam'}</span> : t.online ? <span style={{ color: WARN }}>● no camera</span> : <span className="text-white/35">● offline</span>}</td>
@@ -204,7 +204,9 @@ export function ShowFilePanel({ st, run }: { st: ControllerState; run: Run }) {
   const exportShow = () => {
     const data = {
       kind: 'overdrive-2.0-show', version: 2, exported: new Date().toISOString(), studio: st.studio ?? { scenes: {} },
-      talent: (st.talent ?? []).map(({ id, name, role, mode }) => ({ id, name, role, mode })), seats: st.seats, showPreview: st.showPreview,
+      // 3.0: the reusable profile (role, audio path and levels, framing, picture, notes). Never the link key or the
+      // VDO.Ninja stream ID: those are private and stay on this server.
+      talent: (st.talent ?? []).filter(t => t.name.trim() || t.seat).map(({ id, name, role, mode, camQuality, audio, crop, photo, notes }) => ({ id, name, role, mode, camQuality, audio, crop, photo, notes })), seats: st.seats, showPreview: st.showPreview,
       media: st.media ? { playlist: st.media.playlist, auto: st.media.auto, loop: st.media.loop, volume: st.media.volume } : null,
       graphics: (st.graphics ?? []).map(({ id, pkg, name, config, presets, obsScene }) => ({ id, pkg, name, config, presets, obsScene })),
       rundown: st.rundown ?? null,
@@ -220,8 +222,19 @@ export function ShowFilePanel({ st, run }: { st: ControllerState; run: Run }) {
       let n = 0, fail = 0;
       const ok = (a: Ack) => (a.ok ? n++ : fail++);
       for (const [scene, v] of Object.entries((d.studio?.scenes ?? {}) as Record<string, { modules: string[]; pinned: string[] }>)) ok(await run({ c: 'studio-set', scene, modules: v.modules, pinned: v.pinned }, `Import layout ${scene}`));
-      for (const t of d.talent ?? []) ok(await run({ c: 'talent-edit', id: t.id, name: t.name, role: t.role, mode: t.mode, ...(t.camQuality ? { camQuality: t.camQuality } : {}) }, `Import ${t.id}`));
-      for (const [seat, id] of Object.entries(d.seats ?? {})) ok(await run({ c: 'seat', seat: Number(seat), talent: (id as string) || null }, `Import position ${seat}`));
+      // Profiles that do not exist here (added profiles t11+, or another machine) are added; ids are mapped.
+      const idMap = new Map<string, string>();
+      for (const t of d.talent ?? []) {
+        let id = t.id;
+        if (!(st.talent ?? []).some(x => x.id === t.id)) {
+          const same = (st.talent ?? []).find(x => t.name && x.name.trim().toLowerCase() === String(t.name).trim().toLowerCase());
+          if (same) id = same.id;
+          else { const a = await run({ c: 'talent-add', name: t.name || t.id, role: t.role }, `Import ${t.name || t.id}`); ok(a); if (!a.ok) continue; id = /Added (t\d+)/.exec(a.note ?? '')?.[1] ?? t.id; }
+        }
+        idMap.set(t.id, id);
+        ok(await run({ c: 'talent-edit', id, name: t.name, role: t.role, mode: t.mode, ...(t.camQuality ? { camQuality: t.camQuality } : {}), ...(t.audio ? { audio: t.audio } : {}), ...(t.crop ? { crop: t.crop } : {}), ...(typeof t.photo === 'string' ? { photo: t.photo } : {}), ...(typeof t.notes === 'string' ? { notes: t.notes } : {}) }, `Import ${t.name || t.id}`));
+      }
+      for (const [seat, id] of Object.entries(d.seats ?? {})) ok(await run({ c: 'seat', seat: Number(seat), talent: id ? idMap.get(id as string) ?? (id as string) : null }, `Import position ${seat}`));
       if (d.media?.playlist) { ok(await run({ c: 'media-set', playlist: d.media.playlist }, 'Import playlist')); ok(await run({ c: 'media-opts', auto: d.media.auto, loop: d.media.loop, volume: d.media.volume }, 'Import media options')); }
       // Graphics: configs come in as DRAFTS (review, then publish); missing extra instances are created.
       for (const g of (d.graphics ?? []) as { id: string; pkg: string; name: string; config: Record<string, string | number | boolean>; obsScene?: string | null }[]) {

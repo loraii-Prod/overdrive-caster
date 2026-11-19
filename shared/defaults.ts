@@ -1,3 +1,4 @@
+import { sanitizeCrop } from './talent';
 import { DEFAULT_LEVELS, LEGACY_FOLDER, MUSIC_SECTIONS } from './music';
 import { CASTER_IDS } from './types';
 import type { Caster, CasterId, LayoutMode, Preset, RosItem, RunOfShow, Scene, ScreenId, Show, Social, SocialPlatform, SourceType, Team } from './types';
@@ -25,6 +26,7 @@ export function defaultScene(): Scene {
     showNames: true,
     showBackground: false,
     screen: 'casters',
+    obsCams: false,
   };
 }
 
@@ -151,6 +153,8 @@ export function sanitizeCaster(v: any, id: CasterId): Caster {
       obsSource: str(src.obsSource, 128),
       vdo: typeof src.vdo === 'string' ? src.vdo.replace(/[^A-Za-z0-9_]/g, '').slice(0, 40) : '',
       ...(src.quality === '1080p' ? { quality: '1080p' as const } : {}),
+      ...(src.crop && typeof src.crop === 'object' ? { crop: sanitizeCrop(src.crop) } : {}),
+      ...(src.audioOff === true ? { audioOff: true } : {}),
     },
   };
 }
@@ -167,6 +171,7 @@ export function sanitizeScene(v: any): Scene {
     showNames: bool(v.showNames, d.showNames),
     showBackground: bool(v.showBackground, d.showBackground),
     screen: SCREENS.includes(v.screen) ? v.screen : d.screen,
+    obsCams: bool(v.obsCams, d.obsCams),
   };
 }
 

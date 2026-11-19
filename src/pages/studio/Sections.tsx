@@ -92,7 +92,7 @@ export function ScenesSection({ tab, st, run, x, entry, onAddSegment }: { tab: s
           <Info label="OBS scene">
             {g ? <Select ariaLabel="OBS scene of this graphic" className="!w-[240px]" value={g.obsScene ?? ''} onChange={v => run({ c: 'gfx-obs', id: g.id, scene: v || null }, `${g.name} → OBS ${v || 'auto'}`)}
               options={[['', `Auto (${obsSceneOfGfx({ ...g, obsScene: null }, st) ?? 'not found'})`], ...[...new Set([...(g.obsScene ? [g.obsScene] : []), ...st.obs.scenes])].map(n => [n, n] as [string, string])]} />
-              : <span className={obsScene ? '' : 'text-white/40'}>{obsScene ?? 'not mapped (OBS & Outputs → Scene Builder)'}</span>}
+              : <span className={obsScene ? '' : 'text-white/40'}>{obsScene ?? 'not mapped (Sources & OBS → Scene Builder)'}</span>}
           </Info>
           <div className="ml-auto flex flex-wrap gap-2">
             <Btn onClick={() => onAddSegment(selToTarget(entry.key), entry.name)} icon={I.rundown}>Add to show rundown</Btn>

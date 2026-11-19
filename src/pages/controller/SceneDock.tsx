@@ -1,7 +1,9 @@
 import { useState, type ReactNode } from 'react';
 import type { ClientMsg, QuickOp } from '../../../shared/protocol';
-import { SCREEN_IDS, type Caster, type Scene, type ScreenId, type Show } from '../../../shared/types';
+import { SCREEN_IDS, type Caster, type ControllerState, type Scene, type ScreenId, type Show } from '../../../shared/types';
 import { SCREEN_LABELS } from '../../../shared/defaults';
+import type { ProducerCmd } from '../../../shared/engine';
+import { BUILTIN_IDS } from '../../../shared/camPresets';
 import type { WcLive } from '../../lib/hooks';
 import { formatRemaining } from '../../components/show/parts';
 import { MAJOR_PROFILES, introPhase, normHandle } from '../../../shared/major';
@@ -17,7 +19,7 @@ import { DEFAULT_LEVELS, MUSIC_LABELS, sectionFor } from '../../../shared/music'
  * Scene dock: the controls for the screen that is on air, right under the screen buttons, so nothing
  * needs scrolling during the show. Follows the program; switch to the prepared (preview) screen with the tabs.
  */
-export function SceneDock({ live, preview, show, wc, now, send, quick, twConnected, onMore, casters = [], screens = false, forScreen, part = 'all' }: {
+export function SceneDock({ live, preview, show, wc, now, send, quick, twConnected, onMore, casters = [], screens = false, forScreen, part = 'all', camEngines }: {
   live: ScreenId; preview: ScreenId; show: Show; wc: WcLive | null; now: number;
   send: (m: ClientMsg) => void; quick: (op: QuickOp) => void; twConnected: boolean;
   onMore?: (section: 'wildcard' | 'twitch' | 'match' | 'screens') => void;
@@ -28,6 +30,8 @@ export function SceneDock({ live, preview, show, wc, now, send, quick, twConnect
   forScreen?: ScreenId;
   /** Everything dock: 'shared' = match/score/countdown/Twitch/Champions only; 'scene' = everything else. */
   part?: 'all' | 'shared' | 'scene';
+  /** 3.4e: Desk Camera Engine state, for the Cameras group on the Casters/Analyst Desk screens. */
+  camEngines?: ControllerState['camEngines'];
 }) {
   const [pick, setPick] = useState<'live' | 'preview'>('live');
   const screen = forScreen ?? (pick === 'preview' && preview !== live ? preview : live);
@@ -131,6 +135,44 @@ export function SceneDock({ live, preview, show, wc, now, send, quick, twConnect
     </Group>
   ) : null;
 
+  // ---- 3.4e: Desk Camera Engine — OBS-composited cameras for the Caster Desk / Analyst Desk screens. Every
+  // button here dispatches a real ProducerCmd through the generic `send`, so it works the same from the main
+  // Producer session and from an OBS Custom Browser Dock (/controller/dock, /controller/dock/all): both pass
+  // a plain (m: ClientMsg) => void. Presets/TAKE/AUTO are safe to fire from any of them — the camera engine has
+  // its own A/B Preview/Program isolation, independent of the main show's.
+  const cam = (c: ProducerCmd) => send({ t: 'cmd', id: `cam${Date.now()}${Math.random().toString(36).slice(2, 6)}`, cmd: c });
+  const camGroup = (desk: 'caster-desk' | 'analyst-desk', frameIds: string[], panelIds: string[]) => {
+    const ce = camEngines?.[desk];
+    if (!ce) return null;
+    const { state: cs, presets } = ce;
+    const byId = (id: string) => presets.find(p => p.id === id);
+    const chip = (id: string, label: string) => {
+      const p = byId(id);
+      if (!p) return null;
+      const on = cs.programPreset === id;
+      const staged = cs.previewPreset === id && cs.previewPreset !== cs.programPreset;
+      return (
+        <button key={id} type="button" disabled={cs.animating} title={staged ? 'Prepared on Preview — TAKE to put it on air' : ''}
+          onClick={() => cam({ c: 'cam-prepare', preset: id })}
+          className={`btn-sm ${on ? '!border-[#e5484d] !bg-[#e5484d]/25 !text-white' : staged ? '!border-amber-400/70 !bg-amber-500/15' : ''}`}>{label}</button>
+      );
+    };
+    return (
+      <Group label="Cameras (OBS)">
+        {frameIds.map(id => chip(id, id.includes('trio') ? 'Trio' : id.includes('duo') ? 'Duo' : id.includes('solo') ? 'Solo' : 'Full'))}
+        {panelIds.length > 0 && <span className="text-white/20">·</span>}
+        {panelIds.map(id => chip(id, id.includes('trio') ? 'Panel trio' : id.includes('duo') ? 'Panel duo' : 'Panel solo'))}
+        <Big disabled={cs.animating} title="Prepare + TAKE the preset matching who's seated now" onClick={() => cam({ c: 'cam-auto' })}>Sync &amp; TAKE</Big>
+        {cs.previewPreset && cs.previewPreset !== cs.programPreset && (
+          <Big primary disabled={cs.animating} onClick={() => cam({ c: 'cam-take' })}>TAKE</Big>
+        )}
+        <span className="text-[11px] text-white/35">
+          {cs.animating ? 'Moving…' : cs.hasMoveTransition ? 'Move Transition' : 'Software fallback'}
+        </span>
+      </Group>
+    );
+  };
+
   // ---- Music: this scene's bed (level / off), skip when it's the one playing; master on/off in the shared row.
   const ms = sectionFor(screen), lv = ms ? show.music.levels[ms] : 0;
   const setLevel = (v: number) => ms && quick({ k: 'music', patch: { levels: { ...show.music.levels, [ms]: v } } });
@@ -195,6 +237,7 @@ export function SceneDock({ live, preview, show, wc, now, send, quick, twConnect
             {picksToggle}
           </Group>
           {who}
+          {camGroup('caster-desk', [BUILTIN_IDS['desk-trio'], BUILTIN_IDS['desk-duo'], BUILTIN_IDS['desk-solo']], [])}
           {score}{picksFor(boothNow)}{countdown}{twitch}
         </>
       );
@@ -219,6 +262,7 @@ export function SceneDock({ live, preview, show, wc, now, send, quick, twConnect
             {picksToggle}
           </Group>
           {deskWho}
+          {camGroup('analyst-desk', [BUILTIN_IDS['desk-trio'], BUILTIN_IDS['desk-duo'], BUILTIN_IDS['desk-solo']], [BUILTIN_IDS['panel-trio'], BUILTIN_IDS['panel-duo'], BUILTIN_IDS['panel-solo']])}
           {picksFor(deskNow)}{countdown}{twitch}
         </>
       ) : <Hint>Waiting for the server…</Hint>;

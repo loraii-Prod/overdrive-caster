@@ -1,0 +1,8 @@
+match_id,track_number,round_number,track_id,p1_team_id,team_a_id,team_b_id,pts_a,pts_b,combo_a,combo_b,track_name,picked_by,point_limit,team_a_tag,team_a_name,team_a_roster,team_a_color,team_a_logo_slug,team_b_tag,team_b_name,team_b_roster,team_b_color,team_b_logo_slug,fastest_player,fastest_time_ms,fastest_round,custom_takeaway
+match_0006,1,1,t_czech,,BIG,FUT,2,1,1-3,2-4,OverDrive Czech Republic 2026,BIG PICK,10,BIG,BIG,Massa & GranaDy,#00E5FF,Big.png,FUT,Weibo x FUT,Heav & Nayko,#F43F5E,WeiboxFUT.png,Heav,38104,4,
+match_0006,1,2,,,BIG,FUT,0,3,3-4,1-2,,,,,,,,,,,,,,,,,
+match_0006,1,3,,,BIG,FUT,3,0,1-2,3-4,,,,,,,,,,,,,,,,,
+match_0006,1,4,,,BIG,FUT,1,1,1-4,2-3,,,,,,,,,,,,,,,,,
+match_0006,1,5,,,BIG,FUT,2,1,1-3,2-4,,,,,,,,,,,,,,,,,
+match_0006,1,6,,,BIG,FUT,1,2,2-4,1-3,,,,,,,,,,,,,,,,,
+match_0006,1,7,,,BIG,FUT,3,0,1-2,3-4,,,,,,,,,,,,,,,,,

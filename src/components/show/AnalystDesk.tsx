@@ -72,15 +72,21 @@ export function SkinAnalystDesk({ skin, scene, show, wc, now, bnl, viewer, monit
   const recentKinds = useRecent(S.kind, k => k, ms);
   const backing = recentModes.includes('panel') ? [] : recentKinds.flatMap(k => skin.holes[k]);
 
+  // 3.4: OBS composites these cameras locally (both "Cameras only" and panel layouts have a matching CamEngine
+  // preset — see shared/camPresets.ts's panelColumnRects, built to line up with deskLayout() exactly). Leave the
+  // holes fully transparent — no backing colour, no embedded feed, no camera box-shadow — so OBS's camera layer
+  // underneath shows through; the accent edge and everything else about the frame still render. The Producer's
+  // own monitor preview isn't captured by OBS, so it keeps the embedded feed regardless.
+  const obsCams = scene.obsCams && !monitor;
   return (
-    <div className="wc desk" style={{ pointerEvents: 'none', isolation: 'isolate' }} data-desk-mode={S.mode} data-desk-kind={S.kind}>
+    <div className="wc desk" style={{ pointerEvents: 'none', isolation: 'isolate' }} data-desk-mode={S.mode} data-desk-kind={S.kind} data-obs-cams={obsCams ? '1' : '0'}>
       {/* Bar loop under the cameras (panel mode). It appears at once under the frame (which still covers it)
           and stays until a frame has faded fully over it. */}
       {st.mounted.filter(src => src === skin.bar).map(src => (
         <StageVideo key={src} src={src} visible={S.mode === 'panel'} ms={ms} enter="instant" leave="hold" z={0} onReady={st.ready} />
       ))}
 
-      <HoleBacking holes={backing} z={1} />
+      {!obsCams && <HoleBacking holes={backing} z={1} />}
       {/* Cameras: the same elements in both modes (keyed by position id). */}
       <div className="absolute inset-0" style={{ zIndex: 10 }}>
         {pool.map(c => {
@@ -97,9 +103,9 @@ export function SkinAnalystDesk({ skin, scene, show, wc, now, bnl, viewer, monit
             <div key={c.id} data-cam={c.id} data-cam-on={on ? '1' : '0'} className="absolute overflow-hidden"
               style={{ left: rect.x, top: rect.y, width: rect.w, height: rect.h, opacity: on ? 1 : 0, transform: on ? 'none' : 'scale(0.96)',
                 visibility: on || prev?.on || (!prev && r) ? undefined : 'hidden',
-                background: desk ? '#120A08' : '#140a0a', boxShadow: desk && on ? '0 10px 30px rgba(0,0,0,.45)' : '0 10px 30px rgba(0,0,0,0)',
+                background: obsCams ? 'transparent' : desk ? '#120A08' : '#140a0a', boxShadow: !obsCams && desk && on ? '0 10px 30px rgba(0,0,0,.45)' : '0 10px 30px rgba(0,0,0,0)',
                 transition: `${geo}opacity ${fd}ms ${EASE_OUT}, transform ${fd}ms ${EASE_OUT}, box-shadow ${ms}ms` }}>
-              {c.cameraOn && <Feed caster={c} viewer={viewer} size={n >= 3 ? 'sm' : n > 1 ? 'md' : 'lg'} showName={false} monitor={monitor} />}
+              {!obsCams && c.cameraOn && <Feed caster={c} viewer={viewer} size={n >= 3 ? 'sm' : n > 1 ? 'md' : 'lg'} showName={false} monitor={monitor} />}
               {/* The desk camera's accent top edge (.dk-cam border-top), faded instead of popping. */}
               <div className="absolute inset-x-0 top-0 h-[4px]" style={{ background: 'var(--hot)', opacity: desk ? 1 : 0, transition: `opacity ${ms}ms` }} />
             </div>

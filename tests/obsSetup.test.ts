@@ -11,7 +11,8 @@ const check = (name: string, cond: boolean, extra = '') => { cond ? ok++ : bad++
 
 function rig(o: { obsUrl?: string; lan?: string[]; key?: string; pub?: string } = {}) {
   const obs = new MockObs();
-  const db = { graphics: sanitizeGraphics([]), show: defaultShow(), store: defaultObsSetup() };
+  // ≤ 3.1 layout (one scene per output); the 3.2 main-scenes layout is covered by tests/obsLayout.test.ts
+  const db = { graphics: sanitizeGraphics([]), show: defaultShow(), store: { ...defaultObsSetup(), options: { ...defaultObsSetup().options, layout: 'per-output' as const } } };
   const mapped: { id: string; scene: string }[] = [];
   const b = createObsSetup({
     call: () => (obs.connected ? obs.call : null), connected: () => obs.connected, obsUrl: () => o.obsUrl ?? 'ws://127.0.0.1:4455',

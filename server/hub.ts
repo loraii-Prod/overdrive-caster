@@ -1,6 +1,6 @@
-import type { CamQuality } from '../shared/talent';
 import { createPerf, type Perf } from './perf';
-import { SEATS, SEAT_LABELS, seatOf, talentLabel, type Seat } from '../shared/talent';
+import { SEATS, SEAT_LABELS, seatOf, talentLabel, type Seat, TALENT_ROLES, TALENT_COUNT, TALENT_MAX, sanitizeAudio, sanitizeCrop, describeVdoLink, inUse, blankTalent, talentNum, type TalentRole } from '../shared/talent';
+import type { TalentPatch } from '../shared/engine';
 import { createEngine, type Engine } from './engine';
 import type { ProducerCmd, TransitionKind } from '../shared/engine';
 import type { IncomingMessage, Server } from 'node:http';
@@ -11,7 +11,7 @@ import { config } from './config';
 import { roleFrom, type AuthRole } from './auth';
 import { applyOp, isTeam, resolve, type TournamentOp } from '../shared/tournament';
 import { ensureStreamIds, matchPlayer, sanitizePlayers, sanitizeStories, STORY_LABELS } from '../shared/players';
-import { db, newKey, sanitizeFollow, save } from './store';
+import { db, newKey, newVdoId, sanitizeFollow, save } from './store';
 import { iceServers } from './turn';
 import { Audience } from './audience';
 import { tag } from './assets';
@@ -22,11 +22,20 @@ import { ChatVoting } from './chatVoting';
 import type { ChatOp } from '../shared/twitchChat';
 import { ObsBridge } from './obs';
 import { createObsSetup } from './obsSetup';
+import { createAudioMix } from './audioMix';
+import { CamEngine } from './camEngine';
+import { DESK_SCENES, DESK_SEATS, bSceneName, mainSceneName, type MainKey } from '../shared/obsLayout';
+import { SKINS } from '../shared/skins';
 import { pkgById } from '../shared/gfx';
 import { REGISTRY } from '../shared/registry';
+import { mvpViewOfSel } from '../shared/mainScenes';
 import { parseVdoId } from '../shared/talent';
-import { createEvent, deleteEvent, renameEvent, switchEvent } from './events';
-import { applyFeatured, syncSheet } from './sheet';
+import { TRACK_DEFAULT_SHEET, applyTrackOp, parseTrackRows, trackSheetUrl, type TrackOp } from '../shared/trackProgress';
+import { createEvent, deleteEvent, putRehearsal, rehearsalReturn, renameEvent, switchEvent } from './events';
+import { DEMO_MATCHES, REHEARSAL_ID, demoWildcard } from '../shared/mvpRehearsal';
+import { segmentObsScene } from '../shared/showplan';
+import { applyFeatured, sheetGet, syncSheet } from './sheet';
+import { parseCsv } from '../shared/sheet';
 import { parseSheetUrl } from '../shared/sheet';
 import { compose } from '../shared/layout';
 import { clone, defaultScene, defaultShow, sanitizeRos, sanitizeScene, sanitizeShow, sameScene } from '../shared/defaults';
@@ -34,7 +43,7 @@ import type { ClientMsg, QuickOp, Role, ServerMsg, WatchRequest } from '../share
 import { CASTER_IDS, SCREEN_IDS, type CasterId, type ContributorStatus, type ControllerState, type Preset, type Scene, type ScreenId, type Show } from '../shared/types';
 import { seasonOf } from '../shared/season';
 import { isMapId, majorMap } from '../shared/maps';
-import { GRAND_FINAL, sanitizeInterview, sanitizePb, sanitizeVeto, vetoApply, WC_IDS, matchName, realTeam, wcLogo, wcResolve, applyMatchOp, sanitizePick, demoEvent, diffEvents, isWcBackup, isWcId, mergeSheet, sanitizeIntro, sanitizeShowcase, sanitizeWildcard, updateDone, wcSnapshot, type WcOp, type WcPop, type WcSheetRow } from '../shared/wildcard';
+import { GRAND_FINAL, sanitizeInterview, sanitizePb, sanitizeVeto, vetoApply, WC_IDS, matchName, realTeam, wcLogo, wcResolve, applyMatchOp, sanitizePick, demoEvent, diffEvents, isWcBackup, isWcId, mergeSheet, sanitizeIntro, sanitizeShowcase, sanitizeWildcard, sanitizeRosters, updateDone, wcSnapshot, type WcOp, type WcPop, type WcSheetRow } from '../shared/wildcard';
 
 interface Client {
   id: string;
@@ -59,8 +68,11 @@ export function createHub(server: Server) {
   const publishers = new Map<CasterId, string>();
 
   let stateTimer: NodeJS.Timeout | null = null;
+  // eslint-disable-next-line prefer-const
+  let audioMix: ReturnType<typeof createAudioMix> | undefined; // assigned below (OBS may connect while being constructed)
   let perf: Perf | null = null; // assigned below; the OBS bridge may report changes while it is being constructed
-  const obs = new ObsBridge(() => { pushState(); perf?.kick(); }, { url: db.obsUrl, password: db.obsPassword }, () => { void obsSetup.scan(); perf?.kick(); });
+  let initCamEngines: (() => Promise<void>) | undefined; // assigned below (3.4 camera engines; OBS may connect while being constructed)
+  const obs = new ObsBridge(() => { pushState(); perf?.kick(); }, { url: db.obsUrl, password: db.obsPassword }, () => { void obsSetup.scan(); perf?.kick(); audioMix?.connected(); void initCamEngines?.(); });
   // OBS Scene Builder: one OBS scene per Overdrive output, over the same OBS connection. Never switches OBS.
   const obsSetup = createObsSetup({
     call: () => (obs.status.connected ? obs.request : null),
@@ -79,14 +91,18 @@ export function createHub(server: Server) {
       let gfxChanged = false;
       const scenes = { ...db.showLive.obsScenes };
       const known = new Set(obs.status.scenes);
-      for (const { target, scene } of built) {
+      for (const { target, scene, was } of built) {
         if (target.kind === 'gfx') {
           const g = db.graphics.find(x => `g:${x.id}` === target.id);
-          if (g && g.obsScene !== scene) { g.obsScene = scene; gfxChanged = true; }
+          // 3.2 main layout: a layer is not "the" scene of its graphic (several share one): only the base claims it;
+          // a layer forgets the scene an earlier build wrote (never one the operator chose by hand)
+          const layer = !!target.role && target.role !== 'base';
+          if (g && layer) { if (g.obsScene && was && g.obsScene === was) { g.obsScene = null; gfxChanged = true; } }
+          else if (g && g.obsScene !== scene) { g.obsScene = scene; gfxChanged = true; }
           // a graphics-engine instance that replaces a legacy screen: fill the screen mapping if it is empty or stale
           const p = g ? pkgById(g.pkg) : undefined;
           const key = p && p.id.replace(/^od\./, '') === g!.id ? (p.obsKey as ScreenId | undefined) : undefined;
-          if (key && key in scenes && (!scenes[key] || !known.has(scenes[key]))) scenes[key] = scene;
+          if (key && key in scenes && (!scenes[key] || !known.has(scenes[key]) || target.role === 'base')) scenes[key] = scene;
         } else if (target.screen) scenes[target.screen] = scene;
       }
       db.showPreview = { ...db.showPreview, obsScenes: { ...db.showPreview.obsScenes, ...scenes } };
@@ -94,7 +110,40 @@ export function createHub(server: Server) {
       save();
       if (gfxChanged) pushGfx();
     },
+    refsTo: scene => {
+      const out: string[] = [];
+      for (const sg of db.plan?.segments ?? []) if (sg.obsScene === scene) out.push(`rundown: ${sg.label}`);
+      for (const [k, v] of Object.entries(db.showLive.obsScenes)) if (v === scene) out.push(`screen mapping: ${k}`);
+      for (const g of db.graphics) if (g.obsScene === scene) out.push(`graphic: ${g.name}`);
+      for (const c of db.live.casters) if (c.source.type === 'obs' && c.source.obsScene === scene) out.push(`camera: ${c.name}`);
+      return out;
+    },
+    repoint: (from, to) => {
+      for (const sg of db.plan?.segments ?? []) if (sg.obsScene === from) sg.obsScene = null; // the segment's target mapping now names the main scene
+      const fix = (m: Record<string, string | undefined>) => Object.fromEntries(Object.entries(m).map(([k, v]) => [k, v === from ? to : v]));
+      db.showLive = { ...db.showLive, obsScenes: fix(db.showLive.obsScenes) as typeof db.showLive.obsScenes };
+      db.showPreview = { ...db.showPreview, obsScenes: fix(db.showPreview.obsScenes) as typeof db.showPreview.obsScenes };
+      for (const g of db.graphics) if (g.obsScene === from) g.obsScene = null;
+      for (const sc of [db.live, db.preview]) for (const c of sc.casters) if (c.source.type === 'obs' && c.source.obsScene === from) c.source.obsScene = to;
+      save(); pushGfx(); pushState();
+    },
   });
+  obs.onItems = () => { void obsSetup.refreshLayers(); };
+  // 3.0 persistent talent audio over the same OBS connection (volume, mute, sync, monitoring, meters, health)
+  audioMix = createAudioMix({
+    call: () => (obs.status.connected ? obs.request : null),
+    talent: () => db.talent,
+    seats: () => db.seats,
+    master: () => db.audioMaster === true,
+    onChange: () => pushState(),
+    meters: m => each(c => c.role === 'controller', { t: 'meters', m }),
+  });
+  obs.onEvent('InputVolumeMeters', e => audioMix?.onMeters(e));
+  obs.onEvent('InputMuteStateChanged', e => audioMix?.onMute(e));
+  obs.onEvent('InputCreated', () => void audioMix?.sync('obs input created'));
+  obs.onEvent('InputRemoved', () => void audioMix?.sync('obs input removed'));
+  obs.onEvent('InputNameChanged', () => void audioMix?.sync('obs input renamed'));
+  setInterval(() => void audioMix?.sync('poll'), 5000).unref();
   // Off-air suspension + live performance monitor (both off until the producer enables them in OBS Setup).
   perf = createPerf({
     call: () => (obs.status.connected ? obs.request : null),
@@ -103,6 +152,58 @@ export function createHub(server: Server) {
     send: (id, msg) => send(clients.get(id), msg),
     report: r => each(c => c.role === 'controller', { t: 'perf', perf: r }),
   });
+  // 3.4 Camera composition: one CamEngine per desk, controlling A/B scene pairs with persistent camera inputs.
+  // Created once; (re-)initialized when OBS connects by calling discoverItems() and detectMoveTransition().
+  const camEngines = new Map<MainKey, CamEngine>();
+  for (const desk of DESK_SCENES) {
+    const seats = DESK_SEATS[desk] ?? [];
+    camEngines.set(desk, new CamEngine({
+      obs: { call: () => (obs.status.connected ? obs.request : null), connected: () => obs.status.connected, base: () => ({ w: 1920, h: 1080 }) },
+      desk,
+      scenes: { a: mainSceneName(desk), b: bSceneName(desk) },
+      seats,
+      holes: SKINS.overdrive.holes,
+      onChange: () => pushState(),
+    }));
+  }
+  // When OBS connects, discover camera scene items and check for Move Transition plugin.
+  initCamEngines = async () => {
+    for (const eng of camEngines.values()) {
+      try { await eng.discoverItems(); await eng.detectMoveTransition(); } catch (e) { console.warn(`[cam] ${eng.desk} init:`, (e as Error).message); }
+    }
+  };
+  obs.onEvent('SceneListChanged', () => void initCamEngines?.());
+
+  /**
+   * Which desk a camera command targets. ProducerCmd's cam-* variants carry no explicit desk (one
+   * producer, one desk in view at a time, as of 3.4). Explicit seats in a layout are unambiguous; failing
+   * that, whichever desk screen is currently in Preview (camera prep always targets Preview/B scene); failing
+   * that, Caster Desk. If Phase 3e's dock UI ever needs two desks staged at once, add an explicit `desk`
+   * field to these commands instead of widening this heuristic.
+   */
+  function deskFromSeats(cameras: { seat: number }[]): MainKey | null {
+    for (const desk of DESK_SCENES) if (cameras.some(c => (DESK_SEATS[desk] ?? []).includes(c.seat))) return desk;
+    return null;
+  }
+  function activeCamDesk(cameras?: { seat: number }[]): MainKey {
+    if (cameras) { const d = deskFromSeats(cameras); if (d) return d; }
+    const src = REGISTRY.find(x => x.screen === db.preview.screen);
+    if (src && (DESK_SCENES as string[]).includes(src.id)) return src.id as MainKey;
+    return 'caster-desk';
+  }
+  const camEngineFacade = {
+    prepare: (presetOrLayout: string | import('../shared/camPresets').DeskCamLayout[]) =>
+      camEngines.get(activeCamDesk(Array.isArray(presetOrLayout) ? presetOrLayout : undefined))!.prepare(presetOrLayout as any),
+    take: (duration?: number, easing?: string) => camEngines.get(activeCamDesk())!.take(duration, easing as any),
+    snap: (presetOrLayout: string | import('../shared/camPresets').DeskCamLayout[]) =>
+      camEngines.get(activeCamDesk(Array.isArray(presetOrLayout) ? presetOrLayout : undefined))!.snap(presetOrLayout as any),
+    autoPreset: (mode: 'cams' | 'panel', casterCount: number) => camEngines.get(activeCamDesk())!.autoPreset(mode, casterCount),
+    savePreset: (name: string, cameras: import('../shared/camPresets').DeskCamLayout[], id?: string) =>
+      camEngines.get(activeCamDesk(cameras))!.savePreset(name, cameras, id),
+    // Custom preset ids are generated per-engine (not shared across desks): try every desk's engine.
+    deletePreset: (id: string) => { for (const eng of camEngines.values()) if (eng.deletePreset(id)) return true; return false; },
+  };
+
   const tw = new Twitch(db.twitch, save, () => pushState(), () => each(c => c.role === 'output' || c.role === 'controller' || c.role === 'crew', { t: 'twitch', tw: tw.pub }));
   // Audience interaction: the vote service is reached in the background; its outages never block this server.
   const aud = new Audience(db.audience, save, () => db.wildcard, () => pushAud());
@@ -127,7 +228,8 @@ export function createHub(server: Server) {
   const pushChat = () => { if (chatPushT) return; chatPushT = setTimeout(() => { chatPushT = null; each(c => c.role === 'controller', { t: 'aud-private', aud: audPriv() }); }, 250); };
   const twChat = new TwitchChat(db.twitchChat, save, pushChat, m => chatVoting.onMessage(m), { fallbackClientId: () => db.twitch.clientId });
   const chatVoting = new ChatVoting(twChat, {
-    openPoll: () => aud.openPoll(), call: (method, path, body) => aud.internal(method, path, body), configured: () => aud.configured, onChange: pushChat,
+    // 3.0 rehearsal: real Twitch chat never votes in the demo match
+    openPoll: () => (aud.rehearsal ? null : aud.openPoll()), call: (method, path, body) => aud.internal(method, path, body), configured: () => aud.configured, onChange: pushChat,
     // Stored votes: refresh the producer's live totals (at most once a second).
     onStored: () => { const now = Date.now(); if (now - chatRefreshAt < 1000) return; chatRefreshAt = now; aud.tick().catch(() => {}); },
   });
@@ -152,7 +254,7 @@ export function createHub(server: Server) {
     pushChat(); return null;
   }
   aud.chatHooks = {
-    methods: () => chatVoting.methods(),
+    methods: () => (aud.rehearsal ? { ...chatVoting.methods(), web: false, chat: false } : chatVoting.methods()),
     beforeClose: poll => chatVoting.beforeClose(poll),
     op: chatOp,
   };
@@ -213,6 +315,8 @@ export function createHub(server: Server) {
       outputs: [...routes].map(([route, count]) => ({ route, count })).sort((a, b) => a.route.localeCompare(b.route)),
       obs: obs.status,
       obsSetup: obsSetup.state(),
+      camEngines: { 'caster-desk': { state: camEngines.get('caster-desk')!.state, presets: camEngines.get('caster-desk')!.presets },
+        'analyst-desk': { state: camEngines.get('analyst-desk')!.state, presets: camEngines.get('analyst-desk')!.presets } },
       outputKey: config.outputKey,
       twitch: tw.status,
       engine: engine?.state(),
@@ -224,6 +328,7 @@ export function createHub(server: Server) {
       rundown: db.rundown,
       plan: db.plan,
       gfxHealth,
+      audio: audioMix?.state(),
     };
   }
 
@@ -269,7 +374,13 @@ export function createHub(server: Server) {
     db.liveTransition = !changed ? undefined : obsOwns ? 'cut' : t;
     broadcastLive();
     db.liveTransition = undefined;
-    if (obsOwns) obs.setScene(obsScene!, t);
+    if (!obsOwns) return;
+    // 3.2 main-scenes layout: the screen's output is a layer of the main scene: show it first
+    const src = REGISTRY.find(x => x.screen === db.live.screen);
+    const gfxId = db.graphics.find(g => { const p = pkgById(g.pkg); return !!p && p.id.replace(/^od\./, '') === g.id && p.obsKey === db.live.screen; })?.id;
+    const target = [gfxId ? `g:${gfxId}` : '', src ? `s:${src.id}` : ''].find(x => x && obsSetup.layerOf(x)?.scene === obsScene);
+    if (!target) { obs.setScene(obsScene!, t); return; }
+    void (async () => { await obsSetup.layer(target, true); if (obs.status.currentScene !== obsScene) obs.setScene(obsScene!, t); })();
   }
 
   function goLive(t: TransitionKind = 'stinger') {
@@ -385,16 +496,48 @@ export function createHub(server: Server) {
     const R = wcResolve(db.wildcard.matches, db.wildcard.teams);
     const done = WC_IDS.filter(id => R[id].winner && R[id].winner !== 'BYE' && R[id].t1 !== 'BYE' && R[id].t2 !== 'BYE');
     if (!resultsSeen) { resultsSeen = new Set(done); return; }
-    for (const id of done) if (!resultsSeen.has(id)) { resultsSeen.add(id); engine?.fire('match-end').catch(e => console.warn('[plan] match-end:', e)); }
+    const fresh = done.filter(id => !resultsSeen!.has(id)).sort((a, b) => (db.wildcard.done[a] ?? 0) - (db.wildcard.done[b] ?? 0));
+    for (const id of fresh) {
+      resultsSeen.add(id);
+      // 3.0: the MVP of that match is prepared FIRST, so the "Match ends" automation finds a vote to open
+      mvpChain = mvpChain.then(() => mvpMatchEnded(id)).catch(e => console.warn('[mvp] match end:', e))
+        .then(() => engine?.fire('match-end')).catch(e => console.warn('[plan] match-end:', e));
+    }
     for (const id of [...resultsSeen]) if (!done.includes(id)) resultsSeen.delete(id); // a corrected result can end again
   }
   matchEndCheck(); // results already known at start are never "new"
 
+  // ---------- 3.1 Track Progression (round-by-round story of the current track) ----------
+  function trackOp(op: TrackOp) {
+    const t = db.wildcard.track;
+    if (op.k === 'track-load') { void trackLoad(true); return; }
+    const e = applyTrackOp(t, op, Date.now());
+    if (e) t.error = e; else if (op.k !== 'track-src') t.error = '';
+    wcChanged(false);
+    if (op.k === 'track-src' && t.src.mode === 'sheet' && !e) void trackLoad(true);
+  }
+  let trackBusy = false;
+  /** Read the track rows from the sheet; only a real change is pushed (auto refresh every 8 s stays quiet). */
+  async function trackLoad(force = false) {
+    const t = db.wildcard.track;
+    if (t.src.mode !== 'sheet' || trackBusy) return;
+    trackBusy = true;
+    try {
+      const d = parseTrackRows(parseCsv(await sheetGet(trackSheetUrl(t.src.sheetId || TRACK_DEFAULT_SHEET, t.src))));
+      const cur = db.wildcard.track; // the event may have changed while loading
+      if (cur !== t || cur.src.mode !== 'sheet') return;
+      if (force || t.demo || t.error || JSON.stringify(d) !== JSON.stringify(t.data)) { t.data = d; t.demo = false; t.error = ''; t.at = Date.now(); wcChanged(false); }
+    } catch (e: any) {
+      const msg = `Sheet: ${e?.message ?? e}`;
+      if (db.wildcard.track === t && t.error !== msg) { t.error = msg; wcChanged(false); }
+    } finally { trackBusy = false; }
+  }
+
   function wcChanged(popups = true) {
     pickemArchive();
+    updateDone(db.wildcard); // before the match-end check: the MVP orders new results by when they came in
     matchEndCheck();
     if (castSync()) broadcastLive();
-    updateDone(db.wildcard);
     const snap = wcSnapshot(db.wildcard);
     if (popups) for (const e of diffEvents(wcSnap, snap)) wcPop(e);
     wcSnap = snap;
@@ -405,6 +548,7 @@ export function createHub(server: Server) {
 
   function wcOp(op: WcOp) {
     if (!op || typeof op !== 'object') return;
+    if (typeof op.k === 'string' && op.k.startsWith('track-')) return trackOp(op as TrackOp);
     const wc = db.wildcard;
     switch (op.k) {
       case 'score': case 'wo': case 'clear': case 'live': case 'time':
@@ -519,6 +663,16 @@ export function createHub(server: Server) {
         act({ t: 'screen', screen: 'warmup', take: true }); // the intro plays on the Warm-up screen: cut to it
         return;
       case 'intro-stop': wc.intro = { ...wc.intro, at: null }; break;
+      case 'roster': {
+        const team = String(op.team ?? '').trim();
+        if (!team) return;
+        const next = { ...wc.rosters };
+        if (Array.isArray(op.players) && op.players.some(h => String(h ?? '').trim())) next[team] = op.players.map(String); else delete next[team];
+        wc.rosters = sanitizeRosters(next);
+        wcChanged(false);
+        mvpRosterChanged(team);
+        return;
+      }
       case 'photo': {
         const key = String(op.player ?? '').toLowerCase().replace(/[^a-z0-9]/g, '');
         if (!key) return;
@@ -542,8 +696,12 @@ export function createHub(server: Server) {
     }
   }, 500);
 
-  function switchToEvent(id: string) {
+  function switchToEvent(id: string, opts: { obs?: boolean } = {}) {
+    if (id === db.activeEvent || !db.events.some(e => e.id === id)) return pushState();
+    db.audience.mvpMatch = mvpMatchNow(); // this event's MVP match, back when it is active again
     if (!switchEvent(id)) return pushState();
+    aud.swap(db.audience); // 3.0: this event's votes, MVP choices and analyst picks (never another event's)
+    mvpFollowEvent();
     broadcastLive();
     pushRos();
     pushMatchData();
@@ -553,7 +711,7 @@ export function createHub(server: Server) {
     each(c => c.role === 'output' || c.role === 'controller' || c.role === 'admin' || c.role === 'crew', { t: 'tournament', tournament: db.tournament });
     obs.apply(db.live, db.showLive.theme);
     const sc = db.showLive.obsScenes[db.live.screen];
-    if (sc) obs.setScene(sc);
+    if (sc && opts.obs !== false) obs.setScene(sc); // the rehearsal never switches OBS by itself
     if (db.sheet.enabled && db.sheet.id) sheetNow();
   }
 
@@ -753,8 +911,10 @@ export function createHub(server: Server) {
     const fix = (sc: Scene): Scene => ({ ...sc, casters: sc.casters.map(c => {
       if (c.id !== seat) return c;
       const base = c.source.type === 'webrtc' || c.source.type === 'vdo' ? { ...c.source, type: (t?.mode === 'vdo' ? 'vdo' : 'webrtc') as typeof c.source.type, vdo: t?.mode === 'vdo' ? t.vdoId : c.source.vdo } : c.source;
-      const { quality: _q, ...rest } = base;
-      const src = t?.camQuality === '1080p' && (base.type === 'webrtc' || base.type === 'vdo') ? { ...rest, quality: '1080p' as const } : rest;
+      const { quality: _q, crop: _c, audioOff: _a, ...rest } = base;
+      const cam = base.type === 'webrtc' || base.type === 'vdo';
+      const framed = t && (t.crop.zoom !== 1 || t.crop.x || t.crop.y) ? { crop: t.crop } : {};
+      const src = { ...rest, ...(t?.camQuality === '1080p' && cam ? { quality: '1080p' as const } : {}), ...framed, ...(t && t.audio.source !== 'feed' ? { audioOff: true } : {}) };
       // A seated talent is in the show (their camera is requested by every source); an empty position is not.
       return { ...c, enabled: !!t, name: t ? talentLabel(t) : DEFAULT_SEAT_NAMES[seat], source: src };
     }) });
@@ -775,15 +935,25 @@ export function createHub(server: Server) {
     for (const id of [talent, prevInSeat]) if (id) sendTalentInfo(id);
     save();
     broadcastLive(); // names / sources on every source (same screen: no transition)
+    void audioMix?.sync('seat'); // the voice follows the person to their new position's audio source
     return null;
   }
 
-  function editTalent(id: string, patch: { name?: string; role?: 'caster' | 'analyst'; mode?: 'webrtc' | 'vdo'; camQuality?: CamQuality; vdoId?: string }): string | null {
+  function editTalent(id: string, patch: TalentPatch): string | null {
     const i = db.talent.findIndex(p => p.id === id);
     if (i < 0) return 'Unknown talent';
     const t = { ...db.talent[i] };
     if (typeof patch.name === 'string') t.name = patch.name.trim().slice(0, 40);
-    if (patch.role === 'caster' || patch.role === 'analyst') t.role = patch.role;
+    if (patch.role && TALENT_ROLES.some(r => r.id === patch.role)) t.role = patch.role;
+    if (typeof patch.photo === 'string') { const ph = patch.photo.trim(); if (ph && !/^(\/|https?:\/\/)[^\s"'<>]{0,400}$/.test(ph)) return 'Picture: use an uploaded asset or an http(s) address'; t.photo = ph; }
+    if (typeof patch.ready === 'boolean') t.ready = patch.ready;
+    if (typeof patch.notes === 'string') t.notes = patch.notes.slice(0, 500);
+    if (patch.audio && typeof patch.audio === 'object') {
+      const a = sanitizeAudio({ ...t.audio, ...patch.audio });
+      if (a.source === 'obs' && !a.input.trim()) return 'Choose the OBS audio input this person is heard through';
+      t.audio = a;
+    }
+    if (patch.crop && typeof patch.crop === 'object') t.crop = sanitizeCrop({ ...t.crop, ...patch.crop });
     if (patch.mode === 'webrtc' || patch.mode === 'vdo') t.mode = patch.mode;
     if (patch.camQuality === '720p' || patch.camQuality === '1080p') t.camQuality = patch.camQuality;
     if (typeof patch.vdoId === 'string') {
@@ -791,13 +961,61 @@ export function createHub(server: Server) {
       const v = parseVdoId(patch.vdoId);
       if (!v) return 'Not a VDO.Ninja link or stream ID (it needs push=… or view=…)';
       if (db.talent.some((p, j) => j !== i && p.vdoId === v)) return 'Another talent already uses this VDO.Ninja stream';
-      t.vdoId = v; t.mode = 'vdo';
+      t.vdoId = v; t.mode = 'vdo'; t.vdoSet = true;
     }
+    const audioChanged = JSON.stringify(t.audio) !== JSON.stringify(db.talent[i].audio);
     db.talent = db.talent.map((p, j) => (j === i ? t : p));
     const seat = seatOfTalent(id);
     if (seat) { const before = pubOf(seat); applySeat(seat as Seat); reroute(seat, before); broadcastLive(); }
     sendTalentInfo(id);
     save();
+    if (audioChanged || patch.mode) void audioMix?.sync('talent edit');
+    pushState();
+    return null;
+  }
+
+  /** 3.0 Add Talent: the first unused profile (else a new one, up to TALENT_MAX) with name, role, camera and position. */
+  function addTalent(a: { name: string; role?: TalentRole; vdo?: string; seat?: number | null; mode?: 'webrtc' | 'vdo' }): { id: string } | { error: string } {
+    const name = a.name.trim().slice(0, 40);
+    if (!name) return { error: 'Type the person\'s name' };
+    if (db.talent.some(p => p.name.trim().toLowerCase() === name.toLowerCase())) return { error: `${name} already has a profile: edit it instead of adding a second one` };
+    let vdo: string | null = null;
+    if (a.vdo && a.vdo.trim()) {
+      const info = describeVdoLink(a.vdo);
+      if (!info.ok) return { error: info.problem ?? 'Not a VDO.Ninja link' };
+      vdo = info.id;
+      const other = db.talent.find(p => p.vdoSet && p.vdoId === vdo);
+      if (other) return { error: `This VDO.Ninja stream is already ${talentLabel(other)}'s camera` };
+    }
+    if (a.seat != null && !(SEATS as readonly number[]).includes(a.seat)) return { error: 'Unknown position' };
+    if (a.seat != null && db.seats[a.seat as Seat]) return { error: `${SEAT_LABELS[a.seat as Seat]} is taken by ${talentLabel(db.talent.find(p => p.id === db.seats[a.seat as Seat]))}: free it or pick another position` };
+    let p = db.talent.find(x => !inUse(x, !!seatOfTalent(x.id)) && !talentPubs.has(x.id));
+    if (!p) {
+      if (db.talent.length >= TALENT_MAX) return { error: `All ${TALENT_MAX} profiles are in use: remove someone first` };
+      const used = new Set(db.talent.map(x => x.id));
+      let n = TALENT_COUNT + 1; while (used.has(`t${n}`)) n++;
+      p = blankTalent(`t${n}`, () => newKey(), newVdoId);
+      db.talent = [...db.talent, p];
+    }
+    const id = p.id;
+    db.talent = db.talent.map(x => (x.id === id ? { ...x, name, role: a.role && TALENT_ROLES.some(r => r.id === a.role) ? a.role : 'caster', ...(vdo ? { vdoId: vdo, mode: 'vdo' as const, vdoSet: true } : a.mode === 'vdo' ? { mode: 'vdo' as const } : { mode: 'webrtc' as const }), ready: false } : x));
+    if (a.seat != null) { const e = setSeat(a.seat, id); if (e) return { error: e }; }
+    else { save(); pushState(); }
+    void audioMix?.sync('talent added');
+    return { id };
+  }
+
+  /** Clear a profile: off position, new link key (the old link dies at once), defaults. t11+ are deleted. */
+  function removeTalent(id: string): string | null {
+    const t = db.talent.find(p => p.id === id);
+    if (!t) return 'Unknown talent';
+    const seat = seatOfTalent(id);
+    if (seat) { const e = setSeat(seat, null); if (e) return e; }
+    const pid = talentPubs.get(id), c = pid ? clients.get(pid) : undefined;
+    if (c) { send(c, { t: 'error', code: 'auth', message: 'This talent link has been removed by the producer.' }); c.ws.close(4003, 'revoked'); }
+    db.talent = talentNum(id) > TALENT_COUNT ? db.talent.filter(p => p.id !== id) : db.talent.map(p => (p.id === id ? blankTalent(id, () => newKey(), newVdoId) : p));
+    save(); pushState();
+    void audioMix?.sync('talent removed');
     return null;
   }
 
@@ -1200,6 +1418,16 @@ export function createHub(server: Server) {
 
   obs.apply(db.live, db.showLive.theme);
 
+  function obsLookup() {
+    return {
+      setupMap: obsSetup.state().map ?? {},
+      screenMap: db.showLive.obsScenes as Record<string, string | undefined>,
+      graphics: db.graphics,
+      registry: REGISTRY,
+      scenes: obs.status.connected ? obs.status.scenes : [],
+      pkgObsKey: (pkg: string) => pkgById(pkg)?.obsKey,
+    };
+  }
   engine = createEngine({
     db,
     save,
@@ -1218,8 +1446,15 @@ export function createHub(server: Server) {
     quick,
     setSeat,
     editTalent,
+    addTalent,
+    removeTalent,
+    audio: {
+      master: async muted => { db.audioMaster = muted; save(); if (!obs.status.connected) { pushState(); return null; } await audioMix!.sync('master'); return null; },
+      applyAll: () => audioMix!.applyAll(),
+    },
     regenTalent,
     resyncSeat,
+    camEngine: camEngineFacade,
     obsSetup: async cmd => {
       switch (cmd.action) {
         case 'scan': { const e = await obsSetup.scan(); return e ? { error: e } : { note: 'OBS scanned' }; }
@@ -1232,6 +1467,30 @@ export function createHub(server: Server) {
         case 'apply': { const r = await obsSetup.apply(String(cmd.hash ?? ''), cmd.allowLive === true); return typeof r === 'string' ? { error: r } : r.ok ? { note: r.summary } : { error: r.summary }; }
         case 'cancel': obsSetup.clearPlan(); return {};
         case 'options': { const e = obsSetup.setOptions(cmd.options ?? {}); return e ? { error: e } : {}; }
+        case 'cleanup-scan': {
+          const r = await obsSetup.cleanupScan();
+          if (typeof r === 'string') return { error: r };
+          const n = r.scenes.filter(x => x.cls === 'consolidate').length;
+          return { note: `Cleanup report (dry run): ${r.scenes.filter(x => x.cls === 'main').length} main, ${n} can be consolidated, ${r.scenes.filter(x => x.cls === 'keep').length} kept, ${r.scenes.filter(x => x.cls === 'not-overdrive').length} not Overdrive's. Nothing was removed.` };
+        }
+        case 'cleanup-apply': {
+          const list = (v: unknown) => (Array.isArray(v) ? v.map(String).slice(0, 200) : []);
+          const r = await obsSetup.cleanupApply(String(cmd.hash ?? ''), list(cmd.remove), list(cmd.unnest), String(cmd.confirm ?? ''), list(cmd.drop), list(cmd.nestAudio));
+          if (typeof r === 'string') return { error: r };
+          return { note: `${r.removed.length} scene${r.removed.length === 1 ? '' : 's'} removed${r.unnested.length ? ` · legacy audio migrated in ${r.unnested.length}` : ''}${r.nested.length ? ` · audio decluttered in ${r.nested.length}` : ''}${r.lines.some(l => l.startsWith('Kept') || l.startsWith('Skipped')) ? ' · some were kept (see report)' : ''}` };
+        }
+        case 'audit': {
+          const r = await obsSetup.audit();
+          if (typeof r === 'string') return { error: r };
+          if (!r) return { error: 'OBS is not connected.' };
+          return { note: r.duplicates.length ? `⚠ ${r.duplicates.length} duplicate source${r.duplicates.length === 1 ? '' : 's'} found, out of ${r.checked} browser sources checked` : `No duplicate sources found (${r.checked} browser sources checked)` };
+        }
+        case 'validation': return {};
+        case 'validation-set': {
+          const r = obsSetup.setValidation(String(cmd.id ?? ''), cmd.checked === true);
+          return typeof r === 'string' ? { error: r } : { note: cmd.checked ? 'Confirmed.' : 'Confirmation cleared.' };
+        }
+        case 'validation-new-session': { obsSetup.newValidationSession(); return { note: 'New pre-event check started: previous confirmations are kept as history.' }; }
       }
       return { error: 'Unknown OBS Setup action' };
     },
@@ -1243,15 +1502,15 @@ export function createHub(server: Server) {
         const sec = Number(db.graphics.find(x => x.id === 'mvp')?.config.countdown) || 0; // Studio's default countdown
         return aud.op(action === 'open' ? { k: 'mvp-open', poll: s.pollId, ...(sec >= 10 ? { seconds: sec } : {}) } : { k: 'mvp-close', poll: s.pollId });
       },
+      ready: async match => {
+        const e = await aud.prepareAll(match);
+        const n = aud.notice_; // the producer switched to the match a notice was about: that notice is answered
+        if (!e && n && n.match === match && n.kind !== 'ready') aud.notice(null);
+        return e;
+      },
+      demo: action => mvpDemo(action),
     },
-    obsLookup: () => ({
-      setupMap: obsSetup.state().map ?? {},
-      screenMap: db.showLive.obsScenes as Record<string, string | undefined>,
-      graphics: db.graphics,
-      registry: REGISTRY,
-      scenes: obs.status.connected ? obs.status.scenes : [],
-      pkgObsKey: pkg => pkgById(pkg)?.obsKey,
-    }),
+    obsLookup,
     syncCrew: plan => {
       // Mirror the show plan to the crew / caster run of show (only when the producer turned crew sync on).
       const items = plan.segments.map(sg => ({ id: sg.id, time: '', title: sg.label, minutes: Math.round(sg.dur / 60), who: '', notes: sg.notes }));
@@ -1259,20 +1518,183 @@ export function createHub(server: Server) {
       db.ros = sanitizeRos({ ...db.ros, items, current: cur >= 0 ? cur : null, startedAt: cur >= 0 ? plan.onAir!.at : null });
       pushRos();
     },
-    obsSwitch: async (scene, t) => {
+    obsPreview: async (scene, target) => {
+      if (!obs.status.connected) return { note: 'OBS not connected: preview in Overdrive only' };
+      // 3.2 main-scenes layout: a layer is prepared in its main scene only while that scene is OFF Program (never
+      // changes what is on air); on the Program scene it waits for TAKE.
+      const lay = target ? obsSetup.layerOf(target) : null;
+      let extra = '';
+      // 3.3 unified scene (MVP): the view is prepared on the scene's Preview identity — a separate, muted source in
+      // its own internal scene — and THAT is OBS's Preview. The Program source is never touched.
+      if (lay?.role === 'state') {
+        const view = mvpViewOfSel(target!.replace(/^s:/, ''));
+        const g = db.graphics.find(x => x.id === 'mvp');
+        if (g && view && g.prepared !== view) { g.prepared = view; save(); pushGfx(); }
+        if (!lay.preview) return { note: `MVP ${view} prepared in Overdrive (Build the MVP scene's Preview identity for OBS Preview)` };
+        if (!obs.status.studioMode) return { note: `MVP ${view} prepared on the Preview identity (OBS Studio Mode is off)` };
+        if (!obs.status.scenes.includes(lay.preview)) return { error: `OBS has no scene named "${lay.preview}": Build the MVP scene` };
+        if (obs.status.previewScene !== lay.preview) { const e = await obs.setPreview(lay.preview); if (e) return { error: e }; }
+        return { note: `OBS Preview: MVP · ${view} (Preview identity) · Program untouched` };
+      }
+      if (lay && lay.scene === scene) {
+        if (scene === obs.status.currentScene) {
+          if (!lay.on) return { note: `${scene} is on air: ${target} is prepared in Overdrive only. TAKE shows it on Program.` };
+        } else {
+          const r = await obsSetup.layer(target!, true);
+          if (typeof r === 'string') return { error: r };
+          if (r?.changed) extra = ' · layer prepared off-air';
+        }
+      }
+      if (!obs.status.studioMode) return { note: `OBS Studio Mode is off: the preview is in Overdrive (TAKE switches OBS Program)${extra}` };
+      if (!obs.status.scenes.includes(scene)) return { error: `OBS has no scene named "${scene}"` };
+      if (obs.status.previewScene === scene) return { note: `OBS Preview: ${scene}${extra}` };
+      const e = await obs.setPreview(scene);
+      return e ? { error: e } : { note: `OBS Preview: ${scene}${extra}` };
+    },
+    obsSwitch: async (scene, t, target) => {
       if (!obs.status.connected) return obs.status.enabled ? `OBS is not connected (${obs.status.error ?? 'offline'})` : 'OBS is not set up (Settings → OBS)';
       if (!obs.status.scenes.includes(scene)) return `OBS has no scene named "${scene}"`;
+      // 3.2 main-scenes layout: the output's layer is shown in its main scene, then the scene goes to Program. When
+      // the scene is already on Program the layer change IS the take (a cut inside the scene; no scene transition).
+      const lay = target ? obsSetup.layerOf(target) : null;
+      // 3.3 unified scene: the engine already committed the state to the Program source (with rollback on failure);
+      // the Preview identity goes back to mirroring Program. Already on air → the source's own transition is the take.
+      if (lay?.role === 'state' && lay.scene === scene) {
+        const g = db.graphics.find(x => x.id === 'mvp');
+        if (g?.prepared) { g.prepared = null; save(); pushGfx(); }
+        if (scene === obs.status.currentScene) return null;
+        return (await obs.setScene(scene, t)) ? null : (obs.status.error ?? 'OBS refused the scene switch');
+      }
+      if (lay && lay.scene === scene) {
+        const r = await obsSetup.layer(target!, true);
+        if (typeof r === 'string') return r;
+        if (scene === obs.status.currentScene) return null;
+      }
       return (await obs.setScene(scene, t)) ? null : (obs.status.error ?? 'OBS refused the scene switch');
+    },
+    obsLayer: async (target, on) => {
+      const lay = obsSetup.layerOf(target);
+      if (!lay) return { error: 'Not a layer of a main scene: build the main scenes in Studio → Sources & OBS' };
+      if (!on && lay.role !== 'overlay') return { error: 'Only overlays are hidden on their own: show another layer (or the scene itself) instead' };
+      const r = await obsSetup.layer(target, on);
+      if (typeof r === 'string') return { error: r };
+      const live = lay.scene === obs.status.currentScene;
+      return { note: `${on ? 'Shown' : 'Hidden'} in ${lay.scene}${live ? ' (on air)' : ' (off air)'}` };
     },
   });
 
-  /** The MVP graphic's match (its own setting, else the cast match) and where its vote stands. */
+  // ---------- 3.0 MVP: one MVP match per event, in step with the results ----------
+  // The MVP match is the MVP graphic's `match` (the one value the graphic, Producer, Studio, automation and the vote
+  // read). It follows the results: a match that ends becomes the MVP match and its vote is prepared with all its
+  // players, unless the MVP of another match is still running (voting open, or an MVP scene on Program) — then the
+  // producer is told and switches when ready. Voting never opens and OBS never switches unless the producer turned
+  // that automation on.
+  const mvpGfx = () => db.graphics.find(x => x.id === 'mvp');
+  const mvpMatchNow = () => String(mvpGfx()?.config.match ?? '');
+  const mvpSources = REGISTRY.filter(x => x.gfx === 'mvp' && x.gfxView);
+  /** OBS scene of each MVP view (Scene Builder / mapping), when OBS has one. */
+  function mvpObsScene(view: string): string | null {
+    const src = mvpSources.find(x => x.gfxView === view);
+    return src ? segmentObsScene({ obsScene: null, target: `s:${src.id}` }, obsLookup()) : null;
+  }
+  const mvpOnProgram = () => obs.status.connected && mvpSources.some(x => { const n = mvpObsScene(x.gfxView!); return !!n && n === obs.status.currentScene; });
+  /** Finished matches of this event, oldest result first. */
+  function finishedMatches(): string[] {
+    const wc = db.wildcard, R = wcResolve(wc.matches, wc.teams);
+    return WC_IDS.filter(id => R[id].winner && R[id].loser !== 'BYE' && realTeam(R[id].t1) && realTeam(R[id].t2)).sort((a, b) => (wc.done[a] ?? 0) - (wc.done[b] ?? 0));
+  }
+  const matchTitle = (id: string) => { const r = wcResolve(db.wildcard.matches, db.wildcard.teams)[id]; return `${matchName(id)} · ${r?.t1 ?? '?'} vs ${r?.t2 ?? '?'}`; };
+  let mvpChain: Promise<unknown> = Promise.resolve();
+
+  async function mvpMatchEnded(id: string) {
+    if (!engine) return;
+    const cur = mvpMatchNow(), title = matchTitle(id);
+    if (!aud.auto.prepare) { aud.notice({ kind: 'info', match: id, text: `${title} finished. Automatic MVP preparation is off: choose the match in the MVP panel.` }); return; }
+    const p0 = cur && cur !== id ? aud.pollOf(cur) : null;
+    if (cur && cur !== id && (p0?.status === 'open' || mvpOnProgram())) {
+      aud.notice({ kind: 'queued', match: id, text: `${title} finished. Its MVP is waiting: the MVP of ${matchName(cur)} is still ${p0?.status === 'open' ? 'voting' : 'on air'}. Switch when you are done.` });
+      return;
+    }
+    const r = await engine.run({ c: 'mvp-match', match: id }, 'MVP · match finished', 'auto');
+    if (!r.ok) { aud.notice({ kind: 'error', match: id, text: `${title} finished, but the MVP could not switch to it: ${r.error ?? 'error'}` }); return; }
+    const poll = aud.pollOf(id);
+    if (!poll) { aud.notice({ kind: 'error', match: id, text: `${title} finished. MVP not prepared: ${r.note?.split(' · ').slice(1).join(' · ') || 'players missing'}` }); return; }
+    const extra: string[] = [];
+    if (aud.auto.open && poll.status === 'draft') {
+      const sec = Number(mvpGfx()?.config.countdown) || 0;
+      const e = await aud.op({ k: 'mvp-open', poll: poll.id, ...(sec >= 10 ? { seconds: sec } : {}) });
+      extra.push(e ? `voting NOT opened (${e})` : 'voting OPEN (automation)');
+    }
+    if (aud.auto.preview) {
+      const sc = mvpObsScene('voting');
+      if (sc && obs.status.connected && obs.status.studioMode) { const e = await obs.setPreview(sc); extra.push(e ? `OBS Preview failed (${e})` : `OBS Preview: ${sc}`); }
+    }
+    aud.notice({ kind: 'ready', match: id, text: `MVP ready: ${title} · ${poll.players.length} players${extra.length ? ` · ${extra.join(' · ')}` : ''}` });
+    pushState();
+  }
+
+  /** A team's players changed: a prepared (not yet open) vote of the MVP match picks them up. */
+  function mvpRosterChanged(team: string) {
+    const m = mvpMatchNow(); if (!m) return;
+    const r = wcResolve(db.wildcard.matches, db.wildcard.teams)[m];
+    if (r && (r.t1 === team || r.t2 === team)) mvpChain = mvpChain.then(async () => {
+      const e = await aud.prepareAll(m), n = aud.notice_, poll = aud.pollOf(m);
+      // the missing players were the problem: now the MVP is ready, say so
+      if (!e && poll && n && n.match === m && n.kind === 'error') aud.notice({ kind: 'ready', match: m, text: `MVP ready: ${matchTitle(m)} · ${poll.players.length} players` });
+    }).catch(() => {});
+  }
+
+  /** Another event: the MVP graphic takes that event's latest result (no reveal carried over), prepared if on. */
+  function mvpFollowEvent() {
+    const g = mvpGfx(), p = g && pkgById(g.pkg);
+    if (!g || !p) return;
+    const fin = finishedMatches(), cast = db.wildcard.cast, kept = db.audience.mvpMatch;
+    const m = kept && fin.includes(kept) ? kept : cast && fin.includes(cast) ? cast : fin[fin.length - 1] ?? '';
+    g.config = { ...g.config, match: m, step: 'voting', revealed: '' };
+    if (g.draft) g.draft = { ...g.draft, match: m, step: 'voting', revealed: '' };
+    save(); pushGfx();
+    if (m && aud.auto.prepare) mvpChain = mvpChain.then(() => aud.prepareAll(m)).catch(() => {});
+  }
+
+  /** Rehearsal: demo event in, finish a demo match (the real result path), out. */
+  async function mvpDemo(action: 'load' | 'finish' | 'leave'): Promise<{ error?: string; note?: string }> {
+    if (action === 'load') {
+      if (aud.openPoll() && !aud.rehearsal) return { error: 'MVP voting is open in this event: stop it before starting the rehearsal' };
+      putRehearsal(demoWildcard(), db.activeEvent);
+      if (db.activeEvent === REHEARSAL_ID) { // reloaded in place: start again from the demo data
+        aud.swap(db.audience); resultsSeen = null; matchEndCheck(); wcSnap = wcSnapshot(db.wildcard); mvpFollowEvent();
+        broadcastLive(); each(wcAudience, wcMsg()); pushState();
+      } else switchToEvent(REHEARSAL_ID, { obs: false });
+      return { note: 'Rehearsal loaded: DEMO Falcons vs DEMO Comets (2–1, live). Finish the demo match to see the MVP prepare itself.' };
+    }
+    if (!aud.rehearsal) return { error: 'Not in the rehearsal' };
+    if (action === 'finish') {
+      const R = wcResolve(db.wildcard.matches, db.wildcard.teams);
+      const id = DEMO_MATCHES.find(x => !R[x].winner);
+      if (!id) return { error: 'Both demo matches are finished: load the rehearsal again to start over' };
+      // the real result path: the same score command as the controller, until the match has a winner
+      for (let i = 0; i < 5 && !wcResolve(db.wildcard.matches, db.wildcard.teams)[id].winner; i++) wcOp({ k: 'score', id, side: 1, delta: 1 });
+      return { note: `${matchTitle(id)} finished (demo result)` };
+    }
+    const back = rehearsalReturn();
+    if (!back) return { error: 'No other event to go back to' };
+    switchToEvent(back, { obs: false });
+    return { note: 'Rehearsal closed: back to the real event (its votes and results untouched)' };
+  }
+
+  /** The MVP match (the MVP graphic's own match) and where its vote stands. */
   function mvpFlowState() {
     const g = db.graphics.find(x => x.id === 'mvp');
-    const match = String(g?.config.match || db.wildcard.cast || '');
+    const match = String(g?.config.match || ''); // 3.0: the MVP match (kept in step with the results), never the cast match
     const poll = (aud.priv().summary?.polls ?? []).filter(p => p.match === match).pop();
     return { match, pollId: poll?.id ?? null, status: poll?.status ?? null, frozen: !!poll?.frozen, desk: Object.keys(db.audience.staffMvp?.[match] ?? {}).length > 0, published: String(g?.config.step ?? '') };
   }
+
+  // 3.1 Track Progression: Google Sheet rows (Control tab or match + track query), reloaded every 8 s when Auto is on.
+  setInterval(() => { const t = db.wildcard.track; if (t.src.mode === 'sheet' && t.src.auto) void trackLoad(); }, 8000).unref();
+
+  // 3.0: an MVP graphic saved before 3.0 followed the cast match (no match of its own): give it this event's latest result.
+  if (!mvpMatchNow()) mvpFollowEvent();
 
   // Show plan automation (Studio Mode 2.0): countdown end, segment time up / auto-advance, clock rules.
   const planTick = setInterval(() => { engine?.tick().catch(e => console.warn('[plan] automation tick failed:', e)); }, 500);

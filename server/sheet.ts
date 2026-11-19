@@ -4,6 +4,8 @@ import { ensureStreamIds, normName } from '../shared/players';
 
 const BASE = 'https://docs.google.com/spreadsheets/d/';
 
+/** Read-only GET of a sheet CSV (also used by the Track Progression loader). */
+export async function sheetGet(url: string): Promise<string> { return get(url); }
 async function get(url: string): Promise<string> {
   // Offline testing: SHEET_FIXTURE_DIR/<gid or tab>.csv instead of the network.
   const fx = process.env.SHEET_FIXTURE_DIR;
