@@ -288,6 +288,7 @@ export function SceneDock({ live, preview, show, wc, now, send, quick, twConnect
             <Toggle on={show.showScoreboard} onClick={() => quick({ k: 'flag', key: 'scoreboard', on: !show.showScoreboard })}>Scoreboard</Toggle>
             <Toggle on={show.gameplay.cams} onClick={() => quick({ k: 'flag', key: 'gameplay-cams', on: !show.gameplay.cams })}>Caster cams</Toggle>
             <Toggle on={show.gameplay.ticker} onClick={() => quick({ k: 'flag', key: 'gameplay-ticker', on: !show.gameplay.ticker })}>Ticker</Toggle>
+            <Toggle on={show.gameplay.partners} onClick={() => quick({ k: 'flag', key: 'gameplay-partners', on: !show.gameplay.partners })}>Partners</Toggle>
           </Group>
           {show.brand.skin && (
             <Group label="Overlay">

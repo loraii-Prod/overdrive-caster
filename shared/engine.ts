@@ -26,7 +26,7 @@ export const TRANSITIONS: { id: TransitionKind; label: string }[] = [
 export type KeyGraphic = 'map-card' | 'replay' | 'highlights' | 'clear-badge';
 
 /** Preview-side flags (TAKE sends them to Program with the scene). */
-export type StageFlag = 'scoreboard' | 'matchup-screens' | 'matchup-casters' | 'ticker' | 'gameplay-cams' | 'gameplay-ticker' | 'names' | 'desk-strip' | 'desk-clock';
+export type StageFlag = 'scoreboard' | 'matchup-screens' | 'matchup-casters' | 'ticker' | 'gameplay-cams' | 'gameplay-ticker' | 'gameplay-partners' | 'names' | 'desk-strip' | 'desk-clock';
 
 export type ProducerCmd =
   // ---- Preview (stage): never on air until TAKE

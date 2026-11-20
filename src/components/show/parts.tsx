@@ -174,6 +174,31 @@ export function Socials({ show, size = 18, gap = 40 }: { show: Show; size?: numb
   );
 }
 
+/**
+ * Gameplay partners banner: every sponsor logo side by side in a small dark panel on the left edge,
+ * centred at 75% of the frame height (clear of the scoreboard, caster cams and ticker), plus an optional line.
+ */
+export function PartnersBanner({ show }: { show: Show }) {
+  const on = show.gameplay.partners && show.sponsors.length > 0;
+  return (
+    <div className="absolute left-0" style={{ top: 810, transform: 'translateY(-50%)' }}>
+    <AnimatePresence>
+      {on && (
+        <motion.div key="partners" data-partners className="flex flex-col justify-center"
+          style={{ padding: '10px 22px 10px 18px', background: 'rgba(10,10,12,0.82)', borderLeft: '4px solid var(--accent, #ff6a13)', boxShadow: '0 8px 24px rgba(0,0,0,0.45)', maxWidth: 560 }}
+          initial={{ x: -80, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: -80, opacity: 0 }} transition={{ duration: 0.4, ease: EASE }}>
+          <span className="font-sans font-bold text-white/45" style={{ fontSize: 10, letterSpacing: '0.3em', marginBottom: 6 }}>PARTNERS</span>
+          <div className="flex items-center" style={{ gap: 22, height: 34 }}>
+            {show.sponsors.map((s, i) => <img key={s + i} src={hiRes(s)} alt="" style={{ height: 34, width: 'auto', maxWidth: 150, objectFit: 'contain' }} />)}
+          </div>
+          {show.gameplay.partnersText && <span className="font-sans font-semibold italic text-white/80" style={{ fontSize: 14, marginTop: 7, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{show.gameplay.partnersText}</span>}
+        </motion.div>
+      )}
+    </AnimatePresence>
+    </div>
+  );
+}
+
 /** Rotates sponsor logos with a crossfade. */
 export function Sponsors({ show, height = 56, label = 'PARTNERS' }: { show: Show; height?: number; label?: string }) {
   const [i, setI] = useState(0);
