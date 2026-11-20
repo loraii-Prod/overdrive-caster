@@ -523,7 +523,6 @@ export function createEngine(d: EngineDeps) {
           case 'ticker': db.showPreview = { ...sp, ticker: { ...sp.ticker, onScreens: on } }; break;
           case 'gameplay-cams': db.showPreview = { ...sp, gameplay: { ...sp.gameplay, cams: on } }; break;
           case 'gameplay-ticker': db.showPreview = { ...sp, gameplay: { ...sp.gameplay, ticker: on } }; break;
-          case 'gameplay-partners': db.showPreview = { ...sp, gameplay: { ...sp.gameplay, partners: on } }; break;
           case 'names': db.preview = { ...db.preview, showNames: on }; break;
           case 'desk-strip': setStage({ ...stage(), desk: { ...stage().desk, strip: on } }, by); break;
           case 'desk-clock': setStage({ ...stage(), desk: { ...stage().desk, clock: on } }, by); break;

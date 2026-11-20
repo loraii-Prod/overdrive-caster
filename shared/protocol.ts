@@ -92,7 +92,7 @@ export type QuickOp =
   | { k: 'next-match'; patch: Partial<import('./types').Show['nextMatch']> }
   | { k: 'matchup-casters'; on: boolean }
   /** On-air switches from the scene dock (straight to air, like the other quick ops). */
-  | { k: 'flag'; key: 'scoreboard' | 'ticker' | 'gameplay-ticker' | 'gameplay-cams' | 'gameplay-partners'; on: boolean };
+  | { k: 'flag'; key: 'scoreboard' | 'ticker' | 'gameplay-ticker' | 'gameplay-cams'; on: boolean };
 
 /** Public player card data (from the player sheet) for warm-up / cam graphics. */
 export interface PlayerCard { name: string; vdo: string; input: string; style: string; age: string; funFact: string; rival: string; photo: string }

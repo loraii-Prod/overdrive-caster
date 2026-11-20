@@ -67,7 +67,7 @@ export function defaultShow(): Show {
     music: { enabled: true, volume: 0.6, levels: { ...DEFAULT_LEVELS }, skip: 0, fadeMs: 2500 },
     nextMatch: { enabled: false, corner: 'tr', label: '', time: '' },
     badge: { kind: 'none', at: 0 },
-    gameplay: { cams: false, corner: 'right', ticker: false, partners: false, partnersText: '' },
+    gameplay: { cams: false, corner: 'right', ticker: false },
     theme: 'bnl',
     spotlight: null,
     activePlayer: null,
@@ -264,8 +264,6 @@ export function sanitizeShow(v: any): Show {
       cams: bool(v.gameplay?.cams, d.gameplay.cams),
       corner: v.gameplay?.corner === 'left' ? 'left' : 'right',
       ticker: bool(v.gameplay?.ticker, d.gameplay.ticker),
-      partners: bool(v.gameplay?.partners, d.gameplay.partners),
-      partnersText: str(v.gameplay?.partnersText, 80),
     },
     obsScenes: Object.fromEntries(SCREENS.map(s => [s, str(v.obsScenes?.[s], 128)])) as Show['obsScenes'],
   };

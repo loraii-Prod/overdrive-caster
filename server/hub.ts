@@ -816,7 +816,6 @@ export function createHub(server: Server) {
           else if (op.key === 'ticker') show.ticker.onScreens = on;
           else if (op.key === 'gameplay-ticker') show.gameplay.ticker = on;
           else if (op.key === 'gameplay-cams') show.gameplay.cams = on;
-          else if (op.key === 'gameplay-partners') show.gameplay.partners = on;
           break;
         }
         case 'active-player': {

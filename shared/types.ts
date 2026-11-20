@@ -152,8 +152,7 @@ export interface Show {
   /** Gameplay screen: transparent over the game capture. */
   /** Gameplay overlay badge (skin replay / highlights packages). */
   badge: { kind: 'none' | 'replay' | 'highlights'; at: number };
-  /** partners: the sponsors banner on the left of the gameplay screen (logos from Sponsors + an optional line). */
-  gameplay: { cams: boolean; corner: 'left' | 'right'; ticker: boolean; partners: boolean; partnersText: string };
+  gameplay: { cams: boolean; corner: 'left' | 'right'; ticker: boolean };
   /** Starting Soon shows the bracket's upcoming matches instead of the manual schedule. */
   scheduleFromBracket: boolean;
   /** Which half of the bracket /output/bracket shows (controller picks; "full" shows both). */

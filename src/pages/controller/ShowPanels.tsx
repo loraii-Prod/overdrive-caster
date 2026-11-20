@@ -229,11 +229,6 @@ export function SponsorsTab({ show, set }: ShowProps) {
           <input type="number" min={3} max={60} className="input w-16" value={show.sponsorSeconds} onChange={e => set({ sponsorSeconds: +e.target.value || 8 })} />s
         </label>
       </div>
-      <div className="mb-3 flex flex-wrap items-center gap-3 text-[12px] text-white/60">
-        <label className="flex items-center gap-2"><input type="checkbox" checked={show.gameplay.partners} onChange={e => set({ gameplay: { ...show.gameplay, partners: e.target.checked } })} /> Partners banner on the gameplay screen (left, all logos)</label>
-        <input className="input min-w-0 flex-1" maxLength={80} placeholder="Optional line under the logos, e.g. Reon: your stream won't drop again" value={show.gameplay.partnersText}
-          onChange={e => set({ gameplay: { ...show.gameplay, partnersText: e.target.value } })} />
-      </div>
       {show.sponsors.length === 0 && <p className="text-[12px] text-white/40">No sponsors yet. White or transparent PNG/SVG logos work best on the dark background.</p>}
       <div className="flex flex-wrap gap-3">
         {show.sponsors.map((s, i) => (

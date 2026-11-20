@@ -25,7 +25,7 @@ import { BracketView, MatchesBoard } from './Bracket';
 import { MatchBar, Scoreboard } from './Overlays';
 import { Feed } from '../Feed';
 import { Nameplate } from '../Nameplate';
-import { ScreenBackground, Ticker, PartnersBanner } from './parts';
+import { ScreenBackground, Ticker } from './parts';
 import { WcMapCard } from '../wildcard/MapCard';
 import { WcChampions } from '../wildcard/Champions';
 import { WcInterview } from '../wildcard/Interview';
@@ -194,7 +194,6 @@ export function GameplayScreen({ scene, show, now, viewer, monitor, embeds = tru
         left={(g.cams && cams.length > 0 && g.corner === 'left') || (show.playerCam.enabled && show.activePlayer && show.playerCam.corner === 'left') ? 1920 - 40 - 820 : 40} />
       {ticker && <div className="absolute inset-x-0 bottom-0"><Ticker show={show} height={56} /></div>}
       <OtherMatchPopout show={show} bnl={bnl} />
-      <PartnersBanner show={show} />
     </div>
   );
 }
