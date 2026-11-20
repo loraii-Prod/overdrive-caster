@@ -177,7 +177,7 @@ function toMajor(s: Show): Show {
 }
 
 /** Old → new team display names, applied to the saved state on load. */
-export const TEAM_RENAMES: Record<string, string> = { 'Natus Vincere': 'NAVI Team' };
+export const TEAM_RENAMES: Record<string, string> = { 'Natus Vincere': 'NAVI', 'NAVI Team': 'NAVI' };
 export const renameTeams = (json: string) => Object.entries(TEAM_RENAMES).reduce((t, [a, b]) => t.split(JSON.stringify(a)).join(JSON.stringify(b)), json);
 
 function load(): Persisted {

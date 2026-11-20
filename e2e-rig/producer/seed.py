@@ -8,7 +8,7 @@ W = lambda **op: {'t': 'wc', 'op': op}
 S = lambda mid, side: W(k='score', id=mid, side=side, delta=1)
 C = lambda **c: {'t': 'cmd', 'cmd': c}
 urllib.request.urlopen('http://127.0.0.1:4456/studio-mode?on=1')
-d = probe([W(k='teams', teams=['BIG', 'FUT Esports', 'Airwalkers', 'COOK', 'Ragnarok', 'NAVI Team', 'rnboi', 'All Gamers Global']),
+d = probe([W(k='teams', teams=['BIG', 'FUT Esports', 'Airwalkers', 'COOK', 'Ragnarok', 'NAVI', 'rnboi', 'All Gamers Global']),
   S('R1_UB2', 1), S('R1_UB2', 2), S('R1_UB2', 1), S('R1_UB2', 1), {'wait': 1200},
   W(k='cast', id='R1_UB1'), S('R1_UB1', 1), S('R1_UB1', 2), S('R1_UB1', 1),
   *[W(k='veto', map=m) for m in ['india', 'uk', 'czech', 'egypt']],

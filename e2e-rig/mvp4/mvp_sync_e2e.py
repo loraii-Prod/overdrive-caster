@@ -28,7 +28,7 @@ def src_url(view):
         if u.split('?key=')[0].endswith('/g/mvp'): return i['name'], u
     return None, None
 
-TEAMS = ['BIG', 'FUT Esports', 'Airwalkers', 'COOK', 'Mystery Five', 'NAVI Team', 'rnboi', 'All Gamers Global']
+TEAMS = ['BIG', 'FUT Esports', 'Airwalkers', 'COOK', 'Mystery Five', 'NAVI', 'rnboi', 'All Gamers Global']
 # 3.2 main-scenes layout: the five MVP views are layers (scene items) of ONE scene, "Overdrive · MVP"
 MVP = 'Overdrive · MVP'
 def layer_on(view):

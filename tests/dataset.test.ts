@@ -40,8 +40,8 @@ check('Split 1 match records keep track scores (except the 3 the sheet marks "mi
 const used = MAJOR_TEAMS.map(t => t.name);
 const MJ = d.majorTeams as Record<string, any>;
 check('every Major team listed with its logo file and a team candidate', used.every(n => MJ[n] && T.has(MJ[n].team) && fs.existsSync('public' + MJ[n].logoFile)));
-check('Major names that are not sheet team names stay unconfirmed (FUT Esports, NAVI Team, All Gamers Global)', ['FUT Esports', 'NAVI Team', 'All Gamers Global'].every(n => MJ[n].confirmed === false) && ['BIG', 'COOK', 'Airwalkers', 'Ragnarok', 'rnboi'].every(n => MJ[n].confirmed === true));
-check('unconfirmed links derive nothing: no logo on the team record, no season line', ['FUT Esports', 'NAVI Team', 'All Gamers Global'].every(n => !T.get(MJ[n].team).logo && !SEASON_VERIFIED[n]));
+check('Major names that are not sheet team names stay unconfirmed (FUT Esports, NAVI, All Gamers Global)', ['FUT Esports', 'NAVI', 'All Gamers Global'].every(n => MJ[n].confirmed === false) && ['BIG', 'COOK', 'Airwalkers', 'Ragnarok', 'rnboi'].every(n => MJ[n].confirmed === true));
+check('unconfirmed links derive nothing: no logo on the team record, no season line', ['FUT Esports', 'NAVI', 'All Gamers Global'].every(n => !T.get(MJ[n].team).logo && !SEASON_VERIFIED[n]));
 check('COOK / FUT logo files flagged as the OverDrive placeholder', MJ['COOK'].logoIsPlaceholder === true && MJ['FUT Esports'].logoIsPlaceholder === true && !MJ['BIG'].logoIsPlaceholder);
 check('logos tab imported as a dated registry (team_id, name, official SVG)', d.logoRegistry.length === lines('logos.csv') - 1 && d.logoRegistry.some((e: any) => e.team === 'TEAM_0005' && e.name === 'FUT Esports' && e.svg === 'FUT_Esport.svg' && e.date === '2026-04-03'));
 check('Split 1 FUT / NAVI kept as their own records with both pieces of evidence, unconfirmed', ['S1_FUT', 'S1_NAVI'].every(id => T.get(id).confirmed === false && T.get(id).possibleSameTeam.length === 2));

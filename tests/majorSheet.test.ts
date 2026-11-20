@@ -34,7 +34,7 @@ const R = wcResolve(wc.matches, wc.teams);
 check('scores land on the right matches', wc.matches.R1_UB1.s1 === '3' && wc.matches.R1_UB2.s2 === '3');
 check('results flow: R2_UB1 = BIG vs Ragnarok', R.R2_UB1.t1 === 'BIG' && R.R2_UB1.t2 === 'Ragnarok', `${R.R2_UB1.t1} v ${R.R2_UB1.t2}`);
 check('…and the losers drop to the lower bracket (R1_LB1 = rnboi vs COOK)', R.R1_LB1.t1 === 'rnboi' && R.R1_LB1.t2 === 'COOK', `${R.R1_LB1.t1} v ${R.R1_LB1.t2}`);
-check('NAVI x Joel → NAVI Team', wc.teams[5] === 'NAVI Team', wc.teams.join(', '));
+check('NAVI x Joel → NAVI', wc.teams[5] === 'NAVI', wc.teams.join(', '));
 check('times from the sheet', wc.matches.R5_GF1.time.endsWith('19:00'), wc.matches.R5_GF1.time);
 check('FUT x Heav / All Gamers are not guessed (left for the producer)', !['FUT Esports', 'All Gamers Global'].some(t => b.teams.some(x => resolveTeam({ name: x.name }).name === t)));
 console.log(`\n${ok}/${ok + bad} passed`); process.exit(bad ? 1 : 0);

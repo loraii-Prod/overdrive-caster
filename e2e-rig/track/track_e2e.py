@@ -43,7 +43,7 @@ async def main():
         check('no track yet: the graphic draws nothing (no invented data)', await g.query_selector('[data-track]') is None)
 
         # ---- the cast match and its veto (the event's own data)
-        probe([wc({'k': 'teams', 'teams': ['BIG', 'FUT Esports', 'Airwalkers', 'COOK', 'Ragnarok', 'NAVI Team', 'rnboi', 'All Gamers Global']}), wc({'k': 'cast', 'id': 'R1_UB1'}),
+        probe([wc({'k': 'teams', 'teams': ['BIG', 'FUT Esports', 'Airwalkers', 'COOK', 'Ragnarok', 'NAVI', 'rnboi', 'All Gamers Global']}), wc({'k': 'cast', 'id': 'R1_UB1'}),
                wc({'k': 'score', 'id': 'R1_UB1', 'side': 1, 'delta': 1}), wc({'k': 'veto', 'map': 'india'}), wc({'k': 'veto', 'map': 'uk'})])
         await pr.goto(f'{B}/producer'); await pr.wait_for_timeout(2200)
         await pr.click('[data-gfx-row="track"] button >> nth=0'); await pr.wait_for_timeout(900)
@@ -79,7 +79,7 @@ async def main():
         # ---- Google Sheet: Control tab (out_track_progression)
         await pr.click('[data-track-module] >> text=Google Sheet'); await pr.wait_for_timeout(2500)
         await g.wait_for_timeout(600)
-        check('Source → Google Sheet: Control tab loaded (NaVi x Joel → NAVI Team vs Nyxar Competitive, Egypt)', 'EGYPT' in (await g.inner_text('.trk-title')).upper() and 'NATUS' in (await g.inner_text('.trk-board')).upper() and 'NYXAR' in (await g.inner_text('.trk-board')).upper())
+        check('Source → Google Sheet: Control tab loaded (NaVi x Joel → NAVI vs Nyxar Competitive, Egypt)', 'EGYPT' in (await g.inner_text('.trk-title')).upper() and 'NATUS' in (await g.inner_text('.trk-board')).upper() and 'NYXAR' in (await g.inner_text('.trk-board')).upper())
         check('sheet logos resolve to Overdrive logos (navixjoel, nyxar)', await g.eval_on_selector_all('.trk-logo img', 'e => e.map(x => x.src.split("/").pop())') == ['navixjoel.png', 'nyxar.png'])
         check('module: "Loaded" status', 'Loaded' in await pr.inner_text('[data-track-sheet-status]'))
 

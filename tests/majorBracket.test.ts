@@ -4,7 +4,7 @@ import { defaultWildcard } from '../shared/wildcard';
 let ok = 0, bad = 0;
 const check = (n: string, c: boolean, x = '') => { c ? ok++ : bad++; console.log((c ? 'PASS ' : 'FAIL ') + n + (x ? '  ' + x : '')); };
 const wc = defaultWildcard(true);
-wc.teams = ['BIG', 'FUT Esports', 'COOK', 'Airwalkers', 'Ragnarok', 'NAVI Team', 'RNBOI', 'All Gamers Global'];
+wc.teams = ['BIG', 'FUT Esports', 'COOK', 'Airwalkers', 'Ragnarok', 'NAVI', 'RNBOI', 'All Gamers Global'];
 for (const id of Object.keys(wc.matches)) wc.matches[id] = { ...wc.matches[id], s1: '', s2: '', live: false };
 wc.matches.R1_UB1 = { ...wc.matches.R1_UB1, s1: '3', s2: '1' };
 wc.matches.R1_UB2 = { ...wc.matches.R1_UB2, s1: 'FF', s2: 'W' };

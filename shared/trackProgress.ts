@@ -74,7 +74,7 @@ export const emptyTrack = (): TrackLive => ({ src: defaultTrackSrc(), data: null
 /** Team logo files in /brand/overdrive/teams (the overlay package's logos are the same files). */
 export const TEAM_LOGOS = ['abyssal', 'ag', 'airwalkers', 'big', 'bombo', 'brothers', 'cook', 'dyslexai', 'grassboyz', 'navixjoel', 'nyxar', 'nyxbar', 'onic', 'piwo', 'ragnarok', 'rnboi', 'tmtas', 'weiboxfut', 'wings'];
 const norm = (s: string) => s.toLowerCase().replace(/\.(png|svg|jpe?g|webp)$/, '').replace(/[^a-z0-9]/g, '');
-const ALIASES: Record<string, string> = { navi: 'NAVI Team', naviteam: 'NAVI Team', natusvincere: 'NAVI Team', navixjoel: 'NAVI Team', fut: 'FUT Esports', weiboxfut: 'FUT Esports', futesports: 'FUT Esports', agg: 'All Gamers Global', ag: 'All Gamers Global', allgamersglobal: 'All Gamers Global' };
+const ALIASES: Record<string, string> = { navi: 'NAVI', naviteam: 'NAVI', natusvincere: 'NAVI', navixjoel: 'NAVI', fut: 'FUT Esports', weiboxfut: 'FUT Esports', futesports: 'FUT Esports', agg: 'All Gamers Global', ag: 'All Gamers Global', allgamersglobal: 'All Gamers Global' };
 
 /** A team from the sheet (tag, name, logo slug) → its Overdrive identity (Major name + logo) when we know it. */
 export function resolveTeam(t: { name?: string; tag?: string; roster?: string; logo?: string }): TrackTeam {
