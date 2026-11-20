@@ -176,11 +176,16 @@ function toMajor(s: Show): Show {
   return s;
 }
 
+/** Old → new team display names, applied to the saved state on load. */
+export const TEAM_RENAMES: Record<string, string> = { 'Natus Vincere': 'NAVI Team' };
+export const renameTeams = (json: string) => Object.entries(TEAM_RENAMES).reduce((t, [a, b]) => t.split(JSON.stringify(a)).join(JSON.stringify(b)), json);
+
 function load(): Persisted {
   fs.mkdirSync(config.dataDir, { recursive: true });
   const base = fresh();
   try {
-    const raw = JSON.parse(fs.readFileSync(FILE(), 'utf8'));
+    // Team renames: every saved reference (bracket seeds, picks, intro, staff/community picks…) follows.
+    const raw = JSON.parse(renameTeams(fs.readFileSync(FILE(), 'utf8')));
     const major = raw.wildcard?.bracket !== WC_BRACKET; // first start after the switch to the Major
     const scoresOff = (raw.ui ?? 0) < 2; // first start after "scoreboards off by default"
     const off = (s: Show) => { if (scoresOff) { s.showScoreboard = false; s.showMatchupOnScreens = false; s.showMatchupOnCasters = false; s.nextMatch = { ...s.nextMatch, enabled: false }; } return s; };

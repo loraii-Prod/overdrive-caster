@@ -22,7 +22,7 @@ export const SEASON: Record<string, SeasonLine> = {
   Airwalkers: { split1: '', split2: 'Div 1 · 3rd', wildcards: '', road: 'Split 2 Division 1 · 3rd' },
   COOK: { split1: 'Div 1 · 5th in the league (4–4)', split2: 'Div 1 · 4th', wildcards: '', road: 'Split 2 Division 1 · 4th' },
   Ragnarok: { split1: 'Barrage vs NAVI', split2: '', wildcards: 'Qualified · 1st–2nd', road: 'Through the Wildcards (1st–2nd)' },
-  'Natus Vincere': { split1: 'Div 1 · 9th (2–7) · barrage vs Ragnarok', split2: 'Div 2 · Champions', wildcards: 'Qualified · 3–0, 3–0, 3–0', road: 'Wildcards: 3–0 TMTAS, 3–0 Brothers, 3–0 ONIC' },
+  'NAVI Team': { split1: 'Div 1 · 9th (2–7) · barrage vs Ragnarok', split2: 'Div 2 · Champions', wildcards: 'Qualified · 3–0, 3–0, 3–0', road: 'Wildcards: 3–0 TMTAS, 3–0 Brothers, 3–0 ONIC' },
   rnboi: { split1: '', split2: '', wildcards: 'Qualified · 3rd–4th', road: 'Through the Wildcards (3rd–4th)' },
   'All Gamers Global': { split1: 'Div 1 · 3rd in the league (8–1)', split2: '', wildcards: 'Qualified · 3rd–4th', road: 'Through the Wildcards (3rd–4th)' },
 };

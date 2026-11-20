@@ -16,6 +16,7 @@ import { showcaseList } from '../../components/wildcard/Profiles';
 import { seasonOf } from '../../../shared/season';
 import { MAJOR_MAPS, mapPhoto } from '../../../shared/maps';
 import { pickemTable } from '../../../shared/wildcard';
+import { resolveTeam } from '../../../shared/trackProgress';
 import { PbEditor, VetoControls } from './Talent';
 import { MapArt } from '../../components/wildcard/MapArt';
 
@@ -63,6 +64,28 @@ const PLACES: { k: keyof WcOpts; label: string; hint: string }[] = [
   { k: 'inWarmup', label: 'Player / team card: Major showcase', hint: 'Full-screen player and team cards instead of the player cams' },
 ];
 
+/**
+ * Seeding from the Google Sheet's Major bracket tab (first-round slots, in bracket order). Only names that
+ * match a Major team are filled in; any other name is listed and its slot is left as it is, to pick by hand.
+ */
+function SheetSeeding({ sheet, teams, onApply }: { sheet: SheetState | undefined; teams: string[]; onApply: (t: string[]) => void }) {
+  const r1 = [1, 2, 3, 4].map(n => sheet?.matches.find(m => m.bracket === `R1_UB${n}`));
+  if (!sheet?.id || !r1.some(Boolean)) return null;
+  const names = r1.flatMap(m => [m?.t1.name ?? '', m?.t2.name ?? '']);
+  const known = new Set(MAJOR_TEAMS.map(t => t.name));
+  const res = names.map(n => { const t = n && n !== 'TBD' ? resolveTeam({ name: n }).name : ''; return known.has(t) ? t : ''; });
+  const next = teams.slice(0, 8).concat(Array(8).fill('')).slice(0, 8).map((cur, i) => res[i] || cur);
+  const missing = names.filter((n, i) => n && n !== 'TBD' && !res[i]);
+  const same = next.every((t, i) => t === (teams[i] ?? ''));
+  return (
+    <div className="mb-2.5 flex flex-wrap items-center gap-2 text-[12px]">
+      <button type="button" className="btn-sm" disabled={same} onClick={() => onApply(next)}>Seed from Google Sheet</button>
+      <span className="text-white/50">Sheet order: {names.map((n, i) => <span key={i} className={res[i] ? '' : 'text-amber-300/85'}>{n || 'TBD'}{i < 7 ? (i % 2 ? ' · ' : ' v ') : ''}</span>)}</span>
+      {missing.length > 0 && <span className="text-amber-300/85">Not matched to a Major team (pick by hand): {missing.join(', ')}</span>}
+    </div>
+  );
+}
+
 function Inner({ state: s, send, quick, live, now, sheet, origin, keyQ, outputs, onOpenSheet, casters = [] }: Parameters<typeof WildcardPanel>[0] & { state: WildcardState }) {
   const [edit, setEdit] = useState<1 | 2>(s.air);
   const [restore, setRestore] = useState('');
@@ -87,6 +110,7 @@ function Inner({ state: s, send, quick, live, now, sheet, origin, keyQ, outputs,
   return (
     <>
       <Card title="First round" note="Pick the 8 teams in bracket order · the rest of the bracket fills in from the scores">
+        <SheetSeeding sheet={sheet} teams={s.teams} onApply={t => op({ k: 'teams', teams: t })} />
         <div className="grid gap-2.5" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(330px, 1fr))' }}>
           {[0, 1, 2, 3].map(m => (
             <div key={m} className="rounded-md border border-white/[0.07] bg-black/20 p-2.5">

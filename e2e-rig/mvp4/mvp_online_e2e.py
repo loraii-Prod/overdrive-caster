@@ -27,7 +27,7 @@ def vote(op, poll, player):
     except urllib.error.HTTPError as e: return json.loads(e.read())
 def pub(): return get(f'{V}/v1/state')
 
-TEAMS = ['BIG', 'FUT Esports', 'Airwalkers', 'COOK', 'Ragnarok', 'Natus Vincere', 'rnboi', 'All Gamers Global']
+TEAMS = ['BIG', 'FUT Esports', 'Airwalkers', 'COOK', 'Ragnarok', 'NAVI Team', 'rnboi', 'All Gamers Global']
 
 async def main():
     async with async_playwright() as p:
@@ -103,7 +103,7 @@ async def main():
         check('leave rehearsal → online counting again, real votes intact', not s['rehearsal'] and s['mode'] == 'online' and any(x.startswith('R1_UB1:revealed') for x in s['polls']), [s['mode'], s['polls']])
 
         # ---- a team only known from this event's roster: the online service would refuse it → clear guidance
-        probe([wc({'k': 'teams', 'teams': ['BIG', 'FUT Esports', 'Airwalkers', 'COOK', 'Mystery Five', 'Natus Vincere', 'rnboi', 'All Gamers Global']}), wc({'k': 'roster', 'team': 'Mystery Five', 'players': ['Alpha5', 'Beta5']})])
+        probe([wc({'k': 'teams', 'teams': ['BIG', 'FUT Esports', 'Airwalkers', 'COOK', 'Mystery Five', 'NAVI Team', 'rnboi', 'All Gamers Global']}), wc({'k': 'roster', 'team': 'Mystery Five', 'players': ['Alpha5', 'Beta5']})])
         await pr.click('[data-main-scene="analyst-desk"]'); await pr.wait_for_timeout(300); await pr.click('[data-transport-cut]'); await pr.wait_for_timeout(1000)  # MVP off air
         probe(score('R1_UB3', 3, 0) + [{'wait': 1500}])
         s = probe()

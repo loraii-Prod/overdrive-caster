@@ -16,7 +16,7 @@ check('flat: track name → Overdrive map (czech), picked by, threshold', flat.m
 check('flat: "Weibo x FUT" + WeiboxFUT.png → our FUT Esports (logo weiboxfut)', flat.teamB.name === 'FUT Esports' && flat.teamB.logo === 'weiboxfut' && flat.teamA.name === 'BIG' && flat.teamA.logo === 'big', [flat.teamA, flat.teamB]);
 check('flat: fastest lap read', flat.fastest?.player === 'Heav' && flat.fastest.timeMs === 38104 && flat.fastest.round === '4');
 const ctl = parseTrackRows(fx('out_track_progression.csv'));
-check('Control tab: "NaVi x Joel" → Natus Vincere; Nyxar Competitive keeps its name + nyxar logo', ctl.teamA.name === 'Natus Vincere' && ctl.teamA.logo === 'navixjoel' && ctl.teamB.name === 'Nyxar Competitive' && ctl.teamB.logo === 'nyxar', [ctl.teamA, ctl.teamB]);
+check('Control tab: "NaVi x Joel" → NAVI Team; Nyxar Competitive keeps its name + nyxar logo', ctl.teamA.name === 'NAVI Team' && ctl.teamA.logo === 'navixjoel' && ctl.teamB.name === 'Nyxar Competitive' && ctl.teamB.logo === 'nyxar', [ctl.teamA, ctl.teamB]);
 check('Control tab: roster from the sheet kept', ctl.teamB.roster === 'Alpha & Beta');
 check('a tab that is not a round table is refused (gviz answers a missing tab with the first tab)', (() => { try { parseTrackRows([['team_id', 'name'], ['big', 'BIG']]); return false; } catch (e: any) { return /Not a round table/.test(e.message); } })());
 check('header only → clear error', (() => { try { parseTrackRows([fx('db_rounds_flat.csv')[0]]); return false; } catch (e: any) { return /No round rows|empty/.test(e.message); } })());
@@ -49,7 +49,7 @@ check('custom takeaway wins over the automatic one', trackStory({ ...flat, narra
 check('lap time format', lapTime(38104) === '38.104' && lapTime(81005) === '1:21.005');
 
 // ---------------------------------------------------------------- Overdrive teams and maps
-check('team aliases: NAVI / AG / FUT', resolveTeam({ tag: 'NAVI' }).name === 'Natus Vincere' && resolveTeam({ name: 'AG' }).name === 'All Gamers Global' && resolveTeam({ name: 'fut' }).name === 'FUT Esports');
+check('team aliases: NAVI / AG / FUT', resolveTeam({ tag: 'NAVI' }).name === 'NAVI Team' && resolveTeam({ name: 'AG' }).name === 'All Gamers Global' && resolveTeam({ name: 'fut' }).name === 'FUT Esports');
 check('unknown team: own name, no logo (tag badge drawn)', (() => { const t = resolveTeam({ tag: 'ZZZ', name: 'Zed Team' }); return t.name === 'Zed Team' && t.logo === '' && t.tag === 'ZZZ'; })());
 check('Major team without roster in the sheet: roster from the verified profiles', resolveTeam({ name: 'BIG' }).roster.includes('&'));
 check('map names → ids', resolveMapId('OverDrive United Kingdom 2026') === 'uk' && resolveMapId('New Zealand') === 'nz' && resolveMapId('india') === 'india' && resolveMapId('Alpine Valley') === '');

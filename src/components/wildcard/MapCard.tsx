@@ -3,6 +3,7 @@ import { MAP_CARD_MS, majorMap, mapPhoto } from '../../../shared/maps';
 import type { WildcardState } from '../../../shared/wildcard';
 import { wcLogo } from '../../../shared/wildcard';
 import { MapArt } from './MapArt';
+import { MapFlag } from '../MapFlag';
 import './wildcard.css';
 
 /**
@@ -27,7 +28,7 @@ export function WcMapCard({ wc, show, now }: { wc: WildcardState; show: Show; no
         <div className="mc-art">{photo ? <img src={photo} alt="" /> : <MapArt id={m.id} />}</div>
         <div className="mc-panel">
           <div className="mc-k">Map {show.game}{show.bestOf ? <span> · Best of {show.bestOf}</span> : null}</div>
-          <div className="mc-flag">{m.flag.map((c, i) => <i key={i} style={{ background: c }} />)}</div>
+          <div className="mc-flag"><MapFlag id={m.id} h={56} /></div>
           <h2>{m.country}</h2>
           <div className="mc-t">{m.title}</div>
           <div className="mc-a">by {m.author}</div>

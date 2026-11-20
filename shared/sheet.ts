@@ -107,6 +107,51 @@ export function parseEventTab(rows: string[][]) {
   return { teams, players, matches };
 }
 
+/**
+ * Major bracket tab ("26S3 Major" layout): one row per team slot, header row with
+ * match · helper · bracket · round · position · condition · origin · match_id · datetime · round_seed · team · score.
+ * The sheet's codes differ from the app's Major ids; same 8-team double elimination, mapped 1:1:
+ */
+export const SHEET_MAJOR_IDS: Record<string, string> = {
+  R1_UB1: 'R1_UB1', R1_UB2: 'R1_UB2', R1_UB3: 'R1_UB3', R1_UB4: 'R1_UB4',
+  R2_UB1: 'R2_UB1', R2_UB2: 'R2_UB2', R3_UBF: 'R3_UB1',
+  R2_LB1: 'R1_LB1', R2_LB2: 'R1_LB2', R3_LB1: 'R2_LB1', R3_LB2: 'R2_LB2',
+  R4_LBF: 'R3_LB1', R5_CF: 'R4_LB1', R6_GF: 'R5_GF1',
+};
+/** "TEAM_0001 | BIG" → { id, name }; a placeholder like "W R1_UB1" → TBD (the app resolves it from results). */
+function slotTeam(cell: string): { id: string; name: string } {
+  const c = cell.trim();
+  const m = /^(TEAM_\w+)\s*\|\s*(.+)$/.exec(c);
+  if (m) return { id: m[1], name: m[2].trim() };
+  if (/^[WL]\s+R\d+_\w+$/.test(c)) return { id: c, name: slotLabel(c) };
+  return { id: c, name: c || 'TBD' };
+}
+export function parseMajorBracketTab(rows: string[][]): { teams: SheetTeam[]; matches: SheetMatch[] } | null {
+  const hi = rows.slice(0, 12).findIndex(r => { const h = r.map(x => x.trim().toLowerCase()); return h.includes('match_id') && h.includes('helper') && h.includes('team') && h.includes('position'); });
+  if (hi < 0) return null;
+  const h = rows[hi].map(x => x.trim().toLowerCase()), col = (n: string) => h.indexOf(n);
+  const C = { match: col('match'), side: col('bracket'), round: col('round'), pos: col('position'), id: col('match_id'), when: col('datetime'), seed: col('round_seed'), team: col('team'), score: col('score') };
+  if (C.match < 0 || C.id < 0 || C.team < 0 || C.pos < 0) return null;
+  const by = new Map<string, SheetMatch>(), teams: SheetTeam[] = [];
+  for (const r of rows.slice(hi + 1)) {
+    const g = (i: number) => (i >= 0 ? (r[i] ?? '').trim() : '');
+    const code = g(C.match), app = SHEET_MAJOR_IDS[code];
+    if (!app) continue;
+    const pos = g(C.pos) === '2' ? 2 : 1, t = slotTeam(g(C.team)), sc = /^\d+$/.test(g(C.score)) ? g(C.score) : '';
+    const when = g(C.when), at = parseSheetDate(when);
+    const side = g(C.side) === 'losers' || g(C.side) === 'grandfinal' ? g(C.side) as SheetMatch['side'] : 'winners';
+    const m = by.get(app) ?? { id: g(C.id) || app, bracket: app, side, round: Number(g(C.round)) || 1, at, time: sheetTimeLabel(at), when,
+      t1: { id: '', name: 'TBD' }, t2: { id: '', name: 'TBD' }, status: '', bo: 0, s1: '', s2: '', winner: '' };
+    if (pos === 1) { m.t1 = t; m.s1 = sc; } else { m.t2 = t; m.s2 = sc; }
+    if (side === 'grandfinal') m.side = 'grandfinal';
+    by.set(app, m);
+    if (/^R1_UB\d$/.test(code) && /^TEAM_/.test(t.id) && !teams.some(x => x.id === t.id)) teams.push({ id: t.id, name: t.name, seed: Number(g(C.seed)) || teams.length + 1, players: [], logo: '' });
+  }
+  if (!by.size) return null;
+  for (const m of by.values()) if (m.s1 && m.s2 && m.s1 !== m.s2 && (+m.s1 > 0 || +m.s2 > 0)) m.status = 'scored';
+  return { teams, matches: [...by.values()] };
+}
+
 /** Logos tab: team_id + logo_url_git (or logo) columns. */
 export function parseLogos(rows: string[][]): Record<string, string> {
   const h = rows[0] ?? [];

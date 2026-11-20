@@ -274,7 +274,7 @@ for r in s1_rosters:
 major_ts = open(os.path.join(ROOT, 'shared', 'major.ts'), encoding='utf-8').read()
 major_list = re.findall(r"\{ name: '([^']+)', how: '[^']*', logo: '([^']+)' \}", major_ts)
 # display names used by Overdrive's Major list → team ids, with the evidence in the repo (shared/season.ts) or an exact name
-MAJOR_ALIAS = {'FUT Esports': ('TEAM_0004', 'shared/season.ts: Split 2 "Runner-up (Weibo x FUT)"'), 'Natus Vincere': ('TEAM_0006', 'shared/season.ts: Split 2 "Div 2 · Champions" = NAVI x Joel in the site standings'),
+MAJOR_ALIAS = {'FUT Esports': ('TEAM_0004', 'shared/season.ts: Split 2 "Runner-up (Weibo x FUT)"'), 'NAVI Team': ('TEAM_0006', 'shared/season.ts: Split 2 "Div 2 · Champions" = NAVI x Joel in the site standings'),
                'All Gamers Global': ('TEAM_0002', 'shared/season.ts: Split 1 "Div 1 · 3rd (8–1)" = All Gamers in the site standings')}
 logo_map, major_links = {}, {}
 for disp, logo in major_list:

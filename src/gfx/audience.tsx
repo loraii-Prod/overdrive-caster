@@ -21,7 +21,7 @@ type Cfg = GfxInstance['config'];
 type R = (p: { cfg: Cfg; d: GfxData }) => ReactNode;
 
 const Logo = ({ team, size }: { team: string; size: number }) => { const s = teamLogo(team); return s ? <img className="logo" src={s} alt="" style={{ width: size, height: size }} /> : null; };
-const short = (t: string) => (t === 'FUT Esports' ? 'FUT' : t === 'Natus Vincere' ? 'NAVI' : t === 'All Gamers Global' ? 'AG' : t);
+const short = (t: string) => (t === 'FUT Esports' ? 'FUT' : t === 'NAVI Team' ? 'NAVI' : t === 'All Gamers Global' ? 'AG' : t);
 
 /** The graphic's match: its own setting, else the cast match. `own` (3.0 MVP): its own setting only. */
 function matchOf(cfg: Cfg, d: GfxData, own = false) {

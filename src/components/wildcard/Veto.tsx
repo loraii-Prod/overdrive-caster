@@ -7,6 +7,7 @@ import type { MajorMap } from '../../../shared/maps';
 import { Reveal } from '../Reveal';
 import { PB_SOURCE, seedTeamPb, teamPlayerPbs } from '../../../shared/pbs';
 import { MapArt } from './MapArt';
+import { MapFlag } from '../MapFlag';
 import './wildcard.css';
 
 const EASE = [0.22, 1, 0.36, 1] as const;
@@ -49,7 +50,7 @@ export function WcVeto({ wc, show, now }: { wc: WildcardState; show: Show; now: 
               <motion.div key={m.id} className={`vt-card ${kind}`} style={{ ['--mc' as string]: m.accent }}
                 initial={{ opacity: 0, y: 40 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, ease: EASE, delay: 0.08 * i }}>
                 <div className="vt-art">{photo ? <img src={photo} alt="" /> : <MapArt id={m.id} />}</div>
-                <div className="vt-name"><span>{m.title.replace(/^OverDrive |\s2026$/g, '')}</span><small>by {m.author}</small></div>
+                <div className="vt-name"><MapFlag id={m.id} h={22} className="vt-flag" /><span>{m.title.replace(/^OverDrive |\s2026$/g, '')}</span><small>by {m.author}</small></div>
                 {r && (
                   <motion.div key={`${m.id}-${r.n}`} className="vt-stamp"
                     initial={fresh && last === m.id ? { opacity: 0, scale: 1.6, rotate: -8 } : false} animate={{ opacity: 1, scale: 1, rotate: kind === 'ban' ? -8 : 0 }} transition={{ duration: 0.45, ease: EASE }}>
@@ -74,7 +75,7 @@ export function WcVeto({ wc, show, now }: { wc: WildcardState; show: Show; now: 
             const d = v.done[i], m = d ? MAJOR_MAPS.find(x => x.id === d) : null;
             return (
               <div key={i} className={`vt-step ${st.act}${d ? ' done' : ''}${i === v.done.length ? ' now' : ''}`}>
-                <i>{i + 1}</i><span>{who(st.by)} {st.by === 'd' ? '' : st.act}</span><b>{m ? m.country : '—'}</b>
+                <i>{i + 1}</i><span>{who(st.by)} {st.by === 'd' ? '' : st.act}</span><b>{m ? <><MapFlag id={m.id} h={16} className="vt-flag-s" />{m.country}</> : '—'}</b>
               </div>
             );
           })}
@@ -105,7 +106,7 @@ function PbCompare({ map, a, b, wc, mapNo }: { map: MajorMap; a: string; b: stri
       <div className="pb-art"><img src={mapPhoto(map.id, wc.mapPhotos)} alt="" /></div>
       <div className="pb-body">
         <div className="pb-k">Personal bests{mapNo ? ` · Map ${mapNo}` : ''}</div>
-        <h2>{map.country}</h2>
+        <h2><MapFlag id={map.id} h={44} className="pb-flag" />{map.country}</h2>
         <div className="pb-src">Leaderboard: {PB_SOURCE}</div>
         {[a, b].map((t, i) => {
           const pb = pbs[t], logo = teamLogo(t);

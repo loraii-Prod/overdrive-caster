@@ -651,7 +651,7 @@
 .wc .mc-k{font-family:'WC Montserrat',sans-serif;font-weight:800;font-style:italic;font-size:30px;letter-spacing:.12em;text-transform:uppercase;color:var(--mc)}
 .wc .mc-k span{color:rgba(255,255,255,.45);font-size:22px;letter-spacing:.08em}
 .wc .mc-flag{display:flex;gap:6px;margin:22px 0 18px}
-.wc .mc-flag i{width:70px;height:12px;display:block;box-shadow:0 0 0 1px rgba(255,255,255,.12)}
+.wc .mc-flag svg{display:block}
 .wc .mc h2{margin:0;font-family:'WC Anton',sans-serif;font-weight:400;font-size:128px;line-height:.95;text-transform:uppercase;color:#fff;letter-spacing:.5px}
 .wc .mc-t{margin-top:26px;font-family:'WC Montserrat',sans-serif;font-weight:800;font-style:italic;font-size:30px;color:#fff}
 .wc .mc-a{margin-top:6px;font-family:'WC Montserrat',sans-serif;font-weight:600;font-size:22px;color:rgba(255,255,255,.55)}
@@ -811,3 +811,8 @@
 .wc .match.done .row.win{box-shadow:inset 4px 0 0 var(--hot)}
 .wc .wc-page{contain:layout paint}
 @media (prefers-reduced-motion: reduce){.wc .stage.frame .hdr h1.t-out{display:none}.wc .stage.frame .hdr h1.t-in{animation:none}}
+
+/* map flags (MapFlag): same drawing on the map card, veto, PB card and track graphic */
+.wc .vt-name .vt-flag{display:block;margin-bottom:6px}
+.wc .vt-step b .vt-flag-s{margin-right:8px;vertical-align:-2px}
+.wc .pb-body h2 .pb-flag{margin-right:16px;vertical-align:middle;position:relative;top:-4px}

@@ -1,5 +1,5 @@
 import { db, save } from './store';
-import { parseCsv, parseEventTab, parseLogos, type SheetMatch } from '../shared/sheet';
+import { parseCsv, parseEventTab, parseLogos, parseMajorBracketTab, type SheetMatch } from '../shared/sheet';
 import { ensureStreamIds, normName } from '../shared/players';
 
 const BASE = 'https://docs.google.com/spreadsheets/d/';
@@ -30,8 +30,11 @@ export async function syncSheet(): Promise<void> {
   if (!sh.id) return;
   try {
     const csv = await get(sh.pub ? `${BASE}e/${sh.id}/pub?gid=${sh.gid || '0'}&single=true&output=csv` : `${BASE}${sh.id}/export?format=csv&gid=${sh.gid || '0'}`);
-    const data = parseEventTab(parseCsv(csv));
-    if (!data.matches.length && !data.teams.length) throw new Error('No team_id / match_id columns found in that tab.');
+    const rows = parseCsv(csv);
+    let data = parseEventTab(rows);
+    // Not an event data tab: the Major bracket tab itself ("26S3 Major": match / helper / … / team / score).
+    if (!data.matches.length && !data.teams.length) { const b = parseMajorBracketTab(rows); if (b) data = { ...b, players: [] }; }
+    if (!data.matches.length && !data.teams.length) throw new Error('No team_id / match_id columns (or Major bracket table) found in that tab.');
     let logos: Record<string, string> = {};
     if (!sh.pub) try { logos = parseLogos(parseCsv(await get(`${BASE}${sh.id}/gviz/tq?tqx=out:csv&sheet=logos`))); } catch { /* optional tab */ }
     sh.teams = data.teams.map(t => ({ ...t, logo: logos[t.id] ?? '' }));

@@ -129,7 +129,7 @@ async def main():
         voters = [Viewer(f'v{i:03d}') for i in range(60)]
         plan = [('BIG', '3-1')] * 25 + [('BIG', '3-0')] * 10 + [('FUT Esports', '3-2')] * 15 + [('FUT Esports', '')] * 10
         for v, (t, sc) in zip(voters, plan): v.post('/v1/pick', {'match': 'R1_UB1', 'team': t, 'score': sc})
-        for v in voters[:40]: v.post('/v1/champion', {'team': 'BIG' if int(v.name[1:]) % 3 else 'Natus Vincere'})
+        for v in voters[:40]: v.post('/v1/champion', {'team': 'BIG' if int(v.name[1:]) % 3 else 'NAVI Team'})
         check('3 60 viewers + the phone = 61 picks stored', sql("select count(*) from picks where match='R1_UB1'") == '61')
 
         # invalid votes
@@ -153,7 +153,7 @@ async def main():
         # simultaneous voters
         crowd = [Viewer(f'c{i:03d}') for i in range(200)]
         t0 = time.time()
-        with ThreadPoolExecutor(50) as ex: res = list(ex.map(lambda v: v.post('/v1/pick', {'match': 'R1_UB3', 'team': 'Ragnarok' if int(v.name[1:]) % 4 else 'Natus Vincere', 'score': ''})[0], crowd))
+        with ThreadPoolExecutor(50) as ex: res = list(ex.map(lambda v: v.post('/v1/pick', {'match': 'R1_UB3', 'team': 'Ragnarok' if int(v.name[1:]) % 4 else 'NAVI Team', 'score': ''})[0], crowd))
         dt = time.time() - t0
         check('simultaneous: 200 voters at once, every vote accepted', res.count(200) == 200, {c: res.count(c) for c in set(res)})
         check('simultaneous: …and every vote counted exactly once', sql("select count(*) from picks where match='R1_UB3'") == '200')

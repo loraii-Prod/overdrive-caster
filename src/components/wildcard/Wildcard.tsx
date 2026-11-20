@@ -76,7 +76,11 @@ export function WcStage({ wc, part, enter = false, pin, frame = true }: { wc: Wi
       style={vars({ '--box': box, '--box-dim': box })}>
       {frame && <><div className="hdr"><h1>{P.title}</h1></div><div className="dash" /></>}
       {o.lines && <Lines part={part} R={R} />}
-      {P.cols.map((col, ci) => <div key={col.name} data-c={ci} className="colh" style={{ left: col.x, top: Math.min(...col.ids.map(id => pos[id].y)) - 40, width: col.w }}>{col.name}</div>)}
+      {P.cols.map((col, ci) => {
+        // Per-match start times sit just above each card: lift the round name clear of them.
+        const own = !colTime(wc, col.ids) && col.ids.some(id => wc.matches[id].time);
+        return <div key={col.name} data-c={ci} className="colh" style={{ left: col.x, top: Math.min(...col.ids.map(id => pos[id].y)) - (own ? 66 : 40), width: col.w }}>{col.name}</div>;
+      })}
       {Object.entries(pos).map(([id, p]) => {
         const st = wc.matches[id], r = R[id], col = P.cols[p.c];
         const live = st.live && !r.winner, onCast = cast === id;

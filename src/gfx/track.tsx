@@ -10,6 +10,7 @@
 import type { ReactNode } from 'react';
 import type { GfxInstance } from '../../shared/gfx';
 import { majorMap, mapPhoto } from '../../shared/maps';
+import { MapFlag } from '../components/MapFlag';
 import { lapTime, teamLogoUrl, trackStory, type TrackMapData, type TrackStory, type TrackTeam } from '../../shared/trackProgress';
 import { BgVideo } from '../components/Brand';
 import type { GfxData } from './Graphic';
@@ -39,8 +40,8 @@ export function TrackProgression({ cfg, d }: { cfg: Cfg; d: GfxData }) {
       <header className="trk-head">
         <div className="trk-map">
           {photo && <div className="trk-shot" style={{ backgroundImage: `url(${photo})` }} />}
-          {map && <div className="trk-flag">{map.flag.map((c, i) => <i key={i} style={{ background: c }} />)}</div>}
           <div className="trk-map-txt">
+            {map && <MapFlag id={map.id} h={30} className="trk-flag" />}
             <div className="kick" data-track-kicker>{[data.mapNumber ? `Track ${data.mapNumber}` : '', data.pickedBy].filter(Boolean).join(' · ') || 'Track'}</div>
             <div className="trk-title" style={{ fontSize: fitTitle(map?.country ?? data.track) }}>{map?.country ?? data.track}</div>
             {map && <div className="trk-sub">{map.title}</div>}
