@@ -189,16 +189,19 @@ export function sanitizeIntro(v: any): WcIntro {
 export type WcDeskPanel = 'cams' | 'picks' | 'h2h' | 'player' | 'pickem';
 export const DESK_PANELS: WcDeskPanel[] = ['cams', 'picks', 'h2h', 'player', 'pickem'];
 
-export const defaultShowcase = (): WcShowcase => ({ photos: {}, team: '', seconds: 12, pin: null, frames: {} });
+/** Built-in player photos (public/brand/overdrive/players/<handle>.jpg), used until a photo is uploaded. */
+export const BUILTIN_PHOTOS = ['massa', 'granady', 'heav', 'nayko', 'whizzy', 'stufts', 'l1ngo', 'scrapie', 'melioo', 'epos', 'mime', 'elconn21', 'nabla', 'walegen', 'gwen', 'binkss'];
+const builtinPhotos = () => Object.fromEntries(BUILTIN_PHOTOS.map(k => [k, `/brand/overdrive/players/${k}.jpg`]));
+export const defaultShowcase = (): WcShowcase => ({ photos: builtinPhotos(), team: '', seconds: 12, pin: null, frames: {} });
 export function sanitizeShowcase(v: any): WcShowcase {
   const d = defaultShowcase();
   if (!v || typeof v !== 'object') return d;
   const photos: Record<string, string> = {};
   if (v.photos && typeof v.photos === 'object') for (const [k, u] of Object.entries(v.photos)) {
-    if (typeof u === 'string' && /^(\/uploads\/[\w.-]+|https:\/\/\S+)$/.test(u) && u.length < 400) photos[String(k).toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 40)] = u;
+    if (typeof u === 'string' && /^(\/uploads\/[\w.-]+|\/brand\/overdrive\/players\/[\w.-]+|https:\/\/\S+)$/.test(u) && u.length < 400) photos[String(k).toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 40)] = u;
   }
   return {
-    photos,
+    photos: { ...builtinPhotos(), ...photos }, // an uploaded photo replaces the built-in one
     team: typeof v.team === 'string' ? v.team.slice(0, 60) : '',
     seconds: Math.max(5, Math.min(120, Math.round(Number(v.seconds) || d.seconds))),
     pin: typeof v.pin === 'string' && v.pin ? v.pin.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 40) : null,
