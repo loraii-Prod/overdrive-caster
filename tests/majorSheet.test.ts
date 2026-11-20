@@ -5,7 +5,10 @@ import { defaultWildcard, mergeSheet, wcResolve, WC_IDS, WC_STRUCT } from '../sh
 import { resolveTeam } from '../shared/trackProgress';
 let ok = 0, bad = 0;
 const check = (n: string, c: boolean, x = '') => { c ? ok++ : bad++; console.log((c ? 'PASS ' : 'FAIL ') + n + (x ? '  ' + x : '')); };
-const rows = parseCsv(readFileSync(new URL('./fixtures/major-bracket-tab.csv', import.meta.url), 'utf8'));
+// The live tab's real layout (20 Nov): codes a column off their heading, split origin, tree cells on the same rows.
+const FIX = process.env.MAJOR_FIXTURE || 'major-bracket-tab-live.csv';
+console.log('fixture:', FIX);
+const rows = parseCsv(readFileSync(new URL('./fixtures/' + FIX, import.meta.url), 'utf8'));
 check('not an event data tab (old parser finds nothing)', parseEventTab(rows).matches.length === 0);
 const b = parseMajorBracketTab(rows)!;
 check('bracket tab detected', !!b);

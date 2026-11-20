@@ -126,26 +126,41 @@ function slotTeam(cell: string): { id: string; name: string } {
   if (/^[WL]\s+R\d+_\w+$/.test(c)) return { id: c, name: slotLabel(c) };
   return { id: c, name: c || 'TBD' };
 }
+/**
+ * Read by content, not by heading position: on the live tab the codes sit a column off their "match"
+ * heading, "origin" is split over two cells and the bracket-tree drawing shares the same rows. Per row:
+ * the sheet code (R1_UB1 … R6_GF), then its slot "<code>_1|_2", then MATCH_…, the date, the round seed,
+ * the team cell ("TEAM_0001 | BIG" or "W R1_UB1") and the score right after it.
+ */
 export function parseMajorBracketTab(rows: string[][]): { teams: SheetTeam[]; matches: SheetMatch[] } | null {
-  const hi = rows.slice(0, 12).findIndex(r => { const h = r.map(x => x.trim().toLowerCase()); return h.includes('match_id') && h.includes('helper') && h.includes('team') && h.includes('position'); });
-  if (hi < 0) return null;
-  const h = rows[hi].map(x => x.trim().toLowerCase()), col = (n: string) => h.indexOf(n);
-  const C = { match: col('match'), side: col('bracket'), round: col('round'), pos: col('position'), id: col('match_id'), when: col('datetime'), seed: col('round_seed'), team: col('team'), score: col('score') };
-  if (C.match < 0 || C.id < 0 || C.team < 0 || C.pos < 0) return null;
   const by = new Map<string, SheetMatch>(), teams: SheetTeam[] = [];
-  for (const r of rows.slice(hi + 1)) {
-    const g = (i: number) => (i >= 0 ? (r[i] ?? '').trim() : '');
-    const code = g(C.match), app = SHEET_MAJOR_IDS[code];
-    if (!app) continue;
-    const pos = g(C.pos) === '2' ? 2 : 1, t = slotTeam(g(C.team)), sc = /^\d+$/.test(g(C.score)) ? g(C.score) : '';
-    const when = g(C.when), at = parseSheetDate(when);
-    const side = g(C.side) === 'losers' || g(C.side) === 'grandfinal' ? g(C.side) as SheetMatch['side'] : 'winners';
-    const m = by.get(app) ?? { id: g(C.id) || app, bracket: app, side, round: Number(g(C.round)) || 1, at, time: sheetTimeLabel(at), when,
+  const isDate = (x: string) => /^\d{1,2}[./]\d{1,2}[./]\d{4}/.test(x);
+  for (const r of rows) {
+    const c = r.map(x => (x ?? '').trim());
+    // the slot cell ("R1_UB1_1") names the match and the position; the bare code must sit just before it
+    const si = c.findIndex(x => { const m = /^(R\d_[A-Z]+\d*)_([12])$/.exec(x); return !!m && !!SHEET_MAJOR_IDS[m[1]]; });
+    if (si < 0) continue;
+    const [, code, posS] = /^(R\d_[A-Z]+\d*)_([12])$/.exec(c[si])!;
+    if (!c.slice(Math.max(0, si - 3), si).includes(code)) continue; // not the bracket table (e.g. a tree label)
+    const app = SHEET_MAJOR_IDS[code], pos = posS === '2' ? 2 : 1;
+    const rest = c.slice(si + 1, si + 16);
+    const sideRaw = rest.find(x => /^(winners|losers|grandfinal)$/i.test(x)) ?? 'winners';
+    const side = (sideRaw.toLowerCase() === 'losers' ? 'losers' : sideRaw.toLowerCase() === 'grandfinal' ? 'grandfinal' : 'winners') as SheetMatch['side'];
+    const mi = rest.findIndex(x => /^MATCH_\w+$/i.test(x)), di = rest.findIndex(x => isDate(x));
+    const when = di >= 0 ? rest[di] : '', at = parseSheetDate(when);
+    // team: first cell after the date (skipping the numeric round seed) that is a team or a W/L placeholder
+    let ti = -1, seed = 0;
+    for (let k = (di >= 0 ? di : mi) + 1; k > 0 && k < rest.length && k < (di >= 0 ? di : mi) + 4; k++) {
+      if (/^\d+$/.test(rest[k]) && ti < 0 && !seed) { seed = Number(rest[k]); continue; }
+      if (rest[k]) { ti = k; break; }
+    }
+    const t = ti >= 0 ? slotTeam(rest[ti]) : { id: '', name: 'TBD' };
+    const sc = ti >= 0 && /^\d+$/.test(rest[ti + 1] ?? '') ? rest[ti + 1] : '';
+    const m = by.get(app) ?? { id: mi >= 0 ? rest[mi] : app, bracket: app, side, round: Number(code[1]) || 1, at, time: sheetTimeLabel(at), when,
       t1: { id: '', name: 'TBD' }, t2: { id: '', name: 'TBD' }, status: '', bo: 0, s1: '', s2: '', winner: '' };
     if (pos === 1) { m.t1 = t; m.s1 = sc; } else { m.t2 = t; m.s2 = sc; }
-    if (side === 'grandfinal') m.side = 'grandfinal';
     by.set(app, m);
-    if (/^R1_UB\d$/.test(code) && /^TEAM_/.test(t.id) && !teams.some(x => x.id === t.id)) teams.push({ id: t.id, name: t.name, seed: Number(g(C.seed)) || teams.length + 1, players: [], logo: '' });
+    if (/^R1_UB\d$/.test(code) && /^TEAM_/.test(t.id) && !teams.some(x => x.id === t.id)) teams.push({ id: t.id, name: t.name, seed: seed || teams.length + 1, players: [], logo: '' });
   }
   if (!by.size) return null;
   for (const m of by.values()) if (m.s1 && m.s2 && m.s1 !== m.s2 && (+m.s1 > 0 || +m.s2 > 0)) m.status = 'scored';
