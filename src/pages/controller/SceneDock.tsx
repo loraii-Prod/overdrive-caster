@@ -9,7 +9,7 @@ import { formatRemaining } from '../../components/show/parts';
 import { MAJOR_PROFILES, introPhase, normHandle } from '../../../shared/major';
 import { BoothPicker, DeskPicker, InterviewControls, PicksInput, VetoControls } from './Talent';
 import { boothIds, deskCasters } from '../../components/wildcard/Desk';
-import { DESK_PANELS, GRAND_FINAL, WC_IDS, vetoRows, type WildcardState, matchName, realTeam, wcResolve, type WcOp } from '../../../shared/wildcard';
+import { DESK_PANELS, GRAND_FINAL, WC_IDS, vetoRows, type WildcardState, matchName, realTeam, wcResolve, type WcOp, vetoMapFor } from '../../../shared/wildcard';
 import type { TwOp } from '../../../shared/twitch';
 import { Segmented } from './ui';
 import { MAJOR_MAPS } from '../../../shared/maps';
@@ -279,6 +279,8 @@ export function SceneDock({ live, preview, show, wc, now, send, quick, twConnect
           {match}{score}
           {s && (
             <Group label="Next map (plays the map card)">
+              {(() => { const id = vetoMapFor(s, show.game || 1), mp = MAJOR_MAPS.find(x => x.id === id); return mp
+                ? <Big primary onClick={() => op({ k: 'map-next' })} title="The map the veto set for this game">From veto: Map {show.game || 1} · {mp.country}</Big> : null; })()}
               {vetoOrdered(s).map(({ m, no, ban }) => <Big key={m.id} active={s.map.id === m.id} onClick={() => op({ k: 'map', id: m.id })} title={ban ? 'Banned in the veto' : ''}>{no ? `${no}. ` : ''}{m.country}{ban ? <span className="ml-1 text-[11px] text-white/35">ban</span> : null}</Big>)}
             </Group>
           )}

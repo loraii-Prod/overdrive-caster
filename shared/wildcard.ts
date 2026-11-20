@@ -478,6 +478,8 @@ export type WcOp =
   | { k: 'pickem-reset' }
   | { k: 'teams'; teams: string[] }
   | { k: 'map'; id: string | null }
+  /** Map card for the series' current map as the veto ordered it (map 1, 2, … from the score). */
+  | { k: 'map-next' }
   | { k: 'map-photo'; id: string; url: string | null }
   | { k: 'desk'; panel?: WcDeskPanel; player?: string | null; slots?: number[]; guest?: number | null; strip?: boolean; clock?: boolean }
   /** 3.0: this event's players of a team (empty list = back to the verified profiles). */
@@ -728,6 +730,16 @@ export function vetoApply(v: WcVeto, map: string, now: number): WcVeto {
 
 export interface VetoRow { map: string; step: VetoStep; n: number; mapNo: number | null }
 /** Called steps with their play order ("Map 2") for picks and the decider. */
+/** The veto's word on one map: its map number, who picked it (or decider), or banned. null = not in the veto yet. */
+export function vetoInfo(wc: WildcardState, mapId: string | null | undefined): { mapNo: number | null; ban: boolean; by: string; decider: boolean } | null {
+  const r = vetoRows(wc.veto).find(x => x.map === mapId);
+  if (!r) return null;
+  const decider = r.step.by === 'd';
+  return { mapNo: r.mapNo, ban: r.step.act === 'ban', decider, by: decider ? '' : (r.step.by === 'a' ? wc.intro.a : wc.intro.b) || '' };
+}
+/** The veto's map for series map number `n` (1-based), if the veto has got that far. */
+export const vetoMapFor = (wc: WildcardState, n: number) => vetoRows(wc.veto).find(r => r.mapNo === n)?.map ?? null;
+
 export function vetoRows(v: WcVeto): VetoRow[] {
   let k = 0;
   return v.done.map((map, i) => ({ map, step: v.order[i], n: i + 1, mapNo: v.order[i].act === 'pick' ? ++k : null }));

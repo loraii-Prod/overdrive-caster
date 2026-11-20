@@ -106,7 +106,7 @@ const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b)
 export type Ack = { ok: true; version: number; note?: string } | { ok: false; version: number; error: string };
 
 /** Existing Major ops the console may send through the engine (setup/destructive ones stay in the Controller). */
-const WC_OPS = new Set(['score', 'wo', 'clear', 'live', 'time', 'air', 'cue', 'take', 'page-reset', 'opts', 'cast', 'showcase', 'photo', 'photo-frame', 'intro', 'pick', 'champ', 'interview', 'veto', 'pb', 'pb-show', 'veto-undo', 'veto-reset', 'veto-order', 'pickem-reset', 'map', 'intro-play', 'intro-stop', 'replay', 'desk']);
+const WC_OPS = new Set(['score', 'wo', 'clear', 'live', 'time', 'air', 'cue', 'take', 'page-reset', 'map-next', 'opts', 'cast', 'showcase', 'photo', 'photo-frame', 'intro', 'pick', 'champ', 'interview', 'veto', 'pb', 'pb-show', 'veto-undo', 'veto-reset', 'veto-order', 'pickem-reset', 'map', 'intro-play', 'intro-stop', 'replay', 'desk']);
 const QUICK_OPS = new Set(['score', 'swap', 'reset-scores', 'game', 'timer-start', 'timer-add', 'timer-until', 'timer-stop', 'spotlight', 'spotlight-hide', 'active-player', 'music', 'next-match', 'matchup-casters', 'flag']);
 
 export function createEngine(d: EngineDeps) {

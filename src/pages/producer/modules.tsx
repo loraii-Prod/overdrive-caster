@@ -9,7 +9,7 @@ import { MapFlag } from '../../components/MapFlag';
 import type { CasterId, ControllerState } from '../../../shared/types';
 import type { DraftCmd, EngineState, ProducerCmd } from '../../../shared/engine';
 import type { WildcardState, WcDeskPanel, WcOp } from '../../../shared/wildcard';
-import { INTERVIEW_TITLES, matchName, realTeam, VETO_PRESETS, vetoRows, WC_IDS, wcResolve, GRAND_FINAL } from '../../../shared/wildcard';
+import { INTERVIEW_TITLES, matchName, realTeam, VETO_PRESETS, vetoMapFor, vetoRows, WC_IDS, wcResolve, GRAND_FINAL } from '../../../shared/wildcard';
 import { MAJOR_MAPS } from '../../../shared/maps';
 import { normHandle, teamPlayers } from '../../../shared/major';
 import { MODULES, type ModuleId, type SourceDef } from '../../../shared/registry';
@@ -327,6 +327,9 @@ function GraphicsModule({ x }: { x: Ctx }) {
   return (
     <>
       <Tag live>Map card (gameplay)</Tag>
+      {(() => { const g = x.st.showLive.game || 1, id = vetoMapFor(x.wc, g), mp = MAJOR_MAPS.find(m => m.id === id); return mp
+        ? <div className="mb-1"><Btn active onClick={() => x.run({ c: 'op-wc', op: { k: 'map-next' } }, `Map card from veto: map ${g}`)}><Flag id={mp.id} /> From veto: Map {g} · {mp.country}</Btn></div>
+        : <div className="mb-1 text-[11px] text-white/45">No veto pick for map {g} yet: pick by hand below.</div>; })()}
       <div className="flex flex-wrap gap-1">{MAJOR_MAPS.map(m => <Btn key={m.id} active={x.wc.map.id === m.id} onClick={() => x.run({ c: 'graphic', g: 'map-card', map: m.id }, `Map card ${m.country}`)}><Flag id={m.id} /> {m.country}</Btn>)}</div>
       <Tag live>Badges & popups</Tag>
       <div className="flex flex-wrap gap-1">

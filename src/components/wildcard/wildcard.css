@@ -816,3 +816,5 @@
 .wc .vt-name .vt-flag{display:block;margin-bottom:6px}
 .wc .vt-step b .vt-flag-s{margin-right:8px;vertical-align:-2px}
 .wc .pb-body h2 .pb-flag{margin-right:16px;vertical-align:middle;position:relative;top:-4px}
+.wc .mc .mc-pick{display:inline-flex;align-self:flex-start;width:max-content;align-items:center;gap:10px;margin-top:14px;padding:6px 14px;background:var(--mc,#ff6a13);color:#160A07;font:800 italic 18px 'WC Montserrat',sans-serif;text-transform:uppercase;letter-spacing:.04em}
+.wc .mc .mc-pick img{height:24px;width:auto}

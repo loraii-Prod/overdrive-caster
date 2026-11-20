@@ -43,7 +43,7 @@ import type { ClientMsg, QuickOp, Role, ServerMsg, WatchRequest } from '../share
 import { CASTER_IDS, SCREEN_IDS, type CasterId, type ContributorStatus, type ControllerState, type Preset, type Scene, type ScreenId, type Show } from '../shared/types';
 import { seasonOf } from '../shared/season';
 import { isMapId, majorMap } from '../shared/maps';
-import { GRAND_FINAL, sanitizeInterview, sanitizePb, sanitizeVeto, vetoApply, WC_IDS, matchName, realTeam, wcLogo, wcResolve, applyMatchOp, sanitizePick, demoEvent, diffEvents, isWcBackup, isWcId, mergeSheet, sanitizeIntro, sanitizeShowcase, sanitizeWildcard, sanitizeRosters, updateDone, wcSnapshot, type WcOp, type WcPop, type WcSheetRow } from '../shared/wildcard';
+import { GRAND_FINAL, sanitizeInterview, sanitizePb, sanitizeVeto, vetoApply, WC_IDS, matchName, realTeam, wcLogo, wcResolve, applyMatchOp, sanitizePick, demoEvent, diffEvents, isWcBackup, isWcId, mergeSheet, sanitizeIntro, sanitizeShowcase, sanitizeWildcard, sanitizeRosters, updateDone, wcSnapshot, type WcOp, type WcPop, type WcSheetRow, vetoMapFor } from '../shared/wildcard';
 
 interface Client {
   id: string;
@@ -539,7 +539,8 @@ export function createHub(server: Server) {
     matchEndCheck();
     if (castSync()) broadcastLive();
     const snap = wcSnapshot(db.wildcard);
-    if (popups) for (const e of diffEvents(wcSnap, snap)) wcPop(e);
+    // No popup for the match on stream: viewers are watching it (the scoreboard already shows its score).
+    if (popups) for (const e of diffEvents(wcSnap, snap)) if (e.id !== db.wildcard.cast) wcPop(e);
     wcSnap = snap;
     db.wildcard.rev = Date.now();
     save();
@@ -578,6 +579,12 @@ export function createHub(server: Server) {
       case 'interview': wc.interview = sanitizeInterview({ ...wc.interview, ...op.patch }); break;
       case 'pickem-reset': wc.pickem = {}; break;
       case 'booth': wc.booth = sanitizeWildcard({ ...wc, booth: op.slots }).booth; break;
+      case 'map-next': {
+        // The veto decides which map comes next: series map number = games played + 1 (castSync's show.game).
+        const id = vetoMapFor(wc, db.showLive.game || 1);
+        if (!id) return;
+        return wcOp({ k: 'map', id });
+      }
       case 'map': {
         // Plays the map card on the gameplay screen and names the map on the scoreboard.
         const mp = majorMap(op.id);
