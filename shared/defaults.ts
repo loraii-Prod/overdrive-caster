@@ -76,7 +76,7 @@ export function defaultShow(): Show {
     lineup: [],
     scheduleFromBracket: false,
     bracketView: 'full',
-    otherMatches: { enabled: true, intervalSec: 300, durationSec: 12 },
+    otherMatches: { enabled: false, intervalSec: 300, durationSec: 12 },
   };
 }
 

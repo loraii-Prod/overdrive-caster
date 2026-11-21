@@ -115,11 +115,12 @@ function SkinNextBox({ info, left, pos }: { info: NextMatchInfo; left: string | 
 // -------------------------------------------------------- Other matches popout
 
 /** A sheet match counts as "live elsewhere" once it has a score and isn't done/not-played. */
-function liveElsewhere(bnl: MatchData | null): { t1: string; t2: string; s1: string; s2: string; bracket: string }[] {
+function liveElsewhere(bnl: MatchData | null, cast: string | null): { t1: string; t2: string; s1: string; s2: string; bracket: string }[] {
   const matches = bnl?.sheet?.matches ?? [];
   const featured = bnl?.sheet?.featured;
+  // Only matches the sheet itself marks live: never a finished one, never the match on stream.
   return matches
-    .filter(m => m.id !== featured && m.status.toUpperCase() !== 'COMPLETED' && m.status.toLowerCase() !== 'not played' && (m.s1 || m.s2))
+    .filter(m => m.id !== featured && m.bracket !== cast && /^(live|ongoing|in progress)$/i.test(m.status.trim()) && (m.s1 || m.s2))
     .map(m => ({ t1: m.t1.name, t2: m.t2.name, s1: m.s1 || '0', s2: m.s2 || '0', bracket: m.bracket }));
 }
 
@@ -129,9 +130,9 @@ function liveElsewhere(bnl: MatchData | null): { t1: string; t2: string; s1: str
  * through whichever other sheet matches currently have a score (excludes the
  * match being watched).
  */
-export function OtherMatchPopout({ show, bnl }: { show: Show; bnl: MatchData | null }) {
+export function OtherMatchPopout({ show, bnl, cast = null }: { show: Show; bnl: MatchData | null; cast?: string | null }) {
   const cfg = show.otherMatches;
-  const matches = useMemo(() => liveElsewhere(bnl), [bnl]);
+  const matches = useMemo(() => liveElsewhere(bnl, cast), [bnl, cast]);
   const [i, setI] = useState(0);
   const [visible, setVisible] = useState(false);
   const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
