@@ -1,0 +1,15 @@
+team_id,team_name,seed,player1_id,player2_id,sub1_id,sub2_id,player1,player2,sub1,sub2,,player_id,player_name,nationality,,bracket_id,bracket_helper,bracket_side,round,slot,condition,origin,round_seed,,match_id,bracket_id,bracket_side,round,datetime,team1_id,team1_name,team2_id,team2_name,status,admin,best_of,end_condition,score_team1,score_team2,winner_id
+TEAM_0001,BIG,1,,,,,Granady,Massa,,,,,,,,,,,,,,,,,MATCH_0031,R1_UB1,winners,1,11/21/2026 15:00,TEAM_0001,BIG,TEAM_0012,rnboi,COMPLETED,,5,,3,1,TEAM_0001
+TEAM_0004,FUT x Heav,2,,,,,Nayko,Heav,,,,,,,,,,,,,,,,,MATCH_0032,R1_UB2,winners,1,11/21/2026 15:00,TEAM_0007,COOK,TEAM_0014,Ragnarok,COMPLETED,,5,,2,3,TEAM_0014
+TEAM_0009,Airwalkers,3,,,,,Stufts,Whizzy,,,,,,,,,,,,,,,,,MATCH_0033,R1_UB3,winners,1,11/21/2026 15:00,TEAM_0009,Airwalkers,TEAM_0006,NAVI x Joel,UPCOMING,,5,,,,
+TEAM_0007,COOK,4,,,,,L1ngo,Scrapie,,,,,,,,,,,,,,,,,MATCH_0034,R1_UB4,winners,1,11/21/2026 15:00,TEAM_0004,FUT x Heav,TEAM_0002,All Gamers,UPCOMING,,5,,,,
+TEAM_0006,NAVI x Joel,5,,,,,mime,eLconn21,,,,,,,,,,,,,,,,,MATCH_0035,R2_UB1,winners,2,11/21/2026 17:00,W R1_UB1,,W R1_UB2,,UPCOMING,,5,,,,
+TEAM_0014,Ragnarok,6,,,,,Epos,Melioo,,,,,,,,,,,,,,,,,MATCH_0036,R2_UB2,winners,2,11/21/2026 18:00,W R1_UB3,,W R1_UB4,,UPCOMING,,5,,,,
+TEAM_0002,All Gamers,7,,,,,Binkss,Gwen,,,,,,,,,,,,,,,,,MATCH_0037,R2_LB1,losers,2,11/21/2026 16:00,L R1_UB1,,L R1_UB2,,UPCOMING,,5,,,,
+TEAM_0012,rnboi,8,,,,,Walegen,NablaTM,,,,,,,,,,,,,,,,,MATCH_0038,R2_LB2,losers,2,11/21/2026 16:00,L R1_UB3,,L R1_UB4,,UPCOMING,,5,,,,
+,,,,,,,,,,,,,,,,,,,,,,,,,MATCH_0039,R3_UBF,winners,3,11/22/2026 17:00,W R2_UB1,,W R2_UB2,,UPCOMING,,5,,,,
+,,,,,,,,,,,,,,,,,,,,,,,,,MATCH_0040,R3_LB1,losers,3,11/22/2026 15:00,L R2_UB2,,W R2_LB1,,UPCOMING,,5,,,,
+,,,,,,,,,,,,,,,,,,,,,,,,,MATCH_0041,R3_LB2,losers,3,11/22/2026 15:00,L R2_UB1,,W R2_LB2,,UPCOMING,,5,,,,
+,,,,,,,,,,,,,,,,,,,,,,,,,MATCH_0042,R4_LBF,losers,4,11/22/2026 16:00,W R3_LB1,,W R3_LB2,,UPCOMING,,5,,,,
+,,,,,,,,,,,,,,,,,,,,,,,,,MATCH_0043,R5_CF,losers,5,11/22/2026 18:00,L R3_UBF,,W R4_LBF,,UPCOMING,,5,,,,
+,,,,,,,,,,,,,,,,,,,,,,,,,MATCH_0044,R6_GF,grandfinal,6,11/22/2026 19:00,W R3_UBF,,W R5_CF,,UPCOMING,,5,,,,

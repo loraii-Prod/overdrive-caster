@@ -104,8 +104,13 @@ export function parseEventTab(rows: string[][]) {
       });
     }
   }
+  // The Major data sheet (the one behind lavaaval.github.io/2026_overdrive_major) uses the sheet's own codes
+  // (R3_UBF, R4_LBF, R5_CF, R6_GF…): map them onto the app's Major ids. Only when those codes are present,
+  // because R2_LB1 etc. mean a different match in the app's own numbering.
+  if (matches.some(m => MAJOR_ONLY.has(m.bracket))) for (const m of matches) m.bracket = SHEET_MAJOR_IDS[m.bracket] ?? m.bracket;
   return { teams, players, matches };
 }
+const MAJOR_ONLY = new Set(['R3_UBF', 'R4_LBF', 'R5_CF', 'R6_GF']);
 
 /**
  * Major bracket tab ("26S3 Major" layout): one row per team slot, header row with
